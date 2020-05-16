@@ -11,7 +11,7 @@
 
 NAME = "Supa Simple AI Example"
 AUTHOR = 'CoolCat467'
-__version__ = '0.0.0'
+__version__ = '0.0.1'
 
 REGISTERED = True
 # Please send your finnished version of your AI to CoolCat467 at Github
@@ -113,11 +113,11 @@ def turn():
             # Get the data for that tile
             tileData = tiles[tileId]
             # If the tile's piece is one of ours,
-            if tileDict['piece'] in ('1', '3'):
+            if tileData['piece'] in ('1', '3'):
                 # If this our piece can make jumps,
-                if tileDict['jumps'][0]:
+                if tileData['jumps'][0]:
                     # Get the jumps the piece can make
-                    jumpsdict = tileDict['jumps'][1]
+                    jumpsdict = tileData['jumps'][1]
                     # Get the number of jumps each end point would make
                     v = [len(v) for v in list(jumpsdict.values())]
                     # Get the end point with the most jumps
@@ -126,7 +126,7 @@ def turn():
                     # with the number of jumps that moves makes
                     jumpTiles[max(v)] = [tileId, k]
                 # Get the moves our piece can make
-                moves = tileDict['moves']
+                moves = tileData['moves']
                 # If our piece can move,
                 if len(moves):
                     # Add it's moves to the dictonary of movable pieces at key of target tile id
