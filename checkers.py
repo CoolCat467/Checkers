@@ -25,32 +25,57 @@
 # .........
 # A1 ... H1
 
-from math import sqrt
-from pygame.locals import *
-import pygame
-
-from random import randint
 import os
+from random import randint
 from shutil import copyfile
+from math import sqrt
 
-from base2d import *
+# If pygame is not installed, install it
+try:
+    from pygame.locals import *
+    import pygame
+except ImportError:
+    print('Error: Pygame is not installed!', file=os.sys.stderr)
+    while True:
+        inp = input('Would you like to install pygame automatically? (y/n) : ').lower()
+        if inp in ('y', 'n'):
+            break
+        else:
+            print('Please enter a valid answer.')
+    if inp == 'y':
+        print('Attempting to automatically install pygame...')
+        out = system('pip3 install pygame --user')
+        if out == 0:
+            print('Pygame installed sucessfully!')
+            print('Please Restart the program')
+        else:
+            print('Something went wrong installing pygame.', file=os.sys.stderr)
+            inp = 'n'
+    if inp == 'n':
+        print('To manually install pygame, open your computer\'s command prompt/terminal/shell')
+        print('and type in the command "pip3 install pygame --user".')
+    input('Press Enter to Continue. ')
+    os.abort()
+
+try:
+    from base2d import *
+except ImportError:
+    print('Error: Base2D Module Not Found', file=os.sys.stderr)
+    print('''
+    Please download the Base2D Module found with the release of this
+    project and ensure it is in the same folder as this program,
+    and it\'s filename matches "base2d.py"''')
+    input('Press Enter to Continue. ')
+    os.abort()
 
 NAME = 'Checkers'
-__version__ = '0.0.1'
+__version__ = '0.0.2'
 
 SCREENSIZE = (640, 480)
 
 PICPATH = 'pic/'
-##SNDPATH = 'sound/'
 
 FPS = 60
-
-def showHitboxes(world):
-    """Make all entities show their hitbox (DEBUG COMMAND)"""
-    # For each entity in the world,
-    for entity in iter(world.entities.values()):
-        # Tell the entity to show it's hitbox
-        entity.showhitbox = True
 
 def blit_text(fontname, fontsize, text, color, xy, dest, middle=True):
     """Blit rendered text to dest with the font at fontsize colored color at x, y"""
@@ -78,17 +103,6 @@ class World(WorldBase):
         WorldBase.__init__(self)
         self.background = background.convert()
     
-##    def process(self, gamestate, time_passed):
-##        """Processes all entities in the world"""
-##        
-##        # For each entity, if it has the activegamestate attribute, make shure it matches the current game state 
-##        time_passed_secconds = time_passed / 1000
-##        for entity in list(self.entities.values()):
-##            if hasattr(entity, 'activegamestate'):
-##                if gamestate != entity.activegamestate:
-##                    continue
-##            entity.process(time_passed_secconds)
-##    
     def render(self, surface):
         """Draw the background and render all entities"""
         # Prepare surface for additions
@@ -149,7 +163,8 @@ class Cursor(GameEntity):
             w, h = self.carryimage.get_size()
             x -= w/2
             y -= h/2
-            surface.blit(self.carryimage, (x, y))
+            xy = int(x), int(y)
+            surface.blit(self.carryimage, xy)
     
     def getPressed(self):
         """Return True if the right mouse button is pressed"""
@@ -168,22 +183,10 @@ class Cursor(GameEntity):
         self.carrytile = tile
         self.carry(image)
     
-    def drop(self, targetTile):
+    def drop(self):
         """Drop the image we're carrying"""
-        if not self.carrytile is None:
-##            if not self.carrytile.board.tiles[targetTile].selected:
-##                return
-            # Get the tile who's piece we're carrying and tell the tile to move the piece to the target tile
-            moves = getMoves(self.carrytile.board, self.carrytile.piece, self.carrytile)
-            if targetTile in moves:
-                self.carrytile.move_piece(targetTile)
-                # After the tile has moved the piece, we shouldn't be carrying it anymore (lol)
-                self.carryimage = None
-            else:
-                self.carrytile.board.tiles[targetTile].selected = False
-        else:
-            #targetTile.selected = False
-            raise RuntimeError('Cannot drop an image to a target tile if not carrying an image!')
+        self.carrytile = None
+        self.carryimage = None
     pass
 
 class CursorStateFollowing(State):
@@ -226,9 +229,9 @@ def rmErrorXyChoords(xys):
     """Converts coords to string xy choordinate numbers and removes numbers less than ten and ''"""
     valid = []
     for xy in xys:
-        if xy == '' or (int(''.join(tostr(xy)))+10) < 10:
-            continue
-        valid.append(xy)
+        n = int(''.join(tostr(xy)))+10
+        if not (xy == '' or n < 10 or n > 99):
+            valid.append(xy)
     return valid
 
 def rmFromList(lst, thing=''):
@@ -248,7 +251,7 @@ def getTileFromCoords(coords, gameboard, replace=''):
 
 def getTilesFromCoords(choords, gameboard, replace=''):
     """Returns a list of tiles from the target gameboard based on xy coords and replaces blanks with ''"""
-    tiles = gameboard.getTiles('xy', choords)
+    tiles = gameboard.getTiles('xy', tuple(choords))
     for tile in tiles:
         if tile is None:
             tile = replace
@@ -350,10 +353,10 @@ def checkForWins(gameboard):
     # As far as we know, no one has won the game.
     winner = None
     # Get all the tiles pieces can be on, in this case black tiles
-    tiles = gameboard.getTiles('color', [0])
+    tiles = gameboard.tiles.values()
     # Set up piece count and number of plays count for each player
-    count = [0]*2
-    plays = [0]*2
+    count = [False]*2
+    plays = [False]*2
     # For each of the two players,
     for player in range(2):
         # Get that player's possible pieces
@@ -363,11 +366,12 @@ def checkForWins(gameboard):
             # If the tile's piece is one of the player's pieces,
             if tile.piece in playerPieces:
                 # Increment number of pieces for that player by one
-                count[player] += 1
+                count[player] = True
+                break
     # If a player has no pieces,
-    if 0 in count:
+    if False in count:
         # The other player wins
-        winner = (count.index(0) + 1) % 2
+        winner = (count.index(False) + 1) % 2
     else:
         # Otherwise, find out if either of the players can't move.
         # For each of the two players,
@@ -379,11 +383,13 @@ def checkForWins(gameboard):
                 # If the tile's piece is one of the player's pieces,
                 if tile.piece in playerPieces:
                     # Add the number of moves that piece can make to the number of possible plays
-                    plays[player] += len(getMoves(gameboard, tile.piece, tile))
+                    if len(getMoves(gameboard, tile.piece, tile)):
+                        plays[player] = True
+                        break
         # If a player has no plays,
-        if 0 in plays:
+        if False in plays:
             # The other player wins.
-            winner = (plays.index(0) + 1) % 2
+            winner = (plays.index(False) + 1) % 2
     # Return the player that won, or None
     return winner
 
@@ -410,6 +416,11 @@ class Tile(object):
         self.selected = False
         # We are not glowing
         self.glowing = False
+        # We don't know what the cursor's id is
+        self.cursor_id = None
+        # We don't know if we have any valid moves or jumps
+        self.moves = None
+        self.jumps = None
     
     def __repr__(self):
         return '<Tile %s %s %i %s>' % (self.id, str(self.location), self.color, str(self.xy))
@@ -423,14 +434,14 @@ class Tile(object):
         # Send this tile's piece
         send['piece'] = str(self.piece)
         # If we're an open tile,
-        if self.isOpen():
+        if self.isOpen() or self.moves is None:
             # We have no jumps or moves to send
             send['moves'] = []
             send['jumps'] = [[], {}]
         else:
             # Otherwise, send the jumps and moves our piece can make
-            send['moves'] = list(getMoves(self.board, self.piece, self))
-            send['jumps'] = list(getJumps(self.board, self.piece, self))
+            send['moves'] = list(self.moves)
+            send['jumps'] = list(self.jumps)
         # Send our xy position
         send['xy'] = tuple(self.xy)
         # Send our color value
@@ -442,14 +453,30 @@ class Tile(object):
     
     def getCursor(self):
         """Gets the cursor from the world and returns it"""
-        # Tell the world to find an entity with the name of 'cursor'
-        cursor = self.board.world.get_type('cursor')
-        # If the world found anything and there is at least one cursor entity,
-        if (not cursor is None) and len(cursor):
-            # Set what we should return to the first (and in regular cases the only) cursor entity
-            cursor = cursor[0]
+        # If the cursor's id has not been found,
+        if self.cursor_id is None:
+            # Tell the world to find an entity with the name of 'cursor'
+            cursor = self.board.world.get_type('cursor')
+            # If the world found anything and there is at least one cursor entity,
+            if len(cursor):
+                # Set what we should return to the first (and in regular cases the only) cursor entity
+                cursor = cursor[0]
+                if not cursor is None:
+                    self.cursor_id = cursor.id
+                    return cursor
+        else:
+            # If the cursor's id has been found, get the cursor from the world
+            cursor = self.board.world.get(self.cursor_id)
+            # If the cursor does not exist anymore/was moved to a different id,
+            if cursor is None:
+                # We no longer know the true id of the cursor
+                self.cursor_id = None
+                # Re-find the cursor
+                return self.getCursor()
+            else:
+                return cursor
         # Return None if the world didn't find any matches, and return the first cursor entity if the world did find anything
-        return cursor
+        return None
     
     def getPressed(self):
         """Return True if the cursor is over tile and right click down"""
@@ -474,68 +501,76 @@ class Tile(object):
         """Return True if tile is empty"""
         return self.piece is None
     
-    def setGlowingTiles(self, truefalse):
+    def setGlowingTiles(self, tf):
         """Sets the glowing state of tiles our piece can move to"""
-        # Get the tiles our piece can move to
-        tileids = getMoves(self.board, self.piece, self, mustopen=truefalse)
-        # Get the tiles
-        tiles = [self.board.tiles[tid] for tid in tileids]
-        # Make the tiles that our piece can move to glow
-        for tile in tiles:
-            tile.glowing = bool(truefalse)
+        if self.moves:
+            for tile in [self.board.tiles[tid] for tid in self.moves]:
+                tile.glowing = bool(tf)
     
+    def updateMoves(self):
+        """Update self.moves and self.jumps if either are equal to None"""
+        n = lambda x: x is None
+        if n(self.moves) or n(self.jumps):
+            if not self.isOpen(): 
+                self.moves = list(getMoves(self.board, self.piece, self))
+                self.jumps = getJumps(self.board, self.piece, self)
+            else:
+                self.moves = []
+                self.jumps = []
+        
     def process(self, time_passed):
         """Do stuff like tell the cursor to carry pieces and drop them and click time and crazyness"""
+        global board
+        board = self.board
+        # Find out if we've been pressed
+        pressed = self.getPressed()
         # Get the cursor
         cursor = self.getCursor()
-        if (self.piece is None) or (self.piece in ((1, 3), (0, 2), ())[self.board.playing]):
-            # If we are selected and haven't been clicked recently,
-            if self.getPressed() and not self.clickTime:
-                # Toggle selected
-                self.selected = not self.selected
-                # If the cursor exists,
-                if not cursor is None:
-                    # If we are now selected
-                    if self.selected:
-                        # If we have a piece on us
-                        if not self.isOpen():
-                            # If the cursor is not carrying a piece,
-                            if not cursor.isCarry():
-                                # Tell the cursor to carry our piece
-                                cursor.drag(self, self.board.pieceMap[self.piece])
-                                self.setGlowingTiles(True)
-                            else:
-                                # Otherwise, we shouldn't be selected
-                                self.selected = False
-                        else:
-                            # If we don't have a piece on us
-                            if not self.color:
-                                # If we are a black tile, tell the cursor to drop the piece it's carrying onto us
-                                if cursor.isCarry():
-                                    cursor.drop(self.id)
-                                else:
-                                    self.selected = False
-                            else:
-                                # If we are a red tile, we shouldn't be selected.
-                                self.selected = False
-                    else:# If we are now not selected,
-                        # If the cursor is carrying our piece and we've been un-selected, tell the cursor to give our piece back.
-                        if cursor.isCarry() and cursor.carrytile.id == self.id:
-                            cursor.carryimage = None
-                            cursor.carrytile = None
-                        # Get the tiles our piece could have moved to
-                        tileids = getMoves(self.board, self.piece, self, mustopen=False)
-                        # Get the tiles
-                        tiles = [self.board.tiles[tid] for tid in tileids]
-                        # Make the tiles that our piece could have moved to not glow anymore
-                        for tile in tiles:
-                            tile.glowing = False
-            else:
-                # If we have been clicked recently, decement the time variable that tells us we were clicked recently
-                self.clickTime = max(self.clickTime-time_passed, 0)
-            if self.getPressed():
-                # If we have been clicked just now, reset the time variable that tells us we've been clicked recently
-                self.clickTime = self.clickDelay
+        # Update moves and jumps lists
+        self.updateMoves()
+        # Process if we've been selected
+        # If we are selected and haven't been clicked recently,
+        if pressed and not self.clickTime and (self.isOpen() or self.piece in ([1, 3], [0, 2], [])[self.board.playing]):
+            # Toggle selected
+            self.selected = not self.selected
+            # If the cursor exists,
+            if not cursor is None:
+                # If we are now selected
+                if self.selected:
+                    # If we have a piece on us
+                    if not self.isOpen():
+                        # If the cursor is not carrying a piece,
+                        if not cursor.isCarry():
+                            # Tell the cursor to carry our piece
+                            cursor.drag(self, self.board.pieceMap[self.piece])
+                            # Get the tiles our piece can move to and make them glow
+                            self.setGlowingTiles(True)
+                        else:# If cursor is carrying a piece and have a piece
+                            # Otherwise, we shouldn't be selected
+                            self.selected = False
+                    else:# If we don't have a piece on us,
+                        # If we are a black tile, tell the cursor to drop the piece it's carrying onto us if it's carrying a piece
+                        if not self.color and cursor.isCarry():
+                            # If this move is a valid move,
+                            if self.id in cursor.carrytile.moves:
+                                # Set the valid tiles glowing effect to false
+                                cursor.carrytile.setGlowingTiles(False)
+                                # Move the piece
+                                cursor.carrytile.move_piece(self.id)
+                                # In either case, tell the cursor to drop it's image
+                                cursor.drop()
+                        self.selected = False
+                else:# If we are now not selected,
+                    # If the cursor is carrying our piece and we've been un-selected, tell the cursor to give our piece back.
+                    if cursor.isCarry() and cursor.carrytile.id == self.id:
+                        cursor.drop()
+                        self.setGlowingTiles(False)
+        else:
+            # If we have been clicked recently, decement the time variable that tells us we were clicked recently
+            self.clickTime = max(self.clickTime-time_passed, 0)
+        if pressed:
+            # If we have been clicked just now, reset the time variable that tells us we've been clicked recently
+            self.clickTime = self.clickDelay
     
     def isSelected(self):
         """Return True if we are selected"""
@@ -553,6 +588,8 @@ class Tile(object):
             if (pieceid == 0 and self.id[1] == '8') or (pieceid == 1 and self.id[1] == '1'):
                 # King that piece
                 pieceid += 2
+            # Clear any stray, random data still stored within us
+            self.clearMoves()
             # Put the piece on us
             self.piece = pieceid
     
@@ -560,17 +597,27 @@ class Tile(object):
         """Clear tile of any pieces"""
         # Delete any pieces that are on us.
         self.piece = None
+        # Clear piece information
+        self.clearMoves()
+    
+    def clearMoves(self):
+        """Clear the jumps and moves information"""
+        self.moves = None
+        self.jumps = None
+    
+    def reevaluateMoves(self):
+        """Called by the game board when moves should be re-evaluated"""
+        self.clearMoves()
+        self.updateMoves()
     
     def move_piece(self, tolocid):
         """Return true if successfully moved piece from self to target tile"""
         # Get the target tile from the game board
         target = self.board.tiles[tolocid]
         # If the target tile has no piece on it and it's a valid move,
-        if target.isOpen() and tolocid in getMoves(self.board, self.piece, self):
-            # Set the tiles the tile set to glowing back to false
-            self.setGlowingTiles(False)
+        if target.isOpen() and tolocid in self.moves:
             # Get the moves that are jumps and the dictionary that has jumped piece tile ids in it
-            jumpmoves, jumped = getJumps(self.board, self.piece, self)
+            jumpmoves, jumped = self.jumps
             # If the destination is a jump,
             if tolocid in jumpmoves:
                 # For each tile with a piece that got jumped in it,
@@ -586,8 +633,8 @@ class Tile(object):
             target.selected = False
             # Also set the target's glowing value to false if it was glowing
             target.glowing = False
-            # Toggle the playing value to the next player's turn
-            self.board.playing = (self.board.playing + 1) % 2
+            # Tell the board that the current player's turn is over
+            self.board.turnOver()
     pass
 
 class GameBoard(GameEntity):
@@ -672,13 +719,6 @@ class GameBoard(GameEntity):
     
     def genTileSurf(self, color, size):
         """Generate the image used for a tile"""
-##        surf = pygame.Surface(toint(size))
-##        surf.fill(BLACK)
-##        inside = roundall(amol(toint(size), m=0.95))
-##        inside_surf = pygame.Surface(inside)
-##        inside_surf.fill(color)
-##        pos = roundall(Vector2(*toint(size)) - Vector2(*inside))
-##        surf.blit(inside_surf, pos)
         # Make a blank surface of the size we're given
         surf = pygame.Surface(toint(size))
         # Fill the blank surface with the color given
@@ -690,10 +730,8 @@ class GameBoard(GameEntity):
         """Add an outline of a given color to a surface"""
         # Get the size of the surface
         w, h = surface.get_size()
-        # Make a blank surface of that size
-        surf = pygame.Surface((w, h))
-        # Replace all color on the image with yellow and blit it to the blank surface
-        surf.blit(replaceWithColor(surface, color), (0, 0))
+        # Replace all color on the image with the color
+        surf = replaceWithColor(surface, color)
         # Get 90% of the width and height
         inside = roundall(amol([w, h], m=0.90))
         # Make the surface be 90% of it's size
@@ -701,7 +739,7 @@ class GameBoard(GameEntity):
         # Get the proper position the modified image should be at
         pos = amol(list(Vector2(w, h) - Vector2(*inside)), d=2)
         # Add the modified image to the correct location
-        surf.blit(inside_surf, pos)
+        surf.blit(inside_surf, toint(pos))
         # Return image with yellow outline
         return surf
     
@@ -744,6 +782,7 @@ class GameBoard(GameEntity):
             if hasattr(tile, by) and getattr(tile, by) == value:
                 # If it's a match, return that tile
                 return tile
+        # Otherwise return None
         return None
     
     def getTiles(self, by, values):
@@ -759,6 +798,7 @@ class GameBoard(GameEntity):
         if matches:
             # Return all tiles that matched our query
             return matches
+        # Otherwise return None in a list
         return [None]
     
     def genBoardSurf(self):
@@ -805,12 +845,20 @@ class GameBoard(GameEntity):
         zero = self.location - Vector2(*amol(self.image.get_size(), d=2))
         # and return the given location minus zero zero to get tile location data
         return Vector2(*location) - zero
+    
+    def turnOver(self):
+        """Called when a tile wishes to communicate that the current player's turn is over"""
+        # Toggle the active player
+        self.playing = (self.playing + 1) % 2
+        # Tell all tiles to re-evaluate their move information
+        for tile in iter(self.tiles.values()):
+            tile.reevaluateMoves()
     pass
 
 def showWin(valdisplay):
     """Called when the value display requests text to render"""
     # Get the board
-    boards = world.get_type('board')
+    boards = valdisplay.world.get_type('board')
     if len(boards):
         board = boards[0]
     else:
@@ -855,37 +903,16 @@ class Button(BaseButton):
         # Do regular button processing
         BaseButton.process(self, time_passed)
         # Get the game board
-        boards = world.get_type('board')
+        boards = self.world.get_type('board')
         if len(boards):
             board = boards[0]
             # Show if the game has been won
             self.show = not board.won is None
     pass
 
-##def soundEffect(name, priority=0, endevent=None, volume=1):
-##    """Play a sound on the SFX channel"""
-##    global SFX
-##    global SFX_PRIORITY
-##    if DO_EFKS and (name in SOUNDS.keys()):
-##        if (not SFX.get_busy()) or (SFX_PRIORITY < priority):
-##            SFX_PRIORITY = priority
-##            if SFX.get_busy():
-##                SFX.stop()
-####            if SFX.get_busy():
-####                SFX.fadeout(0.1)
-####            while SFX.get_busy():
-####                clock.tick(0.01)
-##            if endevent is None:
-##                SFX.set_endevent()
-##            else:
-##                SFX.set_endevent(endevent)
-##            sound = pygame.mixer.Sound(SOUNDS[name])
-##            sound.set_volume(volume)
-##            SFX.play(sound)
-
 def backPressed(button):
     """This function is called when the back buttons is pressed"""
-    boards = world.get_type('board')
+    boards = button.world.get_type('board')
     # Get the game board from the world
     if len(boards):
         board = boards[0]
@@ -904,19 +931,15 @@ def genButton(text, size):
     blit_text('VeraSerif.ttf', size, text, GREEN, xy, buttonimage)
     return buttonimage
 
-def aiPlay(targetTileid, toTileId):
+def aiPlay(targetTileid, toTileId, board):
     """Does pretty much everything that tiles and the cursor do to move a piece combined without visuals"""
-    boards = world.get_type('board')
-    if len(boards):
-        board = boards[0]
-        targetTile = board.tiles[targetTileid]
-        toTile = board.tiles[toTileId]
-        if targetTile.piece in (1, 3) and toTile.isOpen():
-            if not toTile.color:
-                moves = getMoves(board, targetTile.piece, targetTile)
-                if toTileId in moves:
-                    targetTile.move_piece(toTileId)
-                    return True
+    targetTile = board.tiles[targetTileid]
+    toTile = board.tiles[toTileId]
+    if targetTile.piece in (1, 3) and toTile.isOpen():
+        if not toTile.color:
+            if toTileId in targetTile.moves:
+                targetTile.move_piece(toTileId)
+                return True
     return False
 
 def loadAI(name):
@@ -925,7 +948,8 @@ def loadAI(name):
         copyfile(name+'.py', 'temp.py')
         global AI
         import temp as AI
-        AI.init()
+        if hasattr(AI, 'init'):
+            AI.init()
 
 def findAis():
     """Returns the filename without the '.py' extention of any python files with 'AI' in their filename"""
@@ -965,34 +989,23 @@ def run():
     print(NAME+' '+__version__)
     computer = playAi()
     # Set up globals
-    global world
-    global IMAGES
-    global SOUNDS
-    global DO_EFKS
-    global DO_MUSIC
-    global SFX
-    global clock
-    global PLAYERS
-##    # Initialize the 44KHz 16-bit stereo sound 44100 22050 
-##    pygame.mixer.pre_init(44100, -16, 2, 4096)
-    # Initialize everything else
+    global IMAGES, SOUNDS, PLAYERS
+    # Initialize Pygame
     pygame.init()
     
     # Set up the screen
-    screen = pygame.display.set_mode(SCREENSIZE, 0, 32)
+    screen = pygame.display.set_mode(SCREENSIZE, 0, 16)
     pygame.display.set_caption(NAME+' '+__version__)
     
     # Set up the FPS clock
     clock = pygame.time.Clock()
     
-    # Get the program path, and use it to find the picture path and sound path
+    # Get the program path, and use it to find the picture path
     PROGPATH = os.path.split(os.sys.argv[0])[0]
     picpath = os.path.join(PROGPATH, PICPATH)
-##    sndpath = os.path.join(PROGPATH, SNDPATH)
     
-    # Get all picture and sound filenames
+    # Get all picture filenames
     pics = os.listdir(picpath)
-##    snds = os.listdir(sndpath)
     
     # Create a dictionary containing the image surfaces
     IMAGES = {}
@@ -1000,17 +1013,6 @@ def run():
         name = picname.split('.png')[0]
         image = pygame.image.load(picpath+picname).convert_alpha()
         IMAGES[name] = scale_surf(image, 0.25)
-    
-##    # Create a dictionary containing the sound filenames
-##    SOUNDS = {}
-##    for sndname in snds:
-##        name = sndname.split('.wav')[0]
-##        data = sndpath+sndname
-##        SOUNDS[name] = data
-    
-    # Remove this from final, but now it is a good way to see everything    
-##    print(IMAGES.keys())
-##    print(SOUNDS.keys())
     
     # Get any additional images
     background = pygame.Surface(SCREENSIZE)
@@ -1037,23 +1039,7 @@ def run():
     world.add_entity(ValDisplay(world, 'VeraSerif.ttf', 60, showWin, location=amol(SCREENSIZE, d=2), color=GREEN, renderPriority=5))
     world.add_entity(Button(world, backAnim, 'cursor', backPressed, states=1, location=Vector2(*amol(SCREENSIZE, d=2))+Vector2(0, 80)))
     
-##    # Set up music
-##    #pygame.mixer.music.load(SOUNDS['eggs'])
-    
-##    # Set up the sfx channel
-##    SFX = pygame.mixer.Channel(1)
-    
-##    # Set additional events
-##    GAME_PAUSE = USEREVENT + 2
-##    GAME_OVER = USEREVENT + 3
-##    MUSIC_END = USEREVENT + 1#This event is sent when a music track ends
-    
-##    # Set music end to actually do the thing
-##    pygame.mixer.music.set_endevent(MUSIC_END)
-    
-    # Set up some important stuff
-##    do_render = True
-##    DO_MUSIC = True
+    # System is running
     RUNNING = True
     
     # While the game is active
@@ -1062,44 +1048,33 @@ def run():
         for event in pygame.event.get():
             if event.type == QUIT:
                 RUNNING = False
-                computer = False
-##            if event.type == KEYDOWN:
-##                 if event.key == K_SPACE:
-##                    do_render = not do_render
-##                    print('Render = '+str(do_render))
-##            if event.type == MUSIC_END:
-##                # If the music track has ended, restart it
-##                if DO_MUSIC:
-##                    pygame.mixer.music.rewind()
-##                    pygame.mixer.music.play()        
         
+        # Update the FPS clock and get how much time elapsed since the last frame
         time_passed = clock.tick(FPS)
         
         # Process entities
         world.process(time_passed)
         
-##        if do_render:
         # Render the world to the screen
         world.render(screen)
         
         # If we are playing against a computer,
-        if computer:
+        if computer and RUNNING:
             # Get the game board from the world
             boards = world.get_type('board')
-            # If there are game board(s)
+            # If there are game board(s) the world found,
             if len(boards):
                 # Get the first one
                 board = boards[0]
-                # If it is the black player's turn it's the AI
+                # If it's the black player's turn (AI if playing one),
                 if not board.playing:
-##                    target = input()
-##                    dest = input()
                     # Send board data to the AI
                     AI.update(board.getData())
                     # Get the target piece id and destination piece id from the AI
                     target, dest = AI.turn()
                     # Play play the target piece id to the destination tile id
-                    success = aiPlay(str(target), str(dest))
+                    # on the game board
+                    success = aiPlay(str(target), str(dest), board)
         
         # Update the display
         pygame.display.update()
