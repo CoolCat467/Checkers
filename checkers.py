@@ -69,7 +69,7 @@ except ImportError:
     os.abort()
 
 NAME = 'Checkers'
-__version__ = '0.0.3'
+__version__ = '0.0.4'
 
 SCREENSIZE = (640, 480)
 
@@ -919,6 +919,7 @@ class Button(BaseButton):
 
 def backPressed(button):
     """This function is called when the back buttons is pressed"""
+    global RUNNING
     boards = button.world.get_type('board')
     # Get the game board from the world
     if len(boards):
@@ -929,6 +930,8 @@ def backPressed(button):
             board.genTiles()# Reset all tiles to defaults
             board.won = None# No one has won
             board.playing = randint(0, 1)# Player who can play now is random
+        if not button.doReset:
+            RUNNING = False
 
 def genButton(text, size):
     """Generates a button surface by rendering text with size onto the base button image"""
@@ -940,23 +943,38 @@ def genButton(text, size):
 
 def aiPlay(targetTileid, toTileId, board):
     """Does pretty much everything that tiles and the cursor do to move a piece combined without visuals"""
+    # If the target tile id or destination tile id is not valid, return False
+    if (not targetTileid in board.tiles) or (not toTileId in board.tiles):
+        return False
+    # Get the target tile from the game board
     targetTile = board.tiles[targetTileid]
+    # Get the destination tile from the game board
     toTile = board.tiles[toTileId]
-    if targetTile.piece in (1, 3) and toTile.isOpen():
-        if not toTile.color:
+    # If the target's piece is one of the black team's pieces,
+    if targetTile.piece in (1, 3):
+        # If the destination tile is a playable tile,
+        if not toTile.color and toTile.isOpen():
+            # If the destination tile id is one of the target tile's valid moves,
             if toTileId in targetTile.moves:
+                # Move the target piece to the destination
                 targetTile.move_piece(toTileId)
+                # Return True
                 return True
     return False
 
 def loadAI(name):
     """Copys the module name + '.py' to 'temp.py' and imports it as AI and calls AI.init()"""
     global aiData
+    # If the ai name is valid,
     if name in findAis():
+        # Copy the ai's file to a temporary file
         copyfile(name+'.py', 'temp.py')
         global AI
+        # Import the temporary file as the AI
         import temp as AI
+        # If the AI has an init command,
         if hasattr(AI, 'init'):
+            # Run it and get any special options the AI wants to run.
             aiData = AI.init()
         else:
             aiData = None
@@ -964,9 +982,13 @@ def loadAI(name):
 def findAis():
     """Returns the filename without the '.py' extention of any python files with 'AI' in their filename"""
     ais = []
+    # For each filename in the current directory,
     for filename in os.listdir(os.getcwd()):
-        if '.py' in filename and 'AI' in filename:
-            ais.append(''.join(filename.split('.py')))
+        # If it's a python file and the word 'AI' is in it's filename,
+        if filename.endswith('.py') and 'AI' in filename:
+            # Add the filename without the exention to the list of ais
+            ais.append(filename.split('.py')[0])
+    # Return all the AI filenames we found
     return ais
 
 def playAi():
@@ -999,7 +1021,7 @@ def run():
     print(NAME+' '+__version__)
     computer = playAi()
     # Set up globals
-    global IMAGES, PLAYERS, aiData
+    global IMAGES, PLAYERS, aiData, RUNNING
     # Initialize Pygame
     pygame.init()
     
@@ -1059,7 +1081,9 @@ def run():
         if 'starting_turn' in keys:
             world.get_type('board')[0].playing = int(aiData['starting_turn'])
         if 'must_quit' in keys:
-            world.get_type('button')[0].doReset = bool(aiData['must_quit'])
+            world.get_type('button')[0].doReset = not bool(aiData['must_quit'])
+    
+    aihasbeentoldgameiswon = False
     
     # System is running
     RUNNING = True
@@ -1081,7 +1105,7 @@ def run():
         world.render(screen)
         
         # If we are playing against a computer,
-        if computer and RUNNING:
+        if computer:
             # Get the game board from the world
             boards = world.get_type('board')
             # If there are game board(s) the world found,
@@ -1090,6 +1114,9 @@ def run():
                 board = boards[0]
                 # If it's the AI's turn,
                 if board.playing == 0:
+                    # Reset game is won tracker since presumabley a new game has started
+                    if aihasbeentoldgameiswon:
+                        aihasbeentoldgameiswon = False
                     # Send board data to the AI
                     AI.update(board.getData())
                     # Get the target piece id and destination piece id from the AI
@@ -1102,19 +1129,24 @@ def run():
                             success = aiPlay(str(target), str(dest), board)
                             if hasattr(AI, 'turnSuccess'):
                                 AI.turnSuccess(bool(success))
-                        else:
-                            print('AI Played None. Still AI\'s Turn.')
+##                        else:
+##                            print('AI Played None. Still AI\'s Turn.')
                     else:
                         # THIS IS IN NO WAY AN EXUSE TO EXIT IF YOUR
                         # AI CALCULATES IT CANNOT WIN! THIS IS FOR EMERGENCY
                         # PURPOSES ONLY!
                         print('AI wishes to hault execution. Exiting game.')
                         RUNNING = False
-        
+                elif board.playing == 2 and not aihasbeentoldgameiswon:
+                    # If the game has been won, tell the AI about it
+                    AI.update(board.getData())
+                    aihasbeentoldgameiswon = True
         # Update the display
         pygame.display.update()
     pygame.quit()
+    # If we have an AI going and it has the stop function,
     if computer and hasattr(AI, 'stop'):
+        # Tell the AI to stop
         AI.stop()
 
 if __name__ == '__main__':

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-# Server for the two hacky NOT AI clients
+# Server for two hacky NOT AI clients
 # -*- coding: utf-8 -*-
 
-import os
-import socket
-import time
+NAME = 'Checkers Socket Server'
+AUTHOR = 'CoolCat467'
+__version__ = '0.0.1'
+
+import os, socket, time
 from threading import Thread, Event
 
 # Taken from WOOF (Web Offer One File) by Simon Budig
@@ -37,7 +39,7 @@ BUFSIZE = 1040
 MAXCONNS = 2
 
 class Client(Thread):
-    """Client handling, given the socket, address, a name to use, a wait event, and chat data."""
+    """Client handling, given the socket, address, a name to use, and chat data."""
     def __init__(self, socket, address, name, chatData):
         Thread.__init__(self)
         self.sock = socket
@@ -51,30 +53,49 @@ class Client(Thread):
         self.start()
     
     def run(self):
+        # We are now active
         self.active = True
+        # While we remain active,
         while self.active:
+            # Try to recive data from our socket
             try:
                 self.recvData = self.sock.recv(BUFSIZE)
-            except OSError as e:
+            except OSError:
+                # If there was an error, we are inactive and
+                # we tell the server our client left
                 self.data.append([self.name, '[S] bye'])
                 self.active = False
             else:
+                # Otherwise, make sure the message isn't blank and
+                # ensure the server is still running.
                 if not self.recvData or self.recvData == b'' or closeWaitEvent.is_set():
+                    # If that did happen, tell the server our client left
+                    # and we are no longer active.
                     self.data.append([self.name, '[S] bye'])
                     self.active = False
                 else:
+                    # If everything went as planned,
+                    # split the recieved message decoded by it's semicolons,
+                    # which are used to seperate messages, and add the messages
+                    # to the list we were told when we were initialised.
                     for i in self.recvData.decode('utf-8').split(';'):
                         self.data.append([self.name, i])
+            # Update the last time we recieved a message (used by clientTimer threads)
             self.lastMsg = float(time.time())
+        # If we are inactive, close our socket.
         self.sock.close()
         print('Client Connection Terminated', file=os.sys.stderr)
     
     def send_all(self, data):
+        """Send data to client using supplied socket"""
+        # If we are active,
         if self.active:
+            # Use our socket to send all of the data
             self.sock.sendall(data)
     pass
 
 class ClientTimer(Thread):
+    """ClientTimer Thread: Uses given clients dict, clientId, a wakeup time, and a wakeup message to re-sync clients."""
     def __init__(self, clients, clientId, waitTime, wakeupMsg=''):
         Thread.__init__(self)
         self.clients = clients
@@ -85,28 +106,42 @@ class ClientTimer(Thread):
         self.start()
     
     def run(self):
-        if self.cid in self.clients:
+        # If our given client id is in the clients dictionary,
+        if self.cid in self.clients.keys():
+            # Get our client we're working for.
             client = self.clients[self.cid]
         else:
+            # Otherwise, exit.
             print('Server: ClientTimer: Error: Client Id is Invalid', file=os.sys.stderr)
             return
+        # While our client is active,
         while client.active:
+            # Get the elapsed time from their last message to now.
             elapsedTime = float(time.time()) - client.lastMsg
+            # If the elaped time is over our timer value,
             if elapsedTime >= self.timer:
+                # If the client should be woken up,
                 if self.wakeup:
+                    # Try to send our client it's wake up message
                     try:
                         print('Server: ClientTimer: Timer over; Sent "%i" Wakeup Message.' % self.cid)
                         client.send_all(self.msg)
                     except OSError:
+                        # If anything goes wrong, try again in half a seccond
                         print('Server: ClientTimer: Error Occored when sending "%i" wakeup message' % self.cid, file=os.sys.stderr)
                         time.sleep(0.5)
                     else:
+                        # If it worked, set our clients last message time to
+                        # right now.
                         client.lastMsg = float(time.time())
                 else:
+                    # If the client should not be woken up, close our client's socket.
                     print('Server: ClientTimer: No Message, Closing Client Socket.')
                     client.sock.close()
             else:
+                # If the timer has not been tripped, sleep for one seccond.
                 time.sleep(1)
+        # Once our client is inactive, we can rest forever.
         print('Server: ClientTimer: Client is Inactive, exiting')
     pass
 
@@ -126,11 +161,10 @@ def getServer():
     return s
 
 def run():
-    global clients
-    global closeWaitEvent
-    global serversocket
-    global chatData
+    global clients, closeWaitEvent, serversocket, chatData
+    # We have no clients currently
     clients = {}
+    # Initalize close event
     closeWaitEvent = Event()
     # Set up a list to hold chat data
     chatData = []
@@ -141,7 +175,7 @@ def run():
     print('Server: Server and running on', ip_addr)
     print('Server: Awaiting %i connections.' % MAXCONNS)
     
-    # Server should only permit a certain number of connections; No more, no less
+    # Server should only permit a certain number of connections; No more, no less.
     cid = 0
     idToAddr = {}
     # While there are spots to be filled,
@@ -181,29 +215,37 @@ def run():
                 messages = [i[1]+';' for i in chatData]
                 # Get the "To" address lines from each message
                 to_ids = [m.split(' ')[0][1:-1] for m in messages]
+                # Get all the different words used for each message
                 words = sum([i.split(' ') for i in sum([i.lower().split(';') for i in messages], [])], [])
+                # We should not close.
                 close = False
                 # If there are messages addressed to server,
                 if 'S' in to_ids:
+                    # For each message's index,
                     for idx in range(len(to_ids)):
+                        # If the "to" address is Server,
                         if to_ids[idx] == 'S':
                             # Get the server message
                             srvrmsg = messages[idx]
+                            # Get the message list
                             msglst = [i for i in sum([i.split(' ') for i in srvrmsg.split(';')], [])]
-                            # If the message contains the word 'bye',
+                            # If the message is a valid wake up command,
                             if len(msglst) >= 3 and msglst[1].lower() == 'wakeup' and msglst[2].isnumeric():
                                 print('Server: Starting Wakeup Thread for Client "%s"' % chatData[idx][0]) 
+                                # Start a wake up thread for that client
                                 cid = int(chatData[idx][0])
                                 wait, wkupmsg = float(msglst[2]), ' '.join(msglst[3:-1])
                                 ClientTimer(clients, cid, wait, wkupmsg)
-                    if close:
-                        break
+                # If a message contains the word 'bye',
                 if 'bye' in words:
                     # Close the server.
                     print("Server: Client said 'bye'. Closing server.")
                     close = True
+                
+                # If we are to close the server, exit the loop.
+                if close:
                     break
-
+                
                 # For each client,
                 for client in iter(clients.values()):
                     # Get the client's id
