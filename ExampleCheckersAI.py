@@ -151,8 +151,21 @@ def turn():
             destination = jumpTiles[select][1]
         # Tell the game about our decision
         return target, destination
-    # Otherwise, send random stuff that's not even valid lol 
-    return 'A1', 'B2'
+    # Otherwise, send that we don't know what to do. 
+    return None
+    # In extreme cases, it may be necessary to quit the game,
+    # for example, if your AI connects to the internet in some way.
+    # In this case, you can also return 'QUIT', but PLEASE,
+    # ONLY USE THIS IF IT IS TRULY NECESSARY
+
+def turnSuccess(tf):
+    """This function is called immidiately after the ai's play is made, telling it if it was successfull or not"""
+    if not tf:
+        print('AI: Something went wrong playing move...')
+
+def stop():
+    """This function is called immidiately after the game's window is closed"""
+    pass
 
 def init():
     """This function is called immidiately after the game imports the AI"""

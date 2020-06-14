@@ -69,7 +69,7 @@ except ImportError:
     os.abort()
 
 NAME = 'Checkers'
-__version__ = '0.0.2'
+__version__ = '0.0.3'
 
 SCREENSIZE = (640, 480)
 
@@ -520,8 +520,6 @@ class Tile(object):
         
     def process(self, time_passed):
         """Do stuff like tell the cursor to carry pieces and drop them and click time and crazyness"""
-        global board
-        board = self.board
         # Find out if we've been pressed
         pressed = self.getPressed()
         # Get the cursor
@@ -836,7 +834,8 @@ class GameBoard(GameEntity):
                     surf.blit(piece, tile.location)
                 # Blit the id of the tile at the tile's location
                 #value = int(''.join(tostr(tile.xy)))+10
-                #blit_text('VeraSerif.ttf', 20, value, GREEN, tile.location, surf, False)
+##                value = tile.id
+##                blit_text('VeraSerif.ttf', 20, value, GREEN, tile.location, surf, False)
         return surf
     
     def convertLoc(self, location):
@@ -898,6 +897,11 @@ class ValDisplay(GameEntity):
 
 class Button(BaseButton):
     """Button that only shows when a player has won the game"""
+    def __init__(self, world, anim, trigger, action, states=0, **kwargs):
+        BaseButton.__init__(self, world, anim, trigger, action, states, **kwargs)
+        self.doReset = True
+        self.animFlip = False
+    
     def process(self, time_passed):
         """Does regular button processing AND makes it so button only shows when the game has been won"""
         # Do regular button processing
@@ -908,6 +912,9 @@ class Button(BaseButton):
             board = boards[0]
             # Show if the game has been won
             self.show = not board.won is None
+        if not self.doReset and not self.animFlip:
+            self.anim = [i for i in reversed(self.anim)]
+            self.animFlip = True
     pass
 
 def backPressed(button):
@@ -917,7 +924,7 @@ def backPressed(button):
     if len(boards):
         board = boards[0]
         # If the game is won and this button is pressed,
-        if not board.won is None:
+        if not board.won is None and button.doReset:
             # Reset the game board
             board.genTiles()# Reset all tiles to defaults
             board.won = None# No one has won
@@ -944,12 +951,15 @@ def aiPlay(targetTileid, toTileId, board):
 
 def loadAI(name):
     """Copys the module name + '.py' to 'temp.py' and imports it as AI and calls AI.init()"""
+    global aiData
     if name in findAis():
         copyfile(name+'.py', 'temp.py')
         global AI
         import temp as AI
         if hasattr(AI, 'init'):
-            AI.init()
+            aiData = AI.init()
+        else:
+            aiData = None
 
 def findAis():
     """Returns the filename without the '.py' extention of any python files with 'AI' in their filename"""
@@ -989,7 +999,7 @@ def run():
     print(NAME+' '+__version__)
     computer = playAi()
     # Set up globals
-    global IMAGES, SOUNDS, PLAYERS
+    global IMAGES, PLAYERS, aiData
     # Initialize Pygame
     pygame.init()
     
@@ -1019,7 +1029,7 @@ def run():
     background.fill(WHITE)
     
     # Define animations
-    backAnim = [genButton('Play Again', 35)]
+    backAnim = [genButton('Play Again', 35), genButton('Quit Game', 35)]
     
     # Set up the world
     world = World(background)
@@ -1027,6 +1037,11 @@ def run():
     # Set up players
     if computer:
         PLAYERS = ['Player', 'Computer']
+        if aiData and hasattr(aiData, 'keys'):
+            keys = aiData.keys()
+            if 'player_names' in keys:
+                if len(aiData['player_names']) == 2:
+                    PLAYERS = tostr(list(aiData['player_names']))
     else:
         PLAYERS = ['Red Player', 'Black Player']
     
@@ -1038,6 +1053,13 @@ def run():
     world.add_entity(GameBoard(world, [8]*2, 45, location=amol(SCREENSIZE, d=2)))
     world.add_entity(ValDisplay(world, 'VeraSerif.ttf', 60, showWin, location=amol(SCREENSIZE, d=2), color=GREEN, renderPriority=5))
     world.add_entity(Button(world, backAnim, 'cursor', backPressed, states=1, location=Vector2(*amol(SCREENSIZE, d=2))+Vector2(0, 80)))
+    
+    if computer and hasattr(aiData, 'keys'):
+        keys = aiData.keys()
+        if 'starting_turn' in keys:
+            world.get_type('board')[0].playing = int(aiData['starting_turn'])
+        if 'must_quit' in keys:
+            world.get_type('button')[0].doReset = bool(aiData['must_quit'])
     
     # System is running
     RUNNING = True
@@ -1066,19 +1088,34 @@ def run():
             if len(boards):
                 # Get the first one
                 board = boards[0]
-                # If it's the black player's turn (AI if playing one),
-                if not board.playing:
+                # If it's the AI's turn,
+                if board.playing == 0:
                     # Send board data to the AI
                     AI.update(board.getData())
                     # Get the target piece id and destination piece id from the AI
-                    target, dest = AI.turn()
-                    # Play play the target piece id to the destination tile id
-                    # on the game board
-                    success = aiPlay(str(target), str(dest), board)
+                    recData = AI.turn()
+                    if not recData == 'QUIT':
+                        if not recData is None:
+                            target, dest = recData
+                            # Play play the target piece id to the destination tile id
+                            # on the game board
+                            success = aiPlay(str(target), str(dest), board)
+                            if hasattr(AI, 'turnSuccess'):
+                                AI.turnSuccess(bool(success))
+                        else:
+                            print('AI Played None. Still AI\'s Turn.')
+                    else:
+                        # THIS IS IN NO WAY AN EXUSE TO EXIT IF YOUR
+                        # AI CALCULATES IT CANNOT WIN! THIS IS FOR EMERGENCY
+                        # PURPOSES ONLY!
+                        print('AI wishes to hault execution. Exiting game.')
+                        RUNNING = False
         
         # Update the display
         pygame.display.update()
     pygame.quit()
+    if computer and hasattr(AI, 'stop'):
+        AI.stop()
 
 if __name__ == '__main__':
     # If we're not imported as a module, run.
