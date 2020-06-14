@@ -44,7 +44,7 @@ except ImportError:
             print('Please enter a valid answer.')
     if inp == 'y':
         print('Attempting to automatically install pygame...')
-        out = system('pip3 install pygame --user')
+        out = os.system('pip3 install pygame --user')
         if out == 0:
             print('Pygame installed sucessfully!')
             print('Please Restart the program')
