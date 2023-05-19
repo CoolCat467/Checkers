@@ -1188,7 +1188,7 @@ def run() -> None:
         )
     )
 
-    if computer and hasattr(aiData, "keys"):
+    if computer and isinstance(aiData, dict):
         keys = aiData.keys()
         if "starting_turn" in keys:
             world.get_type("board")[0].playing = int(aiData["starting_turn"])

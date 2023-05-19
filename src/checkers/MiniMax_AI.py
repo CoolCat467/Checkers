@@ -19,77 +19,6 @@ from minimax import Minimax, MinimaxResult, Player
 
 T = TypeVar("T")
 
-##    # Below is an example of empty board data that would be sent with an empty board to this ai
-##    emptyboard_data = {'boardsize': (8, 8),
-##                      'won': 'None',
-##                      'tiles': {
-##                          'A8': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (0, 0), 'color': 0},
-##                          'B8': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (1, 0), 'color': 1},
-##                          'C8': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (2, 0), 'color': 0},
-##                          'D8': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (3, 0), 'color': 1},
-##                          'E8': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (4, 0), 'color': 0},
-##                          'F8': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (5, 0), 'color': 1},
-##                          'G8': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (6, 0), 'color': 0},
-##                          'H8': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (7, 0), 'color': 1},
-##                          'A7': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (0, 1), 'color': 1},
-##                          'B7': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (1, 1), 'color': 0},
-##                          'C7': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (2, 1), 'color': 1},
-##                          'D7': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (3, 1), 'color': 0},
-##                          'E7': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (4, 1), 'color': 1},
-##                          'F7': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (5, 1), 'color': 0},
-##                          'G7': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (6, 1), 'color': 1},
-##                          'H7': {'open': False, 'piece': '1', 'moves': [], 'jumps': [[], {}], 'xy': (7, 1), 'color': 0},
-##                          'A6': {'open': False, 'piece': '1', 'moves': ['B5'], 'jumps': [[], {}], 'xy': (0, 2), 'color': 0},
-##                          'B6': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (1, 2), 'color': 1},
-##                          'C6': {'open': False, 'piece': '1', 'moves': ['B5', 'D5'], 'jumps': [[], {}], 'xy': (2, 2), 'color': 0},
-##                          'D6': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (3, 2), 'color': 1},
-##                          'E6': {'open': False, 'piece': '1', 'moves': ['D5', 'F5'], 'jumps': [[], {}], 'xy': (4, 2), 'color': 0},
-##                          'F6': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (5, 2), 'color': 1},
-##                          'G6': {'open': False, 'piece': '1', 'moves': ['F5', 'H5'], 'jumps': [[], {}], 'xy': (6, 2), 'color': 0},
-##                          'H6': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (7, 2), 'color': 1},
-##                          'A5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (0, 3), 'color': 1},
-##                          'B5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (1, 3), 'color': 0},
-##                          'C5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (2, 3), 'color': 1},
-##                          'D5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (3, 3), 'color': 0},
-##                          'E5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (4, 3), 'color': 1},
-##                          'F5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (5, 3), 'color': 0},
-##                          'G5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (6, 3), 'color': 1},
-##                          'H5': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (7, 3), 'color': 0},
-##                          'A4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (0, 4), 'color': 0},
-##                          'B4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (1, 4), 'color': 1},
-##                          'C4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (2, 4), 'color': 0},
-##                          'D4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (3, 4), 'color': 1},
-##                          'E4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (4, 4), 'color': 0},
-##                          'F4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (5, 4), 'color': 1},
-##                          'G4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (6, 4), 'color': 0},
-##                          'H4': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (7, 4), 'color': 1},
-##                          'A3': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (0, 5), 'color': 1},
-##                          'B3': {'open': False, 'piece': '0', 'moves': ['A4', 'C4'], 'jumps': [[], {}], 'xy': (1, 5), 'color': 0},
-##                          'C3': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (2, 5), 'color': 1},
-##                          'D3': {'open': False, 'piece': '0', 'moves': ['C4', 'E4'], 'jumps': [[], {}], 'xy': (3, 5), 'color': 0},
-##                          'E3': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (4, 5), 'color': 1},
-##                          'F3': {'open': False, 'piece': '0', 'moves': ['E4', 'G4'], 'jumps': [[], {}], 'xy': (5, 5), 'color': 0},
-##                          'G3': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (6, 5), 'color': 1},
-##                          'H3': {'open': False, 'piece': '0', 'moves': ['G4'], 'jumps': [[], {}], 'xy': (7, 5), 'color': 0},
-##                          'A2': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (0, 6), 'color': 0},
-##                          'B2': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (1, 6), 'color': 1},
-##                          'C2': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (2, 6), 'color': 0},
-##                          'D2': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (3, 6), 'color': 1},
-##                          'E2': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (4, 6), 'color': 0},
-##                          'F2': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (5, 6), 'color': 1},
-##                          'G2': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (6, 6), 'color': 0},
-##                          'H2': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (7, 6), 'color': 1},
-##                          'A1': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (0, 7), 'color': 1},
-##                          'B1': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (1, 7), 'color': 0},
-##                          'C1': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (2, 7), 'color': 1},
-##                          'D1': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (3, 7), 'color': 0},
-##                          'E1': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (4, 7), 'color': 1},
-##                          'F1': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (5, 7), 'color': 0},
-##                          'G1': {'open': True, 'piece': 'None', 'moves': [], 'jumps': [[], {}], 'xy': (6, 7), 'color': 1},
-##                          'H1': {'open': False, 'piece': '0', 'moves': [], 'jumps': [[], {}], 'xy': (7, 7), 'color': 0}
-##                          }
-##                      }
-
 
 def get_sides(xy: tuple[int, int]) -> list[tuple[int, int]]:
     "Returns the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates"
@@ -221,10 +150,7 @@ class State:
         pieces_copy[to_pos] = piece_type
 
         # Swap turn
-        new = class_(self.size, not self.turn, pieces_copy)
-        ##        if jump:
-        ##            print(f"\n\nBefore Jump:\n{self}\nAfter Jump:\n{new}\n")
-        return new
+        return class_(self.size, not self.turn, pieces_copy)
 
     def get_tile_name(self, x: int, y: int) -> str:
         """Get name of a given tile"""
@@ -398,35 +324,46 @@ def update(board_data: dict[str, Any]) -> None:
 
 
 class CheckersMinimax(Minimax[State, Action]):
+    """Minimax Algorithm for Checkers"""
+
     __slots__ = ()
 
-    def value(self, state: State) -> int | float:
+    @staticmethod
+    def value(state: State) -> int | float:
+        # Return winner if possible
         win = state.check_for_win()
+        # If no winner, we have to predict the value
         if win is None:
+            # We'll estimate the value by the pieces in play
             counts = Counter(state.pieces.values())
+            # Score is pawns plus 3 times kings
             min_ = counts[0] + 3 * counts[2]
             max_ = counts[1] + 3 * counts[3]
-            value = (max_ - min_) / (max_ + min_)
-            ##            if value != 0:
-            ##                print(state)
-            ##                print(f'{value = }')
-            return value
+            # More max will make score higher,
+            # more min will make score lower
+            # Plus one in divisor makes so never / 0
+            return (max_ - min_) / (max_ + min_ + 1)
         return win * 2 - 1
 
-    def terminal(self, state: State) -> bool:
+    @staticmethod
+    def terminal(state: State) -> bool:
         return state.check_for_win() is not None
 
-    def player(self, state: State) -> Player:
+    @staticmethod
+    def player(state: State) -> Player:
         return Player.MAX if state.get_turn() else Player.MIN
 
-    def actions(self, state: State) -> Iterable[Action]:
+    @staticmethod
+    def actions(state: State) -> Iterable[Action]:
         return state.get_all_actions(int(state.get_turn()))
 
-    def result(self, state: State, action: Action) -> State:
+    @staticmethod
+    def result(state: State, action: Action) -> State:
         return state.preform_action(action)
 
+    @classmethod
     def adaptive_depth_minimax(
-        self, state: State, minimum: int
+        cls, state: State, minimum: int, maximum: int
     ) -> MinimaxResult:
         current = len(state.pieces.values())
         w, h = state.size
@@ -434,21 +371,21 @@ class CheckersMinimax(Minimax[State, Action]):
         depth = (1 - (current / max_count)) * math.floor(
             math.sqrt(w**2 + h**2)
         )
-        final_depth = math.floor(max(minimum, depth))
+        final_depth = math.floor(min(maximum, max(minimum, depth)))
         print(f"{final_depth = }")
-        return self.minimax(state, final_depth)
+        return cls.minimax(state, final_depth)
 
 
 def turn() -> tuple[str, str] | None:
     "This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."
-    minimax = CheckersMinimax()
-    value, action = minimax.adaptive_depth_minimax(CURRENT_STATE, 4)
-    print(repr(CURRENT_STATE))
+    print("\nAI brain data:")
+    value, action = CheckersMinimax.adaptive_depth_minimax(CURRENT_STATE, 4, 5)
+    print(f"Current State: {repr(CURRENT_STATE)}")
     assert isinstance(action, tuple)
     from_, to_ = action
     assert isinstance(from_, str)
     assert isinstance(to_, str)
-    print(f"{value = } {action = }")
+    print(f"Next Move: {action}\nValue of move: {value}")
     return from_, to_
 
 
@@ -459,7 +396,7 @@ def turn_success(tf: bool) -> None:
 
 
 def stop() -> None:
-    "This function is called immidiately after the game's window is closed"
+    "This function is called immediately after the game's window is closed"
     pass
 
 
@@ -470,5 +407,4 @@ def init() -> dict[str, object]:
     }
 
 
-print("AI: AI Module Loaded")
-print("AI: " + __title__ + " Created by " + __author__)
+print(f"AI: AI Module {__title__} Created by {__author__}")

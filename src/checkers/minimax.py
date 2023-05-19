@@ -38,55 +38,62 @@ class Minimax(ABC, Generic[State, Action]):
     ##    min_wins_value: int | float = -1
     ##    max_wins_value: int | float = 1
 
+    @classmethod
     @abstractmethod
-    def value(self, state: State) -> int | float:
+    def value(cls, state: State) -> int | float:
         """Return the value of a given game state"""
 
+    @classmethod
     @abstractmethod
-    def terminal(self, state: State) -> bool:
+    def terminal(cls, state: State) -> bool:
         """Return if given game state is terminal"""
 
+    @classmethod
     @abstractmethod
-    def player(self, state: State) -> Player:
+    def player(cls, state: State) -> Player:
         """Return player status given the state of the game
 
         Must return either Player.MIN or Player.MAX"""
 
+    @classmethod
     @abstractmethod
-    def actions(self, state: State) -> Iterable[Action]:
+    def actions(cls, state: State) -> Iterable[Action]:
         """Return a collection of all possible actions in a given game state"""
 
+    @classmethod
     @abstractmethod
-    def result(self, state: State, action: Action) -> State:
+    def result(cls, state: State, action: Action) -> State:
         """Return new game state after preforming action on given state"""
 
+    @classmethod
+    @abstractmethod
     def minimax(
-        self,
+        cls,
         state: State,
         depth: int | None = 5,
     ) -> MinimaxResult:
-        if self.terminal(state):
-            return MinimaxResult(self.value(state), None)
+        if cls.terminal(state):
+            return MinimaxResult(cls.value(state), None)
         if depth is not None and depth <= 0:
             return MinimaxResult(
-                self.value(state), next(iter(self.actions(state)))
+                cls.value(state), next(iter(cls.actions(state)))
             )
         next_down = None if depth is None else depth - 1
 
-        current_player = self.player(state)
+        current_player = cls.player(state)
         value: int | float
         if current_player == Player.MAX:
             value = -infinity
             best = max
-        ##            opponent_win = self.min_wins_value
+        ##            opponent_win = cls.min_wins_value
         else:
             value = infinity
             best = min
-        ##            opponent_win = self.max_wins_value
+        ##            opponent_win = cls.max_wins_value
 
         best_action: Action | None = None
-        for action in self.actions(state):
-            result = self.minimax(self.result(state, action), next_down)
+        for action in cls.actions(state):
+            result = cls.minimax(cls.result(state, action), next_down)
             new_value = best(value, result.value)
             if new_value != value:
                 best_action = action
