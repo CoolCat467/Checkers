@@ -18,6 +18,7 @@ from Vector2 import Vector2
 
 class Base2DError(Exception):
     "Base2D Exceptions"
+    __slots__ = ("code", "description")
 
     # Base2D Exception class
     def __init__(self, code: int, description: str) -> None:
@@ -405,6 +406,7 @@ def farthest(number: int | float, lst: list[L]) -> L:
 
 class State:
     "Base Class for all StateMachine States"
+    __slots__ = ("name",)
 
     def __init__(self, name: str) -> None:
         self.name = name

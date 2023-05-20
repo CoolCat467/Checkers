@@ -84,6 +84,7 @@ def render_text(
 
 class World(WorldBase):
     "This is the world. All entities are stored here."
+    __slots__ = ("background",)
 
     def __init__(self, background: Surface) -> None:
         super().__init__()
@@ -121,6 +122,7 @@ class World(WorldBase):
 
 class Cursor(GameEntity):
     "This is the Cursor! It follows the mouse cursor!"
+    __slots__ = ("carry_image", "carry_tile", "render_priority")
 
     def __init__(self, world: World, **kwargs: Any) -> None:
         GameEntity.__init__(self, world, "cursor", None, **kwargs)
