@@ -30,11 +30,12 @@ from math import sqrt
 from random import randint
 from typing import Any
 
+import base2d
 import pygame
-from base2d import *
 from pygame.locals import *
 from pygame.surface import Surface
-from Vector2 import Vector2
+from statemachine import State
+from vector import Vector2
 
 __title__ = "Checkers"
 __version__ = "0.0.5"
@@ -46,6 +47,16 @@ PIC_PATH = "pic/"
 FPS = 60
 
 PLAYERS = ["Red Player", "Black Player"]
+
+
+BLACK = (0, 0, 0)
+BLUE = (15, 15, 255)
+GREEN = (0, 255, 0)
+CYAN = (0, 255, 255)
+RED = (255, 0, 0)
+MAGENTA = (255, 0, 255)
+YELLOW = (255, 255, 0)
+WHITE = (255, 255, 255)
 
 
 def blit_text(
@@ -68,7 +79,7 @@ def blit_text(
         w, h = surf.get_size()
         xy = (xy[0] - w // 2, xy[1] - h // 2)
     # Blit the text surface to the destination surface at the xy position
-    dest.blit(surf, to_int(xy))
+    dest.blit(surf, base2d.to_int(xy))
 
 
 def render_text(
@@ -82,7 +93,7 @@ def render_text(
     return surf
 
 
-class World(WorldBase):
+class World(base2d.WorldBase):
     "This is the world. All entities are stored here."
     __slots__ = ("background",)
 
@@ -120,12 +131,12 @@ class World(WorldBase):
         surface.lock()
 
 
-class Cursor(GameEntity):
+class Cursor(base2d.GameEntity):
     "This is the Cursor! It follows the mouse cursor!"
     __slots__ = ("carry_image", "carry_tile", "render_priority")
 
     def __init__(self, world: World, **kwargs: Any) -> None:
-        GameEntity.__init__(self, world, "cursor", None, **kwargs)
+        base2d.GameEntity.__init__(self, world, "cursor", None, **kwargs)
 
         # Create instances of each brain state
         follow_state = CursorStateFollowing(self)
@@ -210,7 +221,7 @@ def get_sides(xy: tuple[int, int]) -> list[tuple[int, int]]:
 
 
 ##    # Convert xy coords tuple to a list of strings, and join the strings to a stringed number, convert that to an int, and add ten because of zero positions
-##    atnum = int("".join(to_str(xy))) + 10
+##    atnum = int("".join(base2d.to_str(xy))) + 10
 ##    # Get the xy choords plus 1 on x for top left, top right,
 ##    # bottom left, bottom right
 ##    nums = [atnum - 11, atnum + 9, atnum - 9, atnum + 11]
@@ -221,7 +232,7 @@ def get_sides(xy: tuple[int, int]) -> list[tuple[int, int]]:
 ##    # Make the numbers back into usable xy choordinates by
 ##    # splitting each number into two seperate digits, taking the x
 ##    # minus one to fix the zero thing, and return a list of tuples
-##    return [to_int([int(i[0]) - 1, i[1]]) for i in to_str(nums)]
+##    return [base2d.to_int([int(i[0]) - 1, i[1]]) for i in base2d.to_str(nums)]
 
 
 def get_tile_from_coords(
@@ -658,14 +669,14 @@ class Tile:
             self.board.turn_over()
 
 
-class GameBoard(GameEntity):
+class GameBoard(base2d.GameEntity):
     "Entity that stores data about the game board and renders it"
 
     def __init__(
         self, world: World, board_size: int, tile_size: int, **kwargs: Any
     ) -> None:
         # Make a blank surface of the proper size by multiplying the board size by the tile size
-        image = pygame.Surface(to_int(amol(board_size, m=tile_size)))
+        image = pygame.Surface([x * tile_size for x in board_size])
         # Fill the blank surface with green so we know if anything is broken/not updating
         image.fill(GREEN)
         super().__init__(world, "board", image, **kwargs)
@@ -685,7 +696,7 @@ class GameBoard(GameEntity):
         ]
 
         # Store the Board Size and Tile Size
-        self.board_size = to_int(board_size)
+        self.board_size = base2d.to_int(board_size)
         self.tile_size = int(tile_size)
 
         # Convert Tile Color Map and Piece Map into Dictionarys
@@ -706,7 +717,7 @@ class GameBoard(GameEntity):
 
         # Generate a Pice Surface for each piece using a base image and a color
         self.piece_map = {
-            i: replace_with_color(
+            i: base2d.replace_with_color(
                 pygame.transform.scale(
                     IMAGES[self.piece_map[i][1]], [tile_size] * 2
                 ),
@@ -733,8 +744,8 @@ class GameBoard(GameEntity):
 
     def process(self, time_passed: float) -> None:
         "Processes the game board and each of it's tiles and pieces"
-        # Process the GameEntity part of self, which really doesn't do anything since the board doesn't move
-        GameEntity.process(self, time_passed)
+        # Process the base2d.GameEntity part of self, which really doesn't do anything since the board doesn't move
+        base2d.GameEntity.process(self, time_passed)
 
         # For each tile,
         for tile in iter(self.tiles.values()):
@@ -768,7 +779,7 @@ class GameBoard(GameEntity):
     ) -> Surface:
         "Generate the image used for a tile"
         # Make a blank surface of the size we're given
-        surf = pygame.Surface(to_int(size))
+        surf = pygame.Surface(base2d.to_int(size))
         # Fill the blank surface with the color given
         surf.fill(color)
         # Return a rectangular (or square if width and height of size are the same) image of the color given
@@ -781,15 +792,15 @@ class GameBoard(GameEntity):
         # Get the size of the surface
         w, h = surface.get_size()
         # Replace all color on the image with the color
-        surf = replace_with_color(surface, color)
+        surf = base2d.replace_with_color(surface, color)
         # Get 90% of the width and height
-        inside = round_all(amol([w, h], m=0.90))
+        inside = base2d.round_all(base2d.amol([w, h], m=0.90))
         # Make the surface be 90% of it's size
         inside_surf = pygame.transform.scale(surface, inside)
         # Get the proper position the modified image should be at
-        pos = amol(list(Vector2(w, h) - Vector2(*inside)), d=2)
+        pos = base2d.amol(list(Vector2(w, h) - Vector2(*inside)), d=2)
         # Add the modified image to the correct location
-        surf.blit(inside_surf, to_int(pos))
+        surf.blit(inside_surf, base2d.to_int(pos))
         # Return image with yellow outline
         return surf
 
@@ -797,21 +808,21 @@ class GameBoard(GameEntity):
         "Generate data about each tile"
         # Reset tile data
         self.tiles = {}
-        location = Vector2(0, 0)
+        loc_y = 0
         # Get where pieces should be placed
         z_to_1 = round(self.board_size[1] / 3)  # White
         z_to_2 = (self.board_size[1] - (z_to_1 * 2)) + z_to_1  # Black
         # For each xy position in the area of where tiles should be,
         for y in range(self.board_size[1]):
             # Reset the x pos to 0
-            location.x = 0
+            loc_x = 0
             for x in range(self.board_size[0]):
                 # Get the proper name of the tile we're creating ('A1' to 'H8')
                 name = chr(65 + x) + str(self.board_size[1] - y)
                 # Get the color of that spot by adding x and y mod the number of different colors
                 color = (x + y) % len(self.tile_surfs.keys())
                 # Create the tile
-                tile = Tile(self, name, location, color, (x, y))
+                tile = Tile(self, name, Vector2(loc_x, loc_y), color, (x, y))
                 # If a piece should be placed on that tile and the tile is not Red,
                 if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
                     # Set the piece to White Pawn or Black Pawn depending on the current y pos
@@ -819,9 +830,9 @@ class GameBoard(GameEntity):
                 # Add the tile to the tiles dictionary with a key of it's name ('A1' to 'H8')
                 self.tiles[name] = tile
                 # Increment the x counter by tile_size
-                location.x += self.tile_size
+                loc_x += self.tile_size
             # Increment the y counter by tile_size
-            location.y += self.tile_size
+            loc_y += self.tile_size
 
     def get_tile(self, by: str, value: object) -> Tile | None:
         "Get a spicific tile by an atribute it has, otherwise return None"
@@ -855,7 +866,7 @@ class GameBoard(GameEntity):
         "Generate an image of a game board"
         location = Vector2(0, 0)
         # Get a surface the size of everything
-        surf = pygame.Surface(amol(self.board_size, m=self.tile_size))
+        surf = pygame.Surface(base2d.amol(self.board_size, m=self.tile_size))
         # Fill it with green so we know if anything is broken
         surf.fill(GREEN)
         # For each tile xy choordinate,
@@ -871,7 +882,7 @@ class GameBoard(GameEntity):
                     tile_image = self.outline_surf(tile_image, YELLOW)
                 if tile.is_glowing():
                     # Make the tile glow blue
-                    tile_image = self.outline_surf(tile_image, BLUE)
+                    tile_image = self.outline_surf(tile_image, GREEN)
                 # Blit the tile image to the surface at the tile's location
                 surf.blit(tile_image, tile.location)
                 # If the tile does have a piece on it,
@@ -885,7 +896,7 @@ class GameBoard(GameEntity):
                     # Blit the piece to the surface at the tile's location
                     surf.blit(piece, tile.location)
         ##                # Blit the id of the tile at the tile's location
-        ##                value = "".join(to_str(tile.xy))
+        ##                value = "".join(base2d.to_str(tile.xy))
         ##                # value = tile.id
         ##                blit_text(
         ##                    "VeraSerif.ttf",
@@ -901,7 +912,9 @@ class GameBoard(GameEntity):
     def convert_loc(self, location: Vector2) -> Vector2:
         "Converts a screen location to a location on the game board like tiles use"
         # Get where zero zero would be in tile location data,
-        zero = self.location - Vector2(*amol(self.image.get_size(), d=2))
+        zero = self.location - Vector2(
+            *base2d.amol(self.image.get_size(), d=2)
+        )
         # and return the given location minus zero zero to get tile location data
         return Vector2(*location) - zero
 
@@ -941,7 +954,7 @@ def show_win(valdisplay: "ValDisplay") -> str:
     return ""
 
 
-class ValDisplay(GameEntity):
+class ValDisplay(base2d.GameEntity):
     "Entity that displays the value of a string returned by calling value_function(self)"
 
     def __init__(
@@ -952,7 +965,7 @@ class ValDisplay(GameEntity):
         value_function,
         **kwargs: Any,
     ) -> None:
-        GameEntity.__init__(self, world, "valdisplay", None, **kwargs)
+        base2d.GameEntity.__init__(self, world, "valdisplay", None, **kwargs)
         # Store the font __title__, font size, and value function
         self.font_name = str(font_name)
         self.font_size = int(font_size)
@@ -983,7 +996,7 @@ class ValDisplay(GameEntity):
         )
 
 
-class Button(BaseButton):
+class Button(base2d.BaseButton):
     "Button that only shows when a player has won the game"
 
     def __init__(
@@ -996,13 +1009,13 @@ class Button(BaseButton):
     def process(self, time_passed: float) -> None:
         "Does regular button processing AND makes it so button only shows when the game has been won"
         # Do regular button processing
-        BaseButton.process(self, time_passed)
+        super().process(time_passed)
         # Get the game board
         boards = self.world.get_type("board")
         if len(boards):
             board = boards[0]
             # Show if the game has been won
-            self.show = not board.won is None
+            self.visible = not board.won is None
         if not self.do_reset and not self.anim_flip:
             self.anim = [i for i in reversed(self.anim)]
             self.anim_flip = True
@@ -1028,13 +1041,15 @@ def back_pressed(button: Button) -> None:
 def gen_button(text: str, size: int) -> Surface:
     "Generates a button surface by rendering text with size onto the base button image"
     base_image = IMAGES["button"]
-    button_image = scale_surf(base_image, 4)
-    xy = amol(button_image.get_size(), d=2)
+    button_image = base2d.scale_surf(base_image, 4)
+    xy = base2d.amol(button_image.get_size(), d=2)
     blit_text("VeraSerif.ttf", size, text, GREEN, xy, button_image)
     return button_image
 
 
-def ai_play(target_tile_id: str, to_tile_id: str, board: GameEntity) -> bool:
+def ai_play(
+    target_tile_id: str, to_tile_id: str, board: base2d.GameEntity
+) -> bool:
     "Does pretty much everything that tiles and the cursor do to move a piece combined without visuals"
     # If the target tile id or destination tile id is not valid, return False
     if (target_tile_id not in board.tiles) or (to_tile_id not in board.tiles):
@@ -1137,7 +1152,7 @@ def run() -> None:
     for pic_name in pics:
         name = pic_name.split(".png")[0]
         image = pygame.image.load(picpath + pic_name).convert_alpha()
-        IMAGES[name] = scale_surf(image, 0.25)
+        IMAGES[name] = base2d.scale_surf(image, 0.25)
 
     # Get any additional images
     background = pygame.Surface(SCREEN_SIZE)
@@ -1156,7 +1171,7 @@ def run() -> None:
             keys = aiData.keys()
             if "player_names" in keys:
                 if len(aiData["player_names"]) == 2:
-                    PLAYERS = to_str(list(aiData["player_names"]))
+                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
     else:
         PLAYERS = ["Red Player", "Black Player"]
 
@@ -1166,7 +1181,7 @@ def run() -> None:
     # Add entities
     world.add_entity(Cursor(world))
     world.add_entity(
-        GameBoard(world, [8] * 2, 45, location=amol(SCREEN_SIZE, d=2))
+        GameBoard(world, [8] * 2, 45, location=[x // 2 for x in SCREEN_SIZE])
     )
     world.add_entity(
         ValDisplay(
@@ -1174,7 +1189,7 @@ def run() -> None:
             "VeraSerif.ttf",
             60,
             show_win,
-            location=amol(SCREEN_SIZE, d=2),
+            location=base2d.amol(SCREEN_SIZE, d=2),
             color=GREEN,
             renderPriority=5,
         )
@@ -1186,7 +1201,7 @@ def run() -> None:
             "cursor",
             back_pressed,
             states=1,
-            location=Vector2(*amol(SCREEN_SIZE, d=2)) + Vector2(0, 80),
+            location=Vector2(*base2d.amol(SCREEN_SIZE, d=2)) + Vector2(0, 80),
         )
     )
 
@@ -1265,7 +1280,6 @@ def run() -> None:
                     ai_has_been_told_game_is_won = True
         # Update the display
         pygame.display.update()
-    pygame.quit()
     # If we have an AI going and it has the stop function,
     if computer and hasattr(AI, "stop"):
         # Tell the AI to stop
@@ -1274,4 +1288,7 @@ def run() -> None:
 
 if __name__ == "__main__":
     # If we're not imported as a module, run.
-    run()
+    try:
+        run()
+    finally:
+        pygame.quit()

@@ -11,32 +11,35 @@ __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
 from abc import ABC, abstractmethod
-from collections import namedtuple
 from collections.abc import Iterable
 from enum import IntEnum, auto
 from math import inf as infinity
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 
 class Player(IntEnum):
     """Enum for player status"""
 
+    __slots__ = ()
     MIN = auto()
     MAX = auto()
 
 
-MinimaxResult = namedtuple("MinimaxResult", ("value", "action"))
-
 State = TypeVar("State")
 Action = TypeVar("Action")
+
+
+class MinimaxResult(NamedTuple, Generic[Action]):
+    """Minimax Result"""
+
+    value: int | float
+    action: Action | None
 
 
 class Minimax(ABC, Generic[State, Action]):
     """Base class for Minimax AIs"""
 
     __slots__ = ()
-    ##    min_wins_value: int | float = -1
-    ##    max_wins_value: int | float = 1
 
     @classmethod
     @abstractmethod
@@ -71,7 +74,7 @@ class Minimax(ABC, Generic[State, Action]):
         cls,
         state: State,
         depth: int | None = 5,
-    ) -> MinimaxResult:
+    ) -> MinimaxResult[Action]:
         if cls.terminal(state):
             return MinimaxResult(cls.value(state), None)
         if depth is not None and depth <= 0:
@@ -85,11 +88,9 @@ class Minimax(ABC, Generic[State, Action]):
         if current_player == Player.MAX:
             value = -infinity
             best = max
-        ##            opponent_win = cls.min_wins_value
         else:
             value = infinity
             best = min
-        ##            opponent_win = cls.max_wins_value
 
         best_action: Action | None = None
         for action in cls.actions(state):

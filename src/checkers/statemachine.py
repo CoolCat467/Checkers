@@ -14,17 +14,23 @@ __ver_minor__ = 1
 __ver_patch__ = 8
 
 from collections.abc import Iterable
+from typing import Generic, Self, TypeVar
+from weakref import ref
 
 __all__ = ["State", "AsyncState", "StateMachine", "AsyncStateMachine"]
 
 
-class BaseState:
+Machine = TypeVar("Machine", bound="BaseStateMachine", covariant=True)
+
+
+class BaseState(Generic[Machine]):
     "Base class for states."
-    __slots__ = ("name", "machine")
+    __slots__ = ("name", "machine_ref")
 
     def __init__(self, name: str) -> None:
         "Initialize state with a name."
         self.name = name
+        self.machine_ref: ref[Machine]
 
     def __str__(self) -> str:
         "Return <{self.name} {class-name}>"
@@ -34,11 +40,18 @@ class BaseState:
         "Return self as string."
         return str(self)
 
+    @property
+    def machine(self) -> Machine | None:
+        """Get machine from internal weak reference"""
+        return self.machine_ref()
 
-class State(BaseState):
+
+SyncMachine = TypeVar("SyncMachine", bound="StateMachine", covariant=True)
+
+
+class State(BaseState[SyncMachine]):
     "Base class for synchronous states."
     __slots__ = ()
-    machine: "StateMachine"
 
     def entry_actions(self) -> None:
         "Preform entry actions for this State."
@@ -57,10 +70,14 @@ class State(BaseState):
         return None
 
 
-class AsyncState(BaseState):
+AsyncMachine = TypeVar(
+    "AsyncMachine", bound="AsyncStateMachine", covariant=True
+)
+
+
+class AsyncState(BaseState[AsyncMachine]):
     "Base class for asynchronous states."
     __slots__ = ()
-    machine: "AsyncStateMachine"
 
     async def entry_actions(self) -> None:
         "Preform entry actions for this State."
@@ -81,7 +98,7 @@ class AsyncState(BaseState):
 
 class BaseStateMachine:
     "State Machine base class"
-    __slots__ = ("states", "active_state")
+    __slots__ = ("states", "active_state", "__weakref__")
 
     def __repr__(self) -> str:
         "Return <{class-name} {self.states}>"
@@ -96,19 +113,21 @@ class StateMachine(BaseStateMachine):
     __slots__ = ()
 
     def __init__(self) -> None:
-        self.states: dict[str, State] = {}  # Stores the states
-        self.active_state: State | None = None  # The currently active state
+        self.states: dict[str, State[Self]] = {}  # Stores the states
+        self.active_state: State[
+            Self
+        ] | None = None  # The currently active state
 
-    def add_state(self, state: State) -> None:
+    def add_state(self, state: State[Self]) -> None:
         "Add a State instance to the internal dictionary."
         if not isinstance(state, State):
             raise TypeError(
                 f'"{type(state).__name__}" is not an instance of State!'
             )
-        state.machine = self
+        state.machine_ref = ref(self)
         self.states[state.name] = state
 
-    def add_states(self, states: Iterable[State]) -> None:
+    def add_states(self, states: Iterable[State[Self]]) -> None:
         "Add multiple State instances to internal dictionary."
         for state in states:
             self.add_state(state)
@@ -154,19 +173,19 @@ class AsyncStateMachine(BaseStateMachine):
     __slots__ = ()
 
     def __init__(self) -> None:
-        self.states: dict[str, AsyncState] = {}  # Stores the states
-        self.active_state: AsyncState | None = None  # active state
+        self.states: dict[str, AsyncState[Self]] = {}  # Stores the states
+        self.active_state: AsyncState[Self] | None = None  # active state
 
-    def add_state(self, state: AsyncState) -> None:
+    def add_state(self, state: AsyncState[Self]) -> None:
         "Add an AsyncState instance to the internal dictionary."
         if not isinstance(state, AsyncState):
             raise TypeError(
                 f'"{type(state).__name__}" is not an instance of AsyncState!'
             )
-        state.machine = self
+        state.machine_ref = ref(self)
         self.states[state.name] = state
 
-    def add_states(self, states: Iterable[AsyncState]) -> None:
+    def add_states(self, states: Iterable[AsyncState[Self]]) -> None:
         "Add multiple State instances to internal dictionary."
         for state in states:
             self.add_state(state)
