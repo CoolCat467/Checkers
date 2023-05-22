@@ -194,15 +194,10 @@ class GameEntity(sprite.Sprite):
 
     def __init__(
         self,
-        world: "WorldBase",
         name: str,
-        image: pygame.surface.Surface | None,
         **kwargs: Any,
     ) -> None:
         super().__init__(name)
-        self.world = world
-        self.image = image
-        self.base_image = image
 
         self.add_components((sprite.MovementComponent(),))
 
@@ -232,12 +227,6 @@ class GameEntity(sprite.Sprite):
 
         self.id = 0
 
-    def __repr__(self) -> str:
-        return f"<{self.name.title()} GameEntity>"
-
-    def __str__(self) -> str:
-        return f"<{self.name.title()} GameEntity>"
-
     def render(self, surface: pygame.surface.Surface) -> None:
         "Render an entity and it's hitbox if show_hitbox is True, and blit it to the surface"
         x, y = self.location
@@ -249,12 +238,12 @@ class GameEntity(sprite.Sprite):
             ) from ex
         w, h = self.image.get_size()
         if self.visible:
-            surface.blit(self.image, (x - w / 2, y - h / 2))
+            surface.blit(self.image, (x - w // 2, y - h // 2))
         if self.show_hitbox:
-            pygame.draw.rect(surface, [0] * 3, self.get_col_rect(), 1)
+            pygame.draw.rect(surface, (0, 0, 0), self.get_col_rect(), 1)
             if self.scan:
                 pygame.draw.circle(
-                    surface, [0, 0, 60], to_int([x, y]), self.scan, 1
+                    surface, (0, 0, 60), to_int([x, y]), self.scan, 1
                 )
 
     def process(self, time_passed: float) -> None:

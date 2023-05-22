@@ -21,30 +21,37 @@
 # .........
 # A1 ... H1
 
-from __future__ import annotations
+# from __future__ import annotations
 
+import math
 import os
-import traceback
-from collections.abc import Collection, Sequence
-from math import sqrt
+from collections.abc import Generator, Iterable, Sequence
+from os import path
 from random import randint
-from typing import Any
+from typing import Any, NamedTuple, TypeVar, cast
 
 import base2d
+import objects
 import pygame
+import sprite
+import trio
+from async_clock import Clock
+from component import Component, ComponentManager, Event
 from pygame.locals import *
 from pygame.surface import Surface
-from statemachine import State
+from statemachine import AsyncState, AsyncStateMachine
 from vector import Vector2
 
 __title__ = "Checkers"
 __version__ = "0.0.5"
+__author__ = "CoolCat467"
 
 SCREEN_SIZE = (640, 480)
 
 PIC_PATH = "pic/"
 
 FPS = 60
+VSYNC = True
 
 PLAYERS = ["Red Player", "Black Player"]
 
@@ -59,27 +66,31 @@ YELLOW = (255, 255, 0)
 WHITE = (255, 255, 255)
 
 
-def blit_text(
-    font_name: str,
-    font_size: int,
-    text: str,
-    color: tuple[int, int, int],
-    xy: Vector2 | tuple[int, int],
-    dest: Surface,
-    middle: bool = True,
-) -> None:
-    "Blit rendered text to dest with the font at font_size colored color at x, y"
-    # Get a surface of the rendered text
-    surf = render_text(font_name, font_size, text, color)
-    # If rendering in the middle of the text,
-    if middle:
-        # Modify the xy choordinates to be in the middle
-        w: int
-        h: int
-        w, h = surf.get_size()
-        xy = (xy[0] - w // 2, xy[1] - h // 2)
-    # Blit the text surface to the destination surface at the xy position
-    dest.blit(surf, base2d.to_int(xy))
+##def blit_text(
+##    font_name: str,
+##    font_size: int,
+##    text: str,
+##    color: tuple[int, int, int],
+##    xy: Vector2 | tuple[int, int],
+##    dest: Surface,
+##    middle: bool = True,
+##) -> None:
+##    "Blit rendered text to dest with the font at font_size colored color at x, y"
+##    # Get a surface of the rendered text
+##    surf = render_text(font_name, font_size, text, color)
+##    # If rendering in the middle of the text,
+##    if middle:
+##        # Modify the xy choordinates to be in the middle
+##        w: int
+##        h: int
+##        w, h = surf.get_size()
+##        xy = (xy[0] - w // 2, xy[1] - h // 2)
+##    # Blit the text surface to the destination surface at the xy position
+##    dest.blit(surf, base2d.to_int(xy))
+
+T = TypeVar("T")
+
+Pos = tuple[int, int]
 
 
 def render_text(
@@ -93,120 +104,59 @@ def render_text(
     return surf
 
 
-class World(base2d.WorldBase):
-    "This is the world. All entities are stored here."
-    __slots__ = ("background",)
-
-    def __init__(self, background: Surface) -> None:
-        super().__init__()
-        self.background = background.convert()
-
-    def render(self, surface: Surface) -> None:
-        "Draw the background and render all entities"
-        # Prepare surface for additions
-        surface.unlock()
-
-        # Put the background on the display, covering everything
-        surface.blit(self.background, (0, 0))
-
-        render_list = {}
-        render_val = 0
-        # For every entity we know about,
-        for entity in self.entities.values():
-            # If it has the 'render_priority' attribute,
-            if hasattr(entity, "render_priority"):
-                # add it to the render list at the spot it want to be in
-                render_list[entity.render_priority] = entity
-            else:
-                # Otherwise, add it to the next avalable spot.
-                render_list[render_val] = entity
-                render_val += 1
-
-        # For each render value in order from lowest to greatest,
-        for render_val in sorted(render_list.keys()):
-            # Render the entity of that value
-            render_list[render_val].render(surface)
-
-        # Modifications to the surface are done, so re-lock it
-        surface.lock()
-
-
-class Cursor(base2d.GameEntity):
-    "This is the Cursor! It follows the mouse cursor!"
-    __slots__ = ("carry_image", "carry_tile", "render_priority")
-
-    def __init__(self, world: World, **kwargs: Any) -> None:
-        base2d.GameEntity.__init__(self, world, "cursor", None, **kwargs)
-
-        # Create instances of each brain state
-        follow_state = CursorStateFollowing(self)
-
-        # Add states to brain
-        self.brain.add_state(follow_state)
-
-        # Set brain to the following state
-        self.brain.set_state("following")
-
-        # We are not carrying anything
-        self.carry_image = None
-        self.carry_tile = None
-
-        # We should be on top of everything
-        self.render_priority = 100
-
-    def render(self, surface: Surface) -> None:
-        "Render Carry Image if carrying anything"
-        # If we're carrying something,
-        if self.is_carry():
-            # Do stuff so it renders the image's middle to our location
-            x, y = self.location
-            w, h = self.carry_image.get_size()
-            x -= w // 2
-            y -= h // 2
-            xy = int(x), int(y)
-            surface.blit(self.carry_image, xy)
-
-    def get_pressed(self) -> bool:
-        "Return True if the right mouse button is pressed"
-        return bool(pygame.mouse.get_pressed()[0])
-
-    def carry(self, image: Surface | None) -> None:
-        "Set the image we should be carrying to image"
-        self.carry_image = image
-
-    def is_carry(self) -> bool:
-        "Return True if we are carrying something"
-        return not self.carry_image is None
-
-    def drag(self, tile: Tile, image: Surface | None) -> None:
-        "Grab the piece from a tile and carry it"
-        self.carry_tile = tile
-        self.carry(image)
-
-    def drop(self) -> None:
-        "Drop the image we're carrying"
-        self.carry_tile = None
-        self.carry_image = None
+##class Cursor(sprite.Sprite):
+##    "This is the Cursor! It follows the mouse cursor!"
+##    __slots__ = ("carry_tile",)
+##
+##    def __init__(self) -> None:
+##        super().__init__("cursor")
+##
+##        # We are not carrying anything
+##        self.carry_tile = None
+##
+##    def bind_handlers(self) -> None:
+##        self.register_handlers(
+##            {
+##                "cursor_drag": self.handle_drag_event,
+##                "cursor_drop": self.handle_drop_event,
+##            }
+##        )
+##
+##    async def handle_drag_event(
+##        self, event: Event[tuple[Tile, Surface | None]]
+##    ) -> None:
+##        # types: misc error: List or tuple expected as variadic arguments
+##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
+##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/component.py
+##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
+##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
+##        self.drag(*event)
+##
+##    async def handle_drop_event(self, event: Event[None]) -> None:
+##        self.drop()
+##
+##    def carry(self, image: Surface | None) -> None:
+##        "Set the image we should be carrying to image"
+##        self.image = image
+##        self.visible = self.is_carry()
+##
+##    def is_carry(self) -> bool:
+##        "Return True if we are carrying something"
+##        return not self.image is None
+##
+##    def drag(self, tile: Tile, image: Surface | None) -> None:
+##        "Grab the piece from a tile and carry it"
+##        # types: assignment error: Incompatible types in assignment (expression has type "Tile", variable has type "None")
+##        self.carry_tile = tile
+##        self.carry(image)
+##
+##    def drop(self) -> None:
+##        "Drop the image we're carrying"
+##        self.carry_tile = None
+##        self.carry(None)
 
 
-class CursorStateFollowing(State):
-    "Cursor's main state, where it teleports to the mouse location"
-
-    def __init__(self, cursor: Cursor) -> None:
-        # Set up self as a state, with the __title__ of 'following'
-        State.__init__(self, "following")
-        # Store the cursor entity we're doing brain stuff for
-        self.cursor = cursor
-
-    def do_actions(self) -> None:
-        "Move the cursor entity to the xy location of the mouse pointer"
-        self.cursor.location = Vector2(*pygame.mouse.get_pos())
-        # also set destination to mouse pointer location in case
-        # anything wants to know where we're going
-        self.cursor.destination = self.cursor.location
-
-
-def get_sides(xy: tuple[int, int]) -> list[tuple[int, int]]:
+def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
     "Returns the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates"
     cx, cy = xy
     sides = []
@@ -217,875 +167,929 @@ def get_sides(xy: tuple[int, int]) -> list[tuple[int, int]]:
             dx = raw_dx * 2 - 1
             nx = cx + dx
             sides.append((nx, ny))
-    return sides
-
-
-##    # Convert xy coords tuple to a list of strings, and join the strings to a stringed number, convert that to an int, and add ten because of zero positions
-##    atnum = int("".join(base2d.to_str(xy))) + 10
-##    # Get the xy choords plus 1 on x for top left, top right,
-##    # bottom left, bottom right
-##    nums = [atnum - 11, atnum + 9, atnum - 9, atnum + 11]
-##    # If any errored choordinates exist, delete them
-##    for i in range(len(nums) - 1, -1, -1):
-##        if nums[i] < 10:
-##            nums[i] = "0" + str(abs(nums[i]))
-##    # Make the numbers back into usable xy choordinates by
-##    # splitting each number into two seperate digits, taking the x
-##    # minus one to fix the zero thing, and return a list of tuples
-##    return [base2d.to_int([int(i[0]) - 1, i[1]]) for i in base2d.to_str(nums)]
-
-
-def get_tile_from_coords(
-    coords: tuple[int, int], gameboard: GameBoard, replace: object = ""
-) -> str | object:
-    "Ask the gameboard for the tiles at the xy choords given and replaces None with ''"
-    tile = gameboard.get_tile("xy", tuple(coords))
-    if tile is None:
-        tile = replace
-    return tile
-
-
-def get_tiles_from_coords(
-    choords: tuple[int, int], gameboard: GameBoard, replace: str | object = ""
-) -> object:
-    "Returns a list of tiles from the target gameboard based on xy coords and replaces blanks with ''"
-    tiles = gameboard.get_tiles("xy", tuple(choords))
-    for tile in tiles:
-        if tile is None:
-            tile = replace
-    return tiles
+    tuple_sides = tuple(sides)
+    assert len(tuple_sides) == 4
+    return cast(tuple[Pos, Pos, Pos, Pos], tuple_sides)
 
 
 def pawn_modify(
-    lst: list[list[int]] | list[tuple[int, int]], piece_id: int
-) -> list[list[int]] | list[tuple[int, int]]:
+    moves: tuple[T, T, T, T], piece_type: int
+) -> tuple[T, T] | tuple[T, T, T, T]:
     "Modifies a list based on piece id to take out invalid moves for pawns"
     assert (
-        len(lst) == 4
+        len(moves) == 4
     ), "List size MUST be four for this to return valid results!"
     if (
-        piece_id == 0
+        piece_type == 0
     ):  # If it's a white pawn, it can only move to top left and top right
-        lst = lst[:2]
+        return moves[:2]
     if (
-        piece_id == 1
+        piece_type == 1
     ):  # If it's a black pawn, it can only move to bottom left anf bottom right
-        lst = lst[2:]
-    return lst
+        return moves[2:]
+    return moves
 
 
-def get_jumps(
-    gameboard: GameBoard, piece_id: int | None, tile: Tile, _rec: int = 0
-) -> tuple[list[Any], dict[Any, Any]] | tuple[list[Any], dict[Any, list[Any]]]:
-    "Gets valid jumps a piece can make"
-    # If the tile is None or the piece_id is invalid, return nothing for jumps.
-    if tile is None or piece_id not in range(4):
-        return [], {}
-
-    # If we are kinged, get a pawn version of ourselves.
-    # Take that plus one mod 2 to get the pawn of the enemy
-    enemy_pawn = ((piece_id % 2) + 1) % 2
-    # Then get the pawn and the king in a list so we can see if a piece is our enemy
-    enemy_pieces = [enemy_pawn, enemy_pawn + 2]
-
-    # Get the side choordinates of the tile and make them tuples so the scan later works properly.
-    side_coords = [tuple(i) for i in get_sides(tile.xy)]
-    # Make a dictionary to find what direction a tile is in if you give it the tile.
-    side_tile_dict = {
-        gameboard.get_tile("xy", side_coords[i]): i for i in range(4)
-    }
-
-    # Make a dictionary for the valid jumps and the pieces they jump
-    valid = {}
-    # Make a list for the end tiles after valid jumps
-    side_dir_tiles = []
-
-    # For each side tile in the jumpable tiles for this type of piece,
-    for side_tile in gameboard.get_tiles(
-        "xy", pawn_modify(side_coords, piece_id)
-    ):
-        # If the tile doesn't exist/error, go on to the next tile
-        if side_tile is None or side_tile == "":
-            continue
-        # Get the direction from the dictionary we made earlier
-        direction = side_tile_dict[side_tile]
-        # If the tile's piece is one of the enemy pieces,
-        if side_tile.piece in enemy_pieces:
-            # Get the coordiates of the tile on the side of the main tile's side in the same direction as the main tile's side
-            side_dir_side_coord = tuple(get_sides(side_tile.xy)[direction])
-            # Get the tile from the game board by the main side's side coordinates
-            side_dir_side = gameboard.get_tile("xy", side_dir_side_coord)
-            # If the side exists and it's open,
-            if (not side_dir_side is None) and side_dir_side.is_open():
-                # Add it the valid jumps dictionary and add the tile to the list of end tiles.
-                valid[side_dir_side.id] = [side_tile.id]
-                side_dir_tiles.append(side_dir_side)
-
-    # If there are vaid end point tiles,
-    if len(side_dir_tiles):
-        # For each end point tile in the list of end point tiles,
-        for end_tile in side_dir_tiles:
-            # Get the dictionary from the jumps you could make from that end tile
-            w, h = gameboard.board_size
-            if _rec + 1 > round(sqrt(sqrt(w**2 + h**2))):
-                break
-            # If the piece has made it to the opposite side,
-            if (piece_id == 0 and end_tile.id[1] == "8") or (
-                piece_id == 1 and end_tile.id[1] == "1"
-            ):
-                # King that piece
-                piece_id += 2
-                _rec = -1
-            _, add_valid = get_jumps(
-                gameboard, piece_id, end_tile, _rec=_rec + 1
-            )
-            # For each key in the new dictionary of valid tile's keys,
-            for newKey in add_valid.keys():
-                # If the key is not already existant in the list of valid destinations,
-                if not newKey in valid.keys():
-                    # Add that destination to the dictionary and every tile you have to jump to get there.
-                    valid[newKey] = valid[end_tile.id] + add_valid[newKey]
-
-    return list(valid.keys()), valid
-
-
-def get_moves(
-    gameboard: GameBoard, piece_id: int, tile: Tile, mustopen: bool = True
-) -> tuple[str, ...]:
-    "Gets valid moves a piece can make"
-    # Get the side xy choords of the tile's xy pos, then modify results for pawns
-    choords = [tuple(i) for i in pawn_modify(get_sides(tile.xy), piece_id)]
-    moves = []
-    tiles = gameboard.get_tiles("xy", choords)
-
-    if len(choords) >= 1:
-        if mustopen:
-            for i in range(len(tiles) - 1, -1, -1):
-                if (
-                    not tiles[i] is None
-                    and not tiles[i] == ""
-                    and tiles[i].is_open()
-                ):
-                    continue
-                del tiles[i]
-        moves = [tile.id for tile in tiles]
-    # Add in valid moves from jumping
-    jumps = []
-    if not piece_id is None:
-        jumps, _ = get_jumps(gameboard, piece_id, tile)
-    for jump in jumps:
-        if not jump in moves:
-            moves.append(jump)
-
-    return tuple(moves)
-
-
-def check_for_win(gameboard: GameBoard) -> int | None:
-    "Checks a gameboard for wins, returns the player number if there is one, otherwise return None"
-    # Get all the tiles pieces can be on, in this case black tiles
-    tiles = gameboard.tiles.values()
-    # For each of the two players,
-    for player in range(2):
-        # Get that player's possible pieces
-        player_pieces = {player, player + 2}
-        # For each tile in the playable tiles,
-        for tile in tiles:
-            # If the tile's piece is one of the player's pieces,
-            if tile.piece in player_pieces:
-                if get_moves(gameboard, tile.piece, tile):
-                    # Player has at least one move, no need to continue
-                    break
-        else:
-            # Continued without break, so player either has no moves
-            # or no possible moves, so their opponent wins
-            return (player + 1) % 2
-    return None
-
-
-class Tile:
-    "Object for storing data about tiles"
+class Piece(sprite.Sprite):
+    "Piece"
+    __slots__ = (
+        "piece_type",
+        "board_position",
+        "position_name",
+        "selected",
+        "destination_tiles",
+    )
 
     def __init__(
         self,
-        board: GameBoard,
-        tile_id: str,
-        location: Vector2,
-        color: int,
-        xy: tuple[int, int],
+        piece_type: int,
+        position: tuple[int, int],
+        position_name: str,
+        location: tuple[int, int] | Vector2,
     ) -> None:
-        # Store data about the game board, what tile id we are, where we live, what color we are, xy positions, basic stuff.
-        self.board = board
-        self.id = tile_id
-        self.location = Vector2(*location)
-        self.color = color
-        self.xy = xy
-        # We shouldn't have any pieces on us
-        self.piece = None
-        # Get the width and height of self
-        wh = [self.board.tile_size] * 2
-        # Get our location x and y, width, and height for collison later
-        self.xywh = (self.location[0], self.location[1], wh[0], wh[1])
-        # Set up how long untill we can be clicked again
-        self.click_delay = 0.1
-        # We are not clicked
-        self.click_time = 0
-        # We are not selected
+        super().__init__(f"piece_{position_name}")
+
+        self.piece_type = piece_type
+        self.board_position = position
+        self.position_name = position_name
+        self.location = location
+
         self.selected = False
-        # We are not glowing
-        self.glowing = False
-        # We don't know what the cursor's id is
-        self.cursor_id = None
-        # We don't know if we have any valid moves or jumps
-        self.moves = None
-        self.jumps = None
+        self.destination_tiles: list[tuple[Pos, Pos, Pos]] = []
 
-    def __repr__(self) -> str:
-        return f"<Tile {self.id} {self.location} {self.color} {self.xy}>"
+        self.update_location_on_resize = True
 
-    def get_data(self) -> dict[str, int | str | bool | list[Any] | tuple[Any]]:
-        "Returns a dictionary of important data that is safe to send to an AI"
-        # Set up the dictionary we're going to send
-        send = {}
-        # Send if this tile is open
-        send["open"] = bool(self.piece is None)
-        # Send this tile's piece
-        send["piece"] = str(self.piece)
-        # If we're an open tile,
-        if self.is_open() or self.moves is None:
-            # We have no jumps or moves to send
-            send["moves"] = []
-            send["jumps"] = [[], {}]
-        else:
-            # Otherwise, send the jumps and moves our piece can make
-            send["moves"] = list(self.moves)
-            send["jumps"] = list(self.jumps)
-        # Send our xy position
-        send["xy"] = tuple(self.xy)
-        # Send our color value
-        send["color"] = int(self.color)
-        # send['id'] = str(self.id)
-        # No telling id required, board's dictionary has our id as the key.
-        # Send the dictionary
-        return send
-
-    def get_cursor(self) -> Cursor | None:
-        "Gets the cursor from the world and returns it"
-        # If the cursor's id has not been found,
-        if self.cursor_id is None:
-            # Tell the world to find an entity with the name of 'cursor'
-            cursor = self.board.world.get_type("cursor")
-            # If the world found anything and there is at least one cursor entity,
-            if len(cursor):
-                # Set what we should return to the first (and in regular cases the only) cursor entity
-                cursor = cursor[0]
-                if cursor is not None:
-                    self.cursor_id = cursor.id
-                    return cursor
-            # Return None if the world didn't find any matches
-            return None
-        # If the cursor's id has been found, get the cursor from the world
-        cursor = self.board.world.get(self.cursor_id)
-        # If the cursor does not exist anymore/was moved to a different id,
-        if cursor is None:
-            # We no longer know the true id of the cursor
-            self.cursor_id = None
-            # Re-find the cursor
-            return self.get_cursor()
-        return cursor
-
-    def get_pressed(self) -> bool:
-        "Return True if the cursor is over tile and right click down"
-        # Get the cursor
-        cursor = self.get_cursor()
-        # If the cursor exists,
-        if not cursor is None:
-            # See if the right mouse button is down
-            if cursor.get_pressed():
-                # If it is, see if the cursor is over our image
-                point_x, point_y = self.board.convert_loc(cursor.location)
-                x, y, w, h = self.xywh
-
-                in_x = point_x >= x and point_x < x + w
-                in_y = point_y >= y and point_y < y + h
-                # If it is, this will return True
-                return in_x and in_y
-        # Otherwise, return False
-        return False
-
-    def is_open(self) -> bool:
-        "Return True if tile is empty"
-        return self.piece is None
-
-    def set_glowing_tiles(self, tf: bool) -> None:
-        "Sets the glowing state of tiles our piece can move to"
-        if self.moves:
-            for tile in (self.board.tiles[tid] for tid in self.moves):
-                tile.glowing = bool(tf)
-
-    def update_moves(self) -> None:
-        "Update self.moves and self.jumps if either are equal to None"
-        n = lambda x: x is None
-        if n(self.moves) or n(self.jumps):
-            if not self.is_open():
-                self.moves = get_moves(self.board, self.piece, self)
-                self.jumps = get_jumps(self.board, self.piece, self)
-            else:
-                self.moves = []
-                self.jumps = []
-
-    def process(self, time_passed: float) -> None:
-        "Do stuff like tell the cursor to carry pieces and drop them and click time and crazyness"
-        # Find out if we've been pressed
-        pressed = self.get_pressed()
-        # Get the cursor
-        cursor = self.get_cursor()
-        # Update moves and jumps lists
-        self.update_moves()
-        # Process if we've been selected
-        # If we are selected and haven't been clicked recently,
-        if (
-            pressed
-            and not self.click_time
-            and (
-                self.is_open()
-                or self.piece in ({1, 3}, {0, 2}, ())[self.board.playing]
+        self.add_components(
+            (
+                sprite.DragClickEventComponent(),
+                sprite.MovementComponent(speed=120),
+                sprite.TargetingComponent(),
             )
-        ):
-            # Toggle selected
-            self.selected = not self.selected
-            # If the cursor exists,
-            if not cursor is None:
-                # If we are now selected
-                if self.selected:
-                    # If we have a piece on us
-                    if not self.is_open():
-                        # If the cursor is not carrying a piece,
-                        if not cursor.is_carry():
-                            # Tell the cursor to carry our piece
-                            cursor.drag(self, self.board.piece_map[self.piece])
-                            # Get the tiles our piece can move to and make them glow
-                            self.set_glowing_tiles(True)
-                        else:
-                            # If cursor is carrying a piece and have a piece
-                            # Otherwise, we shouldn't be selected
-                            self.selected = False
-                    else:  # If we don't have a piece on us,
-                        # If we are a black tile, tell the cursor to drop the piece it's carrying onto us if it's carrying a piece
-                        if not self.color and cursor.is_carry():
-                            # If this move is a valid move,
-                            if self.id in cursor.carry_tile.moves:
-                                # Set the valid tiles glowing effect to false
-                                cursor.carry_tile.set_glowing_tiles(False)
-                                # Move the piece
-                                cursor.carry_tile.move_piece(self.id)
-                                # In either case, tell the cursor to drop it's image
-                                cursor.drop()
-                        self.selected = False
-                else:  # If we are now not selected,
-                    # If the cursor is carrying our piece and we've been un-selected, tell the cursor to give our piece back.
-                    if cursor.is_carry() and cursor.carry_tile.id == self.id:
-                        cursor.drop()
-                        self.set_glowing_tiles(False)
-        else:
-            # If we have been clicked recently, decement the time variable that tells us we were clicked recently
-            self.click_time = max(self.click_time - time_passed, 0)
-        if pressed:
-            # If we have been clicked just now, reset the time variable that tells us we've been clicked recently
-            self.click_time = self.click_delay
+        )
 
-    def is_selected(self) -> bool:
-        "Return True if we are selected"
-        return self.selected
+    def bind_handlers(self) -> None:
+        "Register handlers"
+        if not self.manager_exists:
+            return
+        self.set_outlined(False)
+        self.visible = True
 
-    def is_glowing(self) -> bool:
-        "Return True if we are glowing"
-        return self.glowing
+        self.register_handlers(
+            {
+                "click": self.handle_click_event,
+                f"piece_outline_{self.position_name}": self.handle_set_outline_event,
+                f"self_destruct_piece_{self.position_name}": self.handle_self_destruct_event,
+                f"piece_move_{self.position_name}": self.handle_move_event,
+                "reached_destination": self.handle_reached_destination_event,
+            }
+        )
 
-    def king_piece(self, piece_id: int) -> int:
-        "Return piece_id after piece has made it to this tile."
-        # If the piece has made it to the opposite side,
-        if (piece_id == 0 and self.id[1] == "8") or (
-            piece_id == 1 and self.id[1] == "1"
-        ):
-            # King that piece
-            piece_id += 2
-        return piece_id
+    def set_outlined(self, state: bool) -> None:
+        "Update image given new outline state"
+        manager_image: sprite.ImageComponent = self.manager.get_component(
+            "image"
+        )
+        value = "_outlined" if state else ""
+        self.image = manager_image.get_image(f"piece_{self.piece_type}{value}")
 
-    def play(self, piece_id: int) -> None:
-        "If tile is empty, set piece to piece id"
-        # If we have no pieces on us,
-        if self.is_open():
-            # Clear any stray, random data still stored within us
-            self.clear_moves()
-            # Put the piece on us
-            self.piece = self.king_piece(piece_id)
+    async def handle_click_event(
+        self, event: Event[dict[str, Pos | int]]
+    ) -> None:
+        await self.raise_event(
+            Event(
+                "gameboard_piece_clicked",
+                (
+                    self.position_name,
+                    self.piece_type,
+                ),
+                1,
+            )
+        )
 
-    def clear(self) -> None:
-        "Clear tile of any pieces"
-        # Delete any pieces that are on us.
-        self.piece = None
-        # Clear piece information
-        self.clear_moves()
+    async def handle_set_outline_event(self, event: Event[bool]) -> None:
+        "Update outlined state"
+        self.set_outlined(event.data)
 
-    def clear_moves(self) -> None:
-        "Clear the jumps and moves information"
-        self.moves = None
-        self.jumps = None
+    async def handle_self_destruct_event(self, event: Event[None]) -> None:
+        "Remove self from play"
+        self.kill()
+        self.manager.remove_component(self.name)
 
-    def reevaluate_moves(self) -> None:
-        "Called by the game board when moves should be re-evaluated"
-        self.clear_moves()
-        self.update_moves()
+    async def handle_tick_event(self, event: Event[dict[str, float]]) -> None:
+        "Move toward destination"
+        time_passed = event.data["time_passed"]
+        targeting: sprite.TargetingComponent = self.get_component("targeting")
+        await targeting.move_destination_time(time_passed)
 
-    def move_piece(self, tolocid: str) -> None:
-        "Return true if successfully moved piece from self to target tile"
-        # Get the target tile from the game board
-        target = self.board.tiles[tolocid]
-        # If the target tile has no piece on it and it's a valid move,
-        if target.is_open() and tolocid in self.moves:
-            # Get the moves that are jumps and the dictionary that has jumped piece tile ids in it
-            jump_moves, jumped = self.jumps
-            # If the destination is a jump,
-            if tolocid in jump_moves:
-                # For each tile with a piece that got jumped in it,
-                for tileid in jumped[tolocid]:
-                    # Get the tile from the gameboard and clear it.
-                    tile = self.board.tiles[tileid]
-                    tile.clear()
-                    self.piece = tile.king_piece(self.piece)
-                    # self.board.tiles[tileid].play(self.piece)
-                    # self.piece = self.board.tiles[tileid].piece
-                    # self.board.tiles[tileid].clear()
-            # Play our piece onto target tile
-            target.play(self.piece)
-            # We just played our piece to the target tile, we shouldn't have it anymore
-            self.clear()
-            # Niether of us are selected, we just made a play
-            self.selected = False
-            target.selected = False
-            # Also set the target's glowing value to false if it was glowing
-            target.glowing = False
-            # Tell the board that the current player's turn is over
-            self.board.turn_over()
+    async def handle_move_event(
+        self, event: Event[Iterable[tuple[Pos, Pos, Pos]]]
+    ) -> None:
+        "Handle movement animation to event position"
+        targeting: sprite.TargetingComponent = self.get_component("targeting")
+        self.destination_tiles.extend(event.data)
+        targeting.destination = self.destination_tiles[0][0]
+
+        self.register_handler("tick", self.handle_tick_event)
+        group = self.groups()[0]
+        group.move_to_front(self)
+
+    async def handle_reached_destination_event(
+        self, event: Event[None]
+    ) -> None:
+        "Raise gameboard_piece_moved event"
+        _, start_pos, end_pos = self.destination_tiles.pop(0)
+
+        if self.destination_tiles:
+            targeting: sprite.TargetingComponent = self.get_component(
+                "targeting"
+            )
+            targeting.destination = self.destination_tiles[0][0]
+        await self.raise_event(
+            Event(
+                "gameboard_piece_moved",
+                (
+                    self.position_name,
+                    start_pos,
+                    end_pos,
+                    not self.destination_tiles,
+                ),
+                1,
+            )
+        )
 
 
-class GameBoard(base2d.GameEntity):
-    "Entity that stores data about the game board and renders it"
+class Tile(sprite.Sprite):
+    "Outlined tile sprite"
+    __slots__ = ("color", "board_position", "position_name")
 
     def __init__(
-        self, world: World, board_size: int, tile_size: int, **kwargs: Any
+        self,
+        color: int,
+        position: tuple[int, int],
+        position_name: str,
+        location: tuple[int, int] | Vector2,
     ) -> None:
-        # Make a blank surface of the proper size by multiplying the board size by the tile size
-        image = pygame.Surface([x * tile_size for x in board_size])
-        # Fill the blank surface with green so we know if anything is broken/not updating
-        image.fill(GREEN)
-        super().__init__(world, "board", image, **kwargs)
+        super().__init__(f"tile_{position_name}")
+
+        self.color = color
+        self.board_position = position
+        self.position_name = position_name
+        self.location = location
+
+        self.update_location_on_resize = True
+
+        self.add_component(sprite.DragClickEventComponent())
+
+    def bind_handlers(self) -> None:
+        "Register handlers"
+        if not self.manager_exists:
+            return
+        self.set_outlined(True)
+
+        self.visible = True
+
+        self.register_handlers(
+            {
+                "click": self.handle_click_event,
+                f"self_destruct_tile_{self.position_name}": self.handle_self_destruct_event,
+            }
+        )
+
+    def set_outlined(self, state: bool) -> None:
+        "Update image given new outline state"
+        manager_image: sprite.ImageComponent = self.manager.get_component(
+            "image"
+        )
+        value = "_outlined" if state else ""
+        self.image = manager_image.get_image(f"tile_{self.color}{value}")
+
+    async def handle_click_event(
+        self, event: Event[dict[str, Pos | int]]
+    ) -> None:
+        await self.raise_event(
+            Event("gameboard_tile_clicked", self.position_name, 1)
+        )
+
+    async def handle_self_destruct_event(self, event: Event[None]) -> None:
+        self.kill()
+        self.manager.remove_component(self.name)
+
+
+def generate_tile_image(
+    # types: valid-type error: Variable "pygame.locals.Color" is not valid as a type
+    # types: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
+    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
+    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
+    # types: valid-type error: Variable "pygame.locals.Color" is not valid as a type
+    # types: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
+    color: Color
+    | int
+    | str
+    | tuple[int, int, int]
+    | tuple[int, int, int, int]
+    | Sequence[int],
+    size: tuple[int, int],
+) -> Surface:
+    "Generate the image used for a tile"
+    # Make a blank surface of the size we're given
+    surf = pygame.Surface(size)
+    # Fill the blank surface with the color given
+    surf.fill(color)
+    # Return a rectangular (or square if width and height of size are the same) image of the color given
+    return surf
+
+
+# 0 = False = Black = 0, 2
+# 1 = True  = Red   = 1, 3
+
+
+class ActionSet(NamedTuple):
+    """Represents a set of actions"""
+
+    jumps: dict[Pos, list[Pos]]
+    moves: tuple[Pos, ...]
+    ends: set[Pos]
+
+
+class GameBoard(sprite.Sprite):
+    "Entity that stores data about the game board and renders it"
+    __slots__ = (
+        "board_size",
+        "tile_size",
+        "tile_color_map",
+        "tile_surfs",
+        "piece_map",
+        "turn",
+        "game_won",
+        "selected_piece",
+        "pieces",
+        "actions",
+        "ai_player",
+    )
+
+    def __init__(
+        self,
+        board_size: tuple[int, int],
+        tile_size: int,
+        turn: int,
+        ai_player: int | None = None,
+    ) -> None:
+        super().__init__("board")
+
+        self.add_component(sprite.ImageComponent())
 
         # Define Tile Color Map and Piece Map
-        self.tile_color_map = [BLACK, RED]
+        self.tile_color_map = (BLACK, RED)
+
+        # Define Black Pawn color to be more of a dark grey so you can see it
+        black = (127, 127, 127)
         red = (160, 0, 0)
-        black = [
-            127
-        ] * 3  # Define Black Pawn color to be more of a dark grey so you can see it
-        # Define each piece by giving what color it should be and an image to recolor
-        self.piece_map = [
-            [red, "Pawn"],
-            [black, "Pawn"],
-            [red, "King"],
-            [black, "King"],
-        ]
+
+        # Define each piece by giving what color it should be and an image
+        # to recolor
+        self.piece_map = (
+            (red, "data/Pawn.png"),
+            (black, "data/Pawn.png"),
+            (red, "data/King.png"),
+            (black, "data/King.png"),
+        )
 
         # Store the Board Size and Tile Size
-        self.board_size = base2d.to_int(board_size)
-        self.tile_size = int(tile_size)
-
-        # Convert Tile Color Map and Piece Map into Dictionarys
-        self.tile_color_map = {
-            i: self.tile_color_map[i] for i in range(len(self.tile_color_map))
-        }
-        self.piece_map = {
-            i: self.piece_map[i] for i in range(len(self.piece_map))
-        }
-
-        # Generate Tile Surfaces for each color of tile stored in the Tile Color Map Dictionary
-        self.tile_surfs = {
-            color_id: self.gen_tile_surf(
-                self.tile_color_map[color_id], [self.tile_size] * 2
-            )
-            for color_id in self.tile_color_map.keys()
-        }
-
-        # Generate a Pice Surface for each piece using a base image and a color
-        self.piece_map = {
-            i: base2d.replace_with_color(
-                pygame.transform.scale(
-                    IMAGES[self.piece_map[i][1]], [tile_size] * 2
-                ),
-                self.piece_map[i][0],
-            )
-            for i in range(len(self.piece_map))
-        }
-
-        # Generate tile data
-        self.gen_tiles()
+        self.board_size = board_size
+        self.tile_size = tile_size
 
         # Set playing side
-        self.playing = randint(0, 1)
+        self.turn = turn
+        self.pieces: dict[Pos, int] = {}
+        self.actions: dict[Pos, ActionSet] = {}
+        self.game_won: int | None = None
+        self.ai_player = ai_player
 
-        # No one has won.
-        self.won = None
+        self.selected_piece: str | None = None
 
-    def render(self, surface: Surface) -> None:
-        "Generates the board surface and blits it to surface"
-        # Generate the board surface and store it as self.image
-        self.image = self.gen_board_surf()
-        # Render self.image in the correct location on the screen
-        super().render(surface)
+        self.update_location_on_resize = True
 
-    def process(self, time_passed: float) -> None:
-        "Processes the game board and each of it's tiles and pieces"
-        # Process the base2d.GameEntity part of self, which really doesn't do anything since the board doesn't move
-        base2d.GameEntity.process(self, time_passed)
+    def get_tile_name(self, x: int, y: int) -> str:
+        """Get name of a given tile"""
+        return chr(65 + x) + str(self.board_size[1] - y)
 
-        # For each tile,
-        for tile in iter(self.tiles.values()):
-            # Process mouse clicks and stuff
-            tile.process(time_passed)
+    def get_tile_pos(self, name: str) -> Pos:
+        """Get tile position from it's name"""
+        x = ord(name[0]) - 65
+        y = self.board_size[1] - int(name[1:])
+        return (x, y)
 
-    def get_data(self) -> dict[str, str | tuple[int, int] | dict[str, Any]]:
-        "Returns imporant data that is safe to send to an AI"
-        # Set up the dictionary we're going to send
-        send = {}
-        # Send the game board size
-        send["board_size"] = tuple(self.board_size)
-        # Send who's won the game
-        send["won"] = str(self.won)
-        # Send all tile data
-        send["tiles"] = {
-            tile.id: tile.get_data() for tile in self.tiles.values()
-        }
-        # Send the dictionary
-        return send
+    def does_piece_king(self, piece_type: int, position: Pos) -> bool:
+        """Return if piece needs to be kinged given it's type and position"""
+        _, y = position
+        _, h = self.board_size
+        return (piece_type == 1 and y == 0) or (piece_type == 0 and y == h - 1)
 
-    def gen_tile_surf(
+    def valid_location(self, position: Pos) -> bool:
+        """Return if position is valid"""
+        x, y = position
+        w, h = self.board_size
+        return 0 <= x and 0 <= y and x < w and y < h
+
+    def get_jumps(
         self,
-        color: Color
-        | int
-        | str
-        | tuple[int, int, int]
-        | tuple[int, int, int, int]
-        | Sequence[int],
-        size: list[int],
-    ) -> Surface:
-        "Generate the image used for a tile"
-        # Make a blank surface of the size we're given
-        surf = pygame.Surface(base2d.to_int(size))
-        # Fill the blank surface with the color given
-        surf.fill(color)
-        # Return a rectangular (or square if width and height of size are the same) image of the color given
-        return surf
+        position: Pos,
+        piece_type: int | None = None,
+        _recursion: int = 0,
+    ) -> dict[Pos, list[Pos]]:
+        """Gets valid jumps a piece can make
 
-    def outline_surf(
-        self, surface: Surface, color: tuple[int, int, int]
-    ) -> Surface:
-        "Add an outline of a given color to a surface"
-        # Get the size of the surface
-        w, h = surface.get_size()
-        # Replace all color on the image with the color
-        surf = base2d.replace_with_color(surface, color)
-        # Get 90% of the width and height
-        inside = base2d.round_all(base2d.amol([w, h], m=0.90))
-        # Make the surface be 90% of it's size
-        inside_surf = pygame.transform.scale(surface, inside)
-        # Get the proper position the modified image should be at
-        pos = base2d.amol(list(Vector2(w, h) - Vector2(*inside)), d=2)
-        # Add the modified image to the correct location
-        surf.blit(inside_surf, base2d.to_int(pos))
-        # Return image with yellow outline
-        return surf
+        position is a xy coordinate tuple pointing to a board position
+            that may or may not have a piece on it.
+        piece_type is the piece type at position. If not
+            given, position must point to a tile with a piece on it
 
-    def gen_tiles(self) -> None:
+        Returns dictionary that maps end positions to
+        jumped pieces to get there"""
+        if piece_type is None:
+            piece_type = self.pieces[position]
+
+        # If we are kinged, get a pawn version of ourselves.
+        # Take that plus one mod 2 to get the pawn of the enemy
+        enemy_pawn = (piece_type + 1) % 2
+        # Then get the pawn and the king in a list so we can see if a piece
+        # is our enemy
+        enemy_pieces = {enemy_pawn, enemy_pawn + 2}
+
+        # Get the side choordinates of the tile and make them tuples so
+        # the scan later works properly.
+        sides = get_sides(position)
+        # Make a dictionary to find what direction a tile is in if you
+        # give it the tile.
+        # end position : jumped pieces
+
+        # Make a dictionary for the valid jumps and the pieces they jump
+        valid: dict[Pos, list[Pos]] = {}
+
+        # For each side tile in the jumpable tiles for this type of piece,
+        # types: misc error: <nothing> object is not iterable
+        for direction, side in pawn_modify(
+            # types: arg-type error: Argument 1 to "pawn_modify" has incompatible type "Tuple[Tuple[int, Tuple[int, int]], ...]"; expected "Tuple[<nothing>, <nothing>, <nothing>, <nothing>]"
+            tuple(enumerate(sides)),
+            piece_type
+            # types: ^
+        ):
+            # types: has-type error: Cannot determine type of "side"
+            side_piece = self.pieces.get(side)
+            # Side piece must be one of our enemy's pieces
+            if side_piece not in enemy_pieces:
+                continue
+            # Get the direction from the dictionary we made earlier
+            # Get the coordiates of the tile on the side of the main tile's
+            # side in the same direction as the main tile's side
+            # types: has-type error: Cannot determine type of "side"
+            # types: has-type error: Cannot determine type of "direction"
+            side_side = get_sides(side)[direction]
+            side_side_piece = self.pieces.get(side_side)
+            # If the side exists and it's open,
+            if side_side_piece is None and self.valid_location(side_side):
+                # Add it the valid jumps dictionary and add the tile
+                # to the list of end tiles.
+                # types: has-type error: Cannot determine type of "side"
+                valid[side_side] = [side]
+
+        # For each end point tile in the list of end point tiles,
+        for end_tile in tuple(valid):
+            # Get the dictionary from the jumps you could make
+            # from that end tile
+            w, h = self.board_size
+            if _recursion + 1 > math.ceil((w**2 + h**2) ** 0.25):
+                break
+            # If the piece has made it to the opposite side,
+            piece_type_copy = piece_type
+            if self.does_piece_king(piece_type_copy, end_tile):
+                # King that piece
+                piece_type_copy += 2
+                _recursion = -1
+            add_valid = self.get_jumps(
+                end_tile, piece_type_copy, _recursion=_recursion + 1
+            )
+            # For each key in the new dictionary of valid tile's keys,
+            for end_pos, jumped_pieces in add_valid.items():
+                # If the key is not already existant in the list of
+                # valid destinations,
+                if end_pos not in valid:
+                    # Add that destination to the dictionary and every
+                    # tile you have to jump to get there.
+                    valid[end_pos] = valid[end_tile] + jumped_pieces
+
+        return valid
+
+    def get_moves(self, position: Pos) -> tuple[Pos, ...]:
+        "Gets valid moves piece at position can make, not including jumps"
+        piece_type = self.pieces[position]
+        # Get the side xy choords of the tile's xy pos,
+        # then modify results for pawns
+        moves = pawn_modify(get_sides(position), piece_type)
+        return tuple(
+            [
+                m
+                for m in filter(self.valid_location, moves)
+                if m not in self.pieces
+            ]
+        )
+
+    def calculate_actions(self, position: Pos) -> ActionSet:
+        "Calculate all the actions the piece at given position can make"
+        jumps = self.get_jumps(position)
+        moves = self.get_moves(position)
+        ends = set(jumps)
+        ends.update(moves)
+        return ActionSet(jumps, moves, ends)
+
+    def bind_handlers(self) -> None:
+        self.register_handlers(
+            {
+                "init": self.handle_init_event,
+                "gameboard_piece_clicked": self.handle_piece_clicked_event,
+                "gameboard_tile_clicked": self.handle_tile_clicked_event,
+                "gameboard_piece_moved": self.handle_piece_moved_event,
+            }
+        )
+
+    async def handle_init_event(self, event: Event[None]) -> None:
+        # Generate tile data
+        await self.generate_tile_images()
+        self.image = self.generate_board_image()
+        self.generate_pieces()
+        self.visible = True
+
+    ##    def get_data(self) -> dict[str, str | tuple[int, int] | dict[str, Any]]:
+    ##        "Returns imporant data that is safe to send to an AI"
+    ##        # Set up the dictionary we're going to send
+    ##        send = {}
+    ##        # Send the game board size
+    ##        send["board_size"] = tuple(self.board_size)
+    ##        # Send who's won the game
+    ##        send["won"] = str(self.won)
+    ##        # Send all tile data
+    ##        send["tiles"] = {
+    ##            tile.id: tile.get_data() for tile in self.tiles.values()
+    ##        }
+    ##        # Send the dictionary
+    ##        return send
+
+    async def handle_piece_clicked_event(
+        self, event: Event[tuple[str, int]]
+    ) -> None:
+        "Update selected piece and outlines accordingly"
+        piece_name, piece_type = event.data
+
+        if piece_type % 2 != self.turn:
+            return
+
+        selected_piece: str | None
+
+        if piece_name != self.selected_piece:
+            if self.selected_piece is not None:
+                await self.raise_event(
+                    Event(f"piece_outline_{self.selected_piece}", False)
+                )
+            selected_piece = piece_name
+            await self.raise_event(Event(f"piece_outline_{piece_name}", True))
+        else:
+            await self.raise_event(
+                Event(f"piece_outline_{self.selected_piece}", False)
+            )
+            selected_piece = None
+        await self.select_piece(selected_piece)
+
+    def get_actions_set(self, piece_position: Pos) -> ActionSet:
+        "Calculate and return ActionSet if required"
+        if piece_position in self.actions:
+            new_action_set = self.actions[piece_position]
+        else:
+            new_action_set = self.calculate_actions(piece_position)
+            self.actions[piece_position] = new_action_set
+        return new_action_set
+
+    async def select_piece(self, piece_name: str | None) -> None:
+        "Update glowing tiles from new selected piece"
+        ignore: set[tuple[int, int]] = set()
+
+        if piece_name is not None:
+            # Calculate actions if required
+            new_action_set = self.get_actions_set(
+                self.get_tile_pos(piece_name)
+            )
+            ignore = new_action_set.ends
+
+        ignored: set[tuple[int, int]] = set()
+
+        # Remove outlined tiles from previous selection if existed
+        if self.selected_piece is not None:
+            action_set = self.get_actions_set(
+                self.get_tile_pos(self.selected_piece)
+            )
+            ignored = action_set.ends & ignore
+            remove = action_set.ends - ignore
+            async with trio.open_nursery() as nursery:
+                for tile_position in remove:
+                    tile_name = self.get_tile_name(*tile_position)
+                    event = Event(f"self_destruct_tile_{tile_name}", None)
+                    nursery.start_soon(self.raise_event, event)
+
+        if piece_name is None:
+            self.selected_piece = None
+            return
+
+        # For each end point
+        for tile_position in new_action_set.ends - ignored:
+            self.add_tile(tile_position)
+
+        self.selected_piece = piece_name
+
+    async def handle_tile_clicked_event(self, event: Event[str]) -> None:
+        "Start preforming move"
+        # No one allowed to move during animation
+        self.turn += 2
+
+        tile_name = event.data
+        piece_name = self.selected_piece
+
+        assert piece_name is not None
+
+        tile_position = self.get_tile_pos(tile_name)
+        piece_position = self.get_tile_pos(piece_name)
+
+        assert tile_position in self.actions[piece_position].ends
+
+        await self.raise_event(Event(f"piece_outline_{piece_name}", False))
+        await self.select_piece(None)
+
+        if tile_position in self.actions[piece_position].moves:
+            tile_location = self.get_tile_location(tile_position)
+
+            await self.raise_event(
+                Event(
+                    f"piece_move_{piece_name}",
+                    [(tile_location, piece_position, tile_position)],
+                )
+            )
+
+        if tile_position in self.actions[piece_position].jumps:
+            jumped = self.actions[piece_position].jumps[tile_position]
+            positions: list[Pos] = []
+
+            cur_x, cur_y = piece_position
+            for jumped_pos in jumped:
+                start_pos = (cur_x, cur_y)
+
+                jumped_x, jumped_y = jumped_pos
+                # Rightshift 1 is more efficiant way to multiply by 2
+                cur_x += (jumped_x - cur_x) << 1
+                cur_y += (jumped_y - cur_y) << 1
+
+                tile_location = self.get_tile_location((cur_x, cur_y))
+                positions.append((tile_location, start_pos, (cur_x, cur_y)))
+            await self.raise_event(
+                Event(f"piece_move_{piece_name}", positions)
+            )
+
+    async def handle_piece_moved_event(
+        self, event: Event[tuple[str, str, bool]]
+    ) -> None:
+        "Handle piece finishing it's movement animation"
+        piece_name, start_pos, end_pos, done = event.data
+
+        piece_type = self.pieces.pop(start_pos)
+
+        if self.does_piece_king(piece_type, end_pos):
+            piece_type += 2
+
+        self.pieces[end_pos] = piece_type
+
+        start_x, start_y = start_pos
+        end_x, end_y = end_pos
+
+        delta_x = end_x - start_x
+        delta_y = end_y - start_y
+        if abs(delta_x) > 1 and abs(delta_y) > 1:
+            # Leftshift 1 is more efficiant way to divide by 2
+            jumped_x = start_x + (delta_x >> 1)
+            jumped_y = start_y + (delta_y >> 1)
+
+            if self.pieces.pop((jumped_x, jumped_y), None) is not None:
+                jumped_name = self.get_tile_name(jumped_x, jumped_y)
+                await self.raise_event(
+                    Event(f"self_destruct_piece_{jumped_name}", None)
+                )
+
+        if done:
+            await self.raise_event(
+                Event(f"self_destruct_piece_{piece_name}", None)
+            )
+
+            self.add_piece(self.pieces[end_pos], end_pos)
+
+            self.turn_over()
+
+    async def generate_tile_images(self) -> None:
+        "Load all the images"
+        image: sprite.ImageComponent = self.get_component("image")
+        outline: sprite.OutlineComponent = image.get_component("outline")
+        outline.size = 2
+
+        base_folder = os.path.dirname(__file__)
+
+        for index, color in enumerate(self.tile_color_map):
+            name = f"tile_{index}"
+            surface = generate_tile_image(
+                color, (self.tile_size, self.tile_size)
+            )
+
+            if index == 0:
+                image.add_image(name, surface)
+            else:
+                image.add_image_and_mask(name, surface, "tile_0")
+
+            if index % 2 != 0:
+                continue
+
+            outline_color = GREEN
+            outline_ident = outline.precalculate_outline(name, outline_color)
+            image.add_image(f"{name}_outlined", outline_ident)
+
+        # Generate a Pice Surface for each piece using a base image and a color
+        for piece_type, piece_data in enumerate(self.piece_map):
+            color, filename = piece_data
+            real_path = os.path.join(base_folder, *filename.split("/"))
+
+            name = f"piece_{piece_type}"
+            surface = base2d.replace_with_color(
+                pygame.transform.scale(
+                    pygame.image.load(real_path),
+                    (self.tile_size, self.tile_size),
+                ),
+                color,
+            )
+
+            if piece_type % 2 == 0:
+                image.add_image(name, surface)
+            else:
+                image.add_image_and_mask(
+                    name, surface, f"piece_{piece_type-1}"
+                )
+
+            outline_color = YELLOW
+            outline_ident = outline.precalculate_outline(name, outline_color)
+            image.add_image(f"{name}_outlined", outline_ident)
+
+    def get_tile_location(self, position: Pos) -> Vector2:
+        "Return the center point of a given tile position"
+        location = Vector2.from_iter(position) * self.tile_size
+        center = self.tile_size // 2
+        return location + (center, center) + self.rect.topleft
+
+    def add_piece(self, piece_type: int, position: Pos) -> str:
+        "Add piece given type and position"
+        group = self.groups()[-1]
+        # Get the proper name of the tile we're creating ('A1' to 'H8')
+        name = self.get_tile_name(*position)
+
+        piece = Piece(
+            piece_type, position, name, self.get_tile_location(position)
+        )
+        self.add_component(piece)
+        group.add(piece)  # type: ignore[arg-type]
+
+        self.pieces[position] = piece_type
+        return piece.name
+
+    def add_tile(self, position: Pos) -> str:
+        "Add outlined tile given position"
+        group = self.groups()[-1]
+        # Get the proper name of the tile we're creating ('A1' to 'H8')
+        x, y = position
+        name = self.get_tile_name(x, y)
+        color = (x + y) % len(self.tile_color_map)
+
+        tile = Tile(color, position, name, self.get_tile_location(position))
+        self.add_component(tile)
+        group.add(tile)  # type: ignore[arg-type]
+        return tile.name
+
+    def generate_pieces(self) -> None:
         "Generate data about each tile"
+        board_width, board_height = self.board_size
         # Reset tile data
-        self.tiles = {}
         loc_y = 0
         # Get where pieces should be placed
-        z_to_1 = round(self.board_size[1] / 3)  # White
-        z_to_2 = (self.board_size[1] - (z_to_1 * 2)) + z_to_1  # Black
+        z_to_1 = round(board_height / 3)  # White
+        z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
         # For each xy position in the area of where tiles should be,
-        for y in range(self.board_size[1]):
+        for y in range(board_height):
             # Reset the x pos to 0
             loc_x = 0
-            for x in range(self.board_size[0]):
-                # Get the proper name of the tile we're creating ('A1' to 'H8')
-                name = chr(65 + x) + str(self.board_size[1] - y)
+            for x in range(board_width):
                 # Get the color of that spot by adding x and y mod the number of different colors
-                color = (x + y) % len(self.tile_surfs.keys())
-                # Create the tile
-                tile = Tile(self, name, Vector2(loc_x, loc_y), color, (x, y))
+                color = (x + y) % len(self.tile_color_map)
                 # If a piece should be placed on that tile and the tile is not Red,
                 if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
                     # Set the piece to White Pawn or Black Pawn depending on the current y pos
-                    tile.piece = {True: 1, False: 0}[y <= z_to_1]
-                # Add the tile to the tiles dictionary with a key of it's name ('A1' to 'H8')
-                self.tiles[name] = tile
+                    piece = int(y <= z_to_1)
+                    self.add_piece(piece, (x, y))
                 # Increment the x counter by tile_size
                 loc_x += self.tile_size
             # Increment the y counter by tile_size
             loc_y += self.tile_size
 
-    def get_tile(self, by: str, value: object) -> Tile | None:
-        "Get a spicific tile by an atribute it has, otherwise return None"
-        by = str(by)
-        # For each tile on the game board,
-        for tile in self.tiles.values():
-            # See if the tile has the attribute we're looking at, and if it does see if it matches value
-            if hasattr(tile, by) and getattr(tile, by) == value:
-                # If it's a match, return that tile
-                return tile
-        # Otherwise return None
-        return None
-
-    def get_tiles(self, by: str, values: Collection[object]) -> list[object]:
-        "Gets all tiles whos attribute of by is in value, and if there are no matches return None"
-        by = str(by)
-        matches = []
-        # For each tile on the game board,
-        for tile in self.tiles.values():
-            # See if it has the attribute we're looking for, and if it does have it, see if it's a match to the given value.
-            if hasattr(tile, by) and getattr(tile, by) in values:
-                # If it's a match, add it to matches
-                matches.append(tile)
-        if matches:
-            # Return all tiles that matched our query
-            return matches
-        # Otherwise return None in a list
-        return [None]
-
-    def gen_board_surf(self) -> Surface:
+    def generate_board_image(self) -> Surface:
         "Generate an image of a game board"
-        location = Vector2(0, 0)
+        image: sprite.ImageComponent = self.get_component("image")
+
+        board_width, board_height = self.board_size
+
         # Get a surface the size of everything
-        surf = pygame.Surface(base2d.amol(self.board_size, m=self.tile_size))
+        surf = pygame.Surface([x * self.tile_size for x in self.board_size])
+
         # Fill it with green so we know if anything is broken
         surf.fill(GREEN)
+
         # For each tile xy choordinate,
-        for y in range(self.board_size[1]):
-            for x in range(self.board_size[0]):
-                # Get the correct tile at that position
-                tile = self.tiles[chr(65 + x) + str(self.board_size[1] - y)]
-                # Get the color id of the tile, and get the tile surface that corrolates to that id
-                tile_image = self.tile_surfs[tile.color]
-                # If the tile has no piece on it and it's selected,
-                if tile.piece is None and tile.is_selected():
-                    # Make the tile have a yellow outline to indicate it's selected
-                    tile_image = self.outline_surf(tile_image, YELLOW)
-                if tile.is_glowing():
-                    # Make the tile glow blue
-                    tile_image = self.outline_surf(tile_image, GREEN)
+        loc_y = 0
+        for y in range(board_height):
+            loc_x = 0
+            for x in range(board_width):
+                color = (x + y) % len(self.tile_color_map)
                 # Blit the tile image to the surface at the tile's location
-                surf.blit(tile_image, tile.location)
-                # If the tile does have a piece on it,
-                if not tile.piece is None:
-                    # Get the piece surface that corrolates to that piece id
-                    piece = self.piece_map[tile.piece]
-                    # If the tile is also selected,
-                    if tile.is_selected():
-                        # Add a yellow outline to the piece to indicate it's selected
-                        piece = self.outline_surf(piece, YELLOW)
-                    # Blit the piece to the surface at the tile's location
-                    surf.blit(piece, tile.location)
-        ##                # Blit the id of the tile at the tile's location
-        ##                value = "".join(base2d.to_str(tile.xy))
-        ##                # value = tile.id
-        ##                blit_text(
-        ##                    "VeraSerif.ttf",
-        ##                    20,
-        ##                    value,
-        ##                    GREEN,
-        ##                    tile.location,
-        ##                    surf,
-        ##                    False,
-        ##                )
+                surf.blit(image.get_image(f"tile_{color}"), (loc_x, loc_y))
+                ##                # Blit the id of the tile at the tile's location
+                ##                surf.blit(
+                ##                    render_text(
+                ##                        "VeraSerif.ttf",
+                ##                        20,
+                ##                        "".join(map(str, (x, y))),
+                ##                        GREEN
+                ##                    ),
+                ##                    (loc_x, loc_y)
+                ##                )
+                loc_x += self.tile_size
+            # Increment the y counter by tile_size
+            loc_y += self.tile_size
         return surf
 
-    def convert_loc(self, location: Vector2) -> Vector2:
-        "Converts a screen location to a location on the game board like tiles use"
-        # Get where zero zero would be in tile location data,
-        zero = self.location - Vector2(
-            *base2d.amol(self.image.get_size(), d=2)
-        )
-        # and return the given location minus zero zero to get tile location data
-        return Vector2(*location) - zero
+    def check_for_win(self) -> int | None:
+        """Return player number if they won else None"""
+        # For each of the two players,
+        for player in range(2):
+            # Get that player's possible pieces
+            player_pieces = {player, player + 2}
+            # For each tile in the playable tiles,
+            for position, piece_type in self.pieces.items():
+                # If the tile's piece is one of the player's pieces,
+                if piece_type in player_pieces:
+                    if self.get_actions_set(position).ends:
+                        # Player has at least one move, no need to continue
+                        break
+            else:
+                # Continued without break, so player either has no moves
+                # or no possible moves, so their opponent wins
+                return (player + 1) % 2
+        return None
 
     def turn_over(self) -> None:
         "Called when a tile wishes to communicate that the current player's turn is over"
+        # Clear actions
+        self.actions.clear()
+
         # Toggle the active player
-        self.playing = (self.playing + 1) % 2
-        # Tell all tiles to re-evaluate their move information
-        for tile in iter(self.tiles.values()):
-            tile.reevaluate_moves()
+        self.turn = (self.turn + 1) % 2
+        ##        # Tell all tiles to re-evaluate their move information
+        ##        for tile in iter(self.tiles.values()):
+        ##            tile.reevaluate_moves()
 
         # If no one has won,
-        if self.won is None:
+        if self.game_won is None:
             # Check for wins
-            win = check_for_win(self)
+            win = self.check_for_win()
             # If someone has won,
-            if not win is None:
+            if win is not None:
                 # Don't let anybody move
-                self.playing = 2
+                self.turn = 2
                 # The winner is the person check_for_win found.
-                self.won = win
+                self.game_won = win
 
 
-def show_win(valdisplay: "ValDisplay") -> str:
-    "Called when the value display requests text to render"
-    # Get the board
-    boards = valdisplay.world.get_type("board")
-    if len(boards):
-        board = boards[0]
-    else:
-        # If the board not exist, nothing to return
-        return ""
-    # If the game has been won,
-    if not board.won is None:
-        # show that
-        return f"{PLAYERS[board.won]} Won!"
-    return ""
+##def show_win(valdisplay: "ValDisplay") -> str:
+##    "Called when the value display requests text to render"
+##    # Get the board
+##    boards = valdisplay.world.get_type("board")
+##    if len(boards):
+##        board = boards[0]
+##    else:
+##        # If the board not exist, nothing to return
+##        return ""
+##    # If the game has been won,
+##    if not board.won is None:
+##        # show that
+##        return f"{PLAYERS[board.won]} Won!"
+##    return ""
 
 
-class ValDisplay(base2d.GameEntity):
-    "Entity that displays the value of a string returned by calling value_function(self)"
-
-    def __init__(
-        self,
-        world: World,
-        font_name: str,
-        font_size: int,
-        value_function,
-        **kwargs: Any,
-    ) -> None:
-        base2d.GameEntity.__init__(self, world, "valdisplay", None, **kwargs)
-        # Store the font __title__, font size, and value function
-        self.font_name = str(font_name)
-        self.font_size = int(font_size)
-        self.value = value_function
-        # By default text is not centered
-        self.centered = True
-        # By default text is black
-        self.color = BLACK
-
-        # Read keyword arguments and act on them appropriately.
-        if "centered" in kwargs.keys():
-            self.centered = bool(kwargs["centered"])
-        if "color" in kwargs.keys():
-            self.color = tuple(kwargs["color"])
-        if "renderPriority" in kwargs.keys():
-            self.render_priority = kwargs["renderPriority"]
-
-    def render(self, surface: Surface) -> None:
-        "Render text and blit it to surface"
-        blit_text(
-            self.font_name,
-            self.font_size,
-            str(self.value(self)),
-            self.color,
-            self.location,
-            surface,
-            middle=self.centered,
-        )
-
-
-class Button(base2d.BaseButton):
-    "Button that only shows when a player has won the game"
-
-    def __init__(
-        self, world: World, anim, trigger, action, states: int = 0, **kwargs
-    ):
-        super().__init__(world, anim, trigger, action, states, **kwargs)
-        self.do_reset = True
-        self.anim_flip = False
-
-    def process(self, time_passed: float) -> None:
-        "Does regular button processing AND makes it so button only shows when the game has been won"
-        # Do regular button processing
-        super().process(time_passed)
-        # Get the game board
-        boards = self.world.get_type("board")
-        if len(boards):
-            board = boards[0]
-            # Show if the game has been won
-            self.visible = not board.won is None
-        if not self.do_reset and not self.anim_flip:
-            self.anim = [i for i in reversed(self.anim)]
-            self.anim_flip = True
+##class ValDisplay(base2d.GameEntity):
+##    "Entity that displays the value of a string returned by calling value_function(self)"
+##
+##    # types: no-untyped-def error: Function is missing a type annotation for one or more arguments
+##    def __init__(
+##        self,
+##        font_name: str,
+##        font_size: int,
+##        value_function,
+##        **kwargs: Any,
+##    ) -> None:
+##        # types: call-arg error: Too many arguments for "__init__" of "GameEntity"
+##        base2d.GameEntity.__init__(self, "valdisplay", None, **kwargs)
+##        # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+##        # Store the font __title__, font size, and value function
+##        self.font_name = str(font_name)
+##        self.font_size = int(font_size)
+##        self.value = value_function
+##        # By default text is not centered
+##        self.centered = True
+##        # By default text is black
+##        self.color = BLACK
+##
+##        # Read keyword arguments and act on them appropriately.
+##        if "centered" in kwargs.keys():
+##            self.centered = bool(kwargs["centered"])
+##        if "color" in kwargs.keys():
+##            # types: assignment error: Incompatible types in assignment (expression has type "Tuple[Any, ...]", variable has type "Tuple[int, int, int]")
+##            self.color = tuple(kwargs["color"])
+##        if "renderPriority" in kwargs.keys():
+##            self.render_priority = kwargs["renderPriority"]
+##
+##    def render(self, surface: Surface) -> None:
+##        "Render text and blit it to surface"
+##        # types: name-defined error: Name "blit_text" is not defined
+##        blit_text(
+##            self.font_name,
+##            self.font_size,
+##            str(self.value(self)),
+##            self.color,
+##            self.location,
+##            surface,
+##            middle=self.centered,
+##        )
 
 
-def back_pressed(button: Button) -> None:
-    "This function is called when the back buttons is pressed"
-    global RUNNING
-    boards = button.world.get_type("board")
-    # Get the game board from the world
-    if len(boards):
-        board = boards[0]
-        # If the game is won and this button is pressed,
-        if board.won is not None and button.do_reset:
-            # Reset the game board
-            board.gen_tiles()  # Reset all tiles to defaults
-            board.won = None  # No one has won
-            board.playing = randint(0, 1)  # Player who can play now is random
-        if not button.do_reset:
-            RUNNING = False
+##class Button(base2d.BaseButton):
+##    "Button that only shows when a player has won the game"
+##
+##    # types: no-untyped-def error: Function is missing a type annotation for one or more arguments
+##    def __init__(
+##        # types: name-defined error: Name "World" is not defined
+##        self, world: World, anim, trigger, action, states: int = 0, **kwargs
+##    ):
+##        super().__init__(world, anim, trigger, action, states, **kwargs)
+##        self.do_reset = True
+##        self.anim_flip = False
+##
+##    def process(self, time_passed: float) -> None:
+##        "Does regular button processing AND makes it so button only shows when the game has been won"
+##        # Do regular button processing
+##        super().process(time_passed)
+##        # Get the game board
+##        # types: attr-defined error: "Button" has no attribute "world"
+##        boards = self.world.get_type("board")
+##        if len(boards):
+##            board = boards[0]
+##            # Show if the game has been won
+##            self.visible = not board.won is None
+##        if not self.do_reset and not self.anim_flip:
+##            self.anim = [i for i in reversed(self.anim)]
+##            self.anim_flip = True
 
 
-def gen_button(text: str, size: int) -> Surface:
-    "Generates a button surface by rendering text with size onto the base button image"
-    base_image = IMAGES["button"]
-    button_image = base2d.scale_surf(base_image, 4)
-    xy = base2d.amol(button_image.get_size(), d=2)
-    blit_text("VeraSerif.ttf", size, text, GREEN, xy, button_image)
-    return button_image
+##def gen_button(text: str, size: int) -> Surface:
+##    "Generates a button surface by rendering text with size onto the base button image"
+##    # types: name-defined error: Name "IMAGES" is not defined
+##    base_image = IMAGES["button"]
+##    button_image = base2d.scale_surf(base_image, 4)
+##    xy = base2d.amol(button_image.get_size(), d=2)
+##    # types: name-defined error: Name "blit_text" is not defined
+##    blit_text("VeraSerif.ttf", size, text, GREEN, xy, button_image)
+##    return button_image
 
 
-def ai_play(
-    target_tile_id: str, to_tile_id: str, board: base2d.GameEntity
-) -> bool:
-    "Does pretty much everything that tiles and the cursor do to move a piece combined without visuals"
-    # If the target tile id or destination tile id is not valid, return False
-    if (target_tile_id not in board.tiles) or (to_tile_id not in board.tiles):
-        return False
-    # Get the target tile from the game board
-    target_tile = board.tiles[target_tile_id]
-    # Get the destination tile from the game board
-    to_tile = board.tiles[to_tile_id]
-    # If the target's piece is one of the black team's pieces,
-    if target_tile.piece in (1, 3):
-        # If the destination tile is a playable tile,
-        if not to_tile.color and to_tile.is_open():
-            if target_tile.moves is None:
-                target_tile.reevaluate_moves()
-            # If the destination tile id is one of the target tile's valid moves,
-            if to_tile_id in target_tile.moves:
-                # Move the target piece to the destination
-                target_tile.move_piece(to_tile_id)
-                # Return True
-                return True
-    return False
-
-
-def load_ai(name: str) -> None:
-    "Imports ai and calls AI.init()"
-    # If the ai __title__ is valid,
-    if name in find_ais():
-        # Copy the ai's file to a temporary file
-        global AI, aiData
-        AI = __import__(name)
-        # If the AI has an init command,
-        if hasattr(AI, "init"):
-            # Run it and get any special options the AI wants to run.
-            aiData = AI.init()
-        else:
-            aiData = None
+##def load_ai(name: str) -> None:
+##    "Imports ai and calls AI.init()"
+##    # If the ai __title__ is valid,
+##    if name in find_ais():
+##        # Copy the ai's file to a temporary file
+##        AI = __import__(name)
+##        # If the AI has an init command,
+##        if hasattr(AI, "init"):
+##            # Run it and get any special options the AI wants to run.
+##            aiData = AI.init()
+##        else:
+##            aiData = None
 
 
 def find_ais() -> list[str]:
@@ -1116,6 +1120,7 @@ def play_ai() -> bool:
             inp = input(f"(Number between 1 and {len(ais)}) : ")
             if inp.isalnum():
                 num = abs(int(inp) - 1) % len(ais)
+                # types: name-defined error: Name "load_ai" is not defined
                 load_ai(ais[num])
                 return True
             print("Answer is not a number. Starting two player game.")
@@ -1124,171 +1129,575 @@ def play_ai() -> bool:
     return False
 
 
-def run() -> None:
+class ClickDestinationComponent(Component):
+    "Component that will use targeting to go to wherever you click on the screen"
+    __slots__ = ("selected",)
+    outline = pygame.color.Color(255, 220, 0)
+
+    def __init__(self) -> None:
+        super().__init__("click_dest")
+
+        self.selected = False
+
+    def bind_handlers(self) -> None:
+        "Register PygameMouseButtonDown and tick handlers"
+        self.register_handlers(
+            {
+                "click": self.click,
+                "drag": self.drag,
+                "PygameMouseButtonDown": self.mouse_down,
+                "tick": self.move_towards_dest,
+                "init": self.cache_outline,
+                "test": self.test,
+            }
+        )
+
+    async def test(self, event: Event[Any]) -> None:
+        print(f"{event = }")
+
+    async def cache_outline(self, _: Event[Any]) -> None:
+        "Precalculate outlined images"
+        image: sprite.ImageComponent = self.get_component("image")
+        outline: sprite.OutlineComponent = image.get_component("outline")
+        outline.precalculate_all_outlined(self.outline)
+
+    async def update_selected(self) -> None:
+        "Update selected"
+        image: sprite.ImageComponent = self.get_component("image")
+        outline: sprite.OutlineComponent = image.get_component("outline")
+
+        color = (None, self.outline)[int(self.selected)]
+        outline.set_color(color)
+
+        if not self.selected:
+            movement: sprite.MovementComponent = self.get_component("movement")
+            movement.speed = 0
+
+    # types: type-arg error: Missing type parameters for generic type "Event"
+    async def click(self, event: Event) -> None:
+        "Toggle selected"
+        if event.data["button"] == 1:
+            self.selected = not self.selected
+
+            await self.update_selected()
+
+    # types: type-arg error: Missing type parameters for generic type "Event"
+    async def drag(self, event: Event) -> None:
+        "Drag sprite"
+        if not self.selected:
+            self.selected = True
+            await self.update_selected()
+        movement: sprite.MovementComponent = self.get_component("movement")
+        movement.speed = 0
+
+    # types: type-arg error: Missing type parameters for generic type "Event"
+    async def mouse_down(self, event: Event) -> None:
+        "Target click pos if selected"
+        if not self.selected:
+            return
+        if event.data["button"] == 1:
+            movement: sprite.MovementComponent = self.get_component("movement")
+            movement.speed = 200
+            target: sprite.TargetingComponent = self.get_component("targeting")
+            target.destination = Vector2.from_iter(event.data["pos"])
+
+    # types: type-arg error: Missing type parameters for generic type "Event"
+    async def move_towards_dest(self, event: Event) -> None:
+        "Move closer to destination"
+        target: sprite.TargetingComponent = self.get_component("targeting")
+        # types: unused-coroutine error: Value of type "Coroutine[Any, Any, None]" must be used
+        # types: note: Are you missing an await?
+        target.move_destination_time(event.data["time_passed"])
+
+
+# types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+
+class MrFloppy(sprite.Sprite):
+    "Mr. Floppy test sprite"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("MrFloppy")
+
+        self.add_components(
+            (
+                sprite.MovementComponent(),
+                sprite.TargetingComponent(),
+                ClickDestinationComponent(),
+                sprite.ImageComponent(),
+                sprite.DragClickEventComponent(),
+            )
+        )
+
+        movement = self.get_component("movement")
+        targeting = self.get_component("targeting")
+        image = self.get_component("image")
+
+        movement.speed = 200
+
+        floppy: pygame.surface.Surface = pygame.image.load(
+            path.join("data", "mr_floppy.png")
+        )
+
+        image.add_images(
+            {
+                0: floppy,
+                ##            '1': pygame.transform.flip(floppy, False, True)
+                1: pygame.transform.rotate(floppy, 270),
+                2: pygame.transform.flip(floppy, True, True),
+                3: pygame.transform.rotate(floppy, 90),
+            }
+        )
+
+        self.update_location_on_resize = True
+
+        anim = image.get_component("animation")
+        anim.controller = self.controller(image.list_images())
+
+        image.set_image(0)
+        self.visible = True
+
+        self.location = [x >> 1 for x in SCREEN_SIZE]
+        targeting.destination = self.location
+
+        self.register_handler("drag", self.drag)
+
+    def controller(
+        self, image_identifiers: list[str | int]
+    ) -> Generator[str | None, None, None]:
+        "Animation controller"
+        cidx = 0
+        while True:
+            count = len(image_identifiers)
+            if not count:
+                yield None
+                continue
+            cidx = (cidx + 1) % count
+            # types: misc error: Incompatible types in "yield" (actual type "Union[str, int]", expected type "Optional[str]")
+            yield image_identifiers[cidx]
+
+    # types: ^^^^^^^
+
+    async def drag(
+        self, event: Event[dict[str, int | tuple[int, int]]]
+    ) -> None:
+        "Move by relative from drag"
+        if event.data["button"] != 1:
+            return
+        sprite_component: sprite.Sprite = self.get_component("sprite")
+        assert isinstance(event.data["rel"], tuple)
+        sprite_component.location += event.data["rel"]
+        sprite_component.dirty = 1
+
+
+class FPSCounter(objects.Text):
+    "FPS counter"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        font = pygame.font.Font("data/VeraSerif.ttf", 28)
+        super().__init__("fps", font)
+
+        self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
+
+    async def on_tick(self, event: Event[dict[str, float]]) -> None:
+        "Update text"
+        ##        self.text = f'FPS: {event.data["fps"]:.2f}'
+        self.text = f'FPS: {event.data["fps"]:.0f}'
+
+    def bind_handlers(self) -> None:
+        super().bind_handlers()
+        self.register_handlers(
+            {
+                "tick": self.on_tick,
+            }
+        )
+
+
+# types: type-arg error: Missing type parameters for generic type "AsyncState"
+class HaltState(AsyncState):
+    "Halt state to set state to None so running becomes False"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("Halt")
+
+    async def check_conditions(self) -> None:
+        "Set active state to None."
+        # types: union-attr error: Item "None" of "Optional[Any]" has no attribute "set_state"
+        await self.machine.set_state(None)
+
+
+# types: ^^^^
+
+
+##class DataContainerComponent(Component):
+##    "Data container component"
+##    __slots__ = ("data",)
+##    def __init__(self, data: dict[str, Any]) -> None:
+##        super().__init__("data container")
+##        self.data = data
+
+
+class GameState(AsyncState["CheckersClient"]):
+    "Checkers Game Asynchronous State base class"
+    __slots__ = ("id", "manager")
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+        self.id: int = 0
+        self.manager = ComponentManager(self.name)
+
+    def group_add(self, new_sprite: sprite.Sprite) -> None:
+        assert self.machine is not None
+        group = self.machine.get_group(self.id)
+        assert group is not None, "Expected group from new group id"
+        group.add(new_sprite)
+        self.manager.add_component(new_sprite)
+
+    async def exit_actions(self) -> None:
+        assert self.machine is not None
+        self.machine.remove_group(self.id)
+        self.manager.unbind_components()
+
+
+class InitializeState(AsyncState["CheckersClient"]):
+    "Initialize Checkers"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("initialize")
+
+    async def check_conditions(self) -> str:
+        return "title"
+
+
+class TestState(GameState):
+    "Test state"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("test")
+
+    async def entry_actions(self) -> None:
+        assert self.machine is not None
+        self.id = self.machine.new_group("test")
+
+        floppy = MrFloppy()
+        self.group_add(floppy)
+        self.group_add(FPSCounter())
+
+        await self.machine.raise_event(Event("init", None))
+
+
+class TitleState(GameState):
+    "Game Title State"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("title")
+
+    async def entry_actions(self) -> None:
+        assert self.machine is not None
+        self.id = self.machine.new_group("title")
+
+        # self.group_add()
+
+        await self.machine.raise_event(Event("init", None))
+
+    async def check_conditions(self) -> str:
+        return "play"
+
+
+class PlayState(GameState):
+    "Game Play State"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("play")
+
+    async def entry_actions(self) -> None:
+        assert self.machine is not None
+        self.id = self.machine.new_group("play")
+
+        # self.group_add(Cursor())
+        gameboard = GameBoard((8, 8), 45, randint(0, 1))
+        gameboard.location = [x // 2 for x in SCREEN_SIZE]
+        self.group_add(gameboard)
+
+        await self.machine.raise_event(Event("init", None))
+
+
+class CheckersClient(sprite.GroupProcessor):
+    """Checkers Game Client"""
+
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        sprite.GroupProcessor.__init__(self)
+        AsyncStateMachine.__init__(self)
+
+        self.add_states(
+            (
+                HaltState(),
+                InitializeState(),
+                TitleState(),
+                PlayState(),
+            )
+        )
+
+    @property
+    def running(self) -> bool:
+        "Boolean of if state machine is running."
+        return self.active_state is not None
+
+    async def raise_event(self, event: Event[Any]) -> None:
+        "Raise component event in all groups"
+        if self.active_state is None:
+            return
+        manager = getattr(self.active_state, "manager", None)
+        if manager is None:
+            return
+        await manager.raise_event(event)
+
+
+async def async_run() -> None:
     "Main loop of everything"
-    print(f"{__title__} {__version__}")
-    computer = play_ai()
+    ##    computer = play_ai()
     # Set up globals
-    global IMAGES, PLAYERS, aiData, RUNNING
-    # Initialize Pygame
-    pygame.init()
+    global SCREEN_SIZE
+    ##    global IMAGES, PLAYERS, aiData, RUNNING
 
     # Set up the screen
-    screen = pygame.display.set_mode(SCREEN_SIZE, 0, 16)
-    pygame.display.set_caption(__title__ + " " + __version__)
+    screen = pygame.display.set_mode(SCREEN_SIZE, 0, 16, vsync=VSYNC)
+    pygame.display.set_caption(f"{__title__} v{__version__}")
+    pygame.key.set_repeat(1000, 30)
+    screen.fill((0xFF, 0xFF, 0xFF))
 
-    # Set up the FPS clock
-    clock = pygame.time.Clock()
+    client = CheckersClient()
 
-    # Get the program path, and use it to find the picture path
-    PROGPATH = os.path.split(os.sys.argv[0])[0]
-    picpath = os.path.join(PROGPATH, PIC_PATH)
+    background = pygame.image.load(
+        path.join("data", "background.png")
+    ).convert()
+    client.clear(screen, background)
 
-    # Get all picture filenames
-    pics = os.listdir(picpath)
+    client.set_timing_threshold(1000 / FPS)
 
-    # Create a dictionary containing the image surfaces
-    IMAGES = {}
-    for pic_name in pics:
-        name = pic_name.split(".png")[0]
-        image = pygame.image.load(picpath + pic_name).convert_alpha()
-        IMAGES[name] = base2d.scale_surf(image, 0.25)
+    await client.set_state("initialize")
 
-    # Get any additional images
-    background = pygame.Surface(SCREEN_SIZE)
-    background.fill(WHITE)
+    # clock = pygame.time.Clock()
+    clock = Clock()
 
-    # Define animations
-    backAnim = [gen_button("Play Again", 35), gen_button("Quit Game", 35)]
+    ##    # Get the program path, and use it to find the picture path
+    ##    PROGPATH = os.path.split(os.sys.argv[0])[0]
+    ##    picpath = os.path.join(PROGPATH, PIC_PATH)
+    ##
+    ##    # Create a dictionary containing the image surfaces
+    ##    IMAGES = {}
+    ##    for pic_name in os.listdir(picpath):
+    ##        name = pic_name.split(".png")[0]
+    ##        image = pygame.image.load(picpath + pic_name).convert_alpha()
+    ##        IMAGES[name] = base2d.scale_surf(image, 0.25)
+    ##
+    ##    # Get any additional images
+    ##    background = pygame.Surface(SCREEN_SIZE)
+    ##    background.fill(WHITE)
+    ##
+    ##    # Define animations
+    ##    backAnim = [gen_button("Play Again", 35), gen_button("Quit Game", 35)]
+    ##
+    ##    # Set up the world
+    ##    world = World(background)
+    ##
+    ##    # Set up players
+    ##    if computer:
+    ##        PLAYERS = ["Player", "Computer"]
+    ##        if aiData and hasattr(aiData, "keys"):
+    ##            keys = aiData.keys()
+    ##            if "player_names" in keys:
+    ##                if len(aiData["player_names"]) == 2:
+    ##                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
+    ##    else:
+    ##        PLAYERS = ["Red Player", "Black Player"]
+    ##
+    ##    # Get the screen width and height for a lot of things
+    ##    w, h = SCREEN_SIZE
+    ##
+    ##    # Add entities
+    ##    world.add_entity(Cursor(world))
+    ##    world.add_entity(
+    ##        GameBoard(world, [8] * 2, 45, location=[x // 2 for x in SCREEN_SIZE])
+    ##    )
+    ##    world.add_entity(
+    ##        ValDisplay(
+    ##            world,
+    ##            "VeraSerif.ttf",
+    ##            60,
+    ##            show_win,
+    ##            location=base2d.amol(SCREEN_SIZE, d=2),
+    ##            color=GREEN,
+    ##            renderPriority=5,
+    ##        )
+    ##    )
+    ##    world.add_entity(
+    ##        Button(
+    ##            world,
+    ##            backAnim,
+    ##            "cursor",
+    ##            back_pressed,
+    ##            states=1,
+    ##            location=Vector2(*base2d.amol(SCREEN_SIZE, d=2)) + Vector2(0, 80),
+    ##        )
+    ##    )
+    ##
+    ##    if computer and isinstance(aiData, dict):
+    ##        keys = aiData.keys()
+    ##        if "starting_turn" in keys:
+    ##            world.get_type("board")[0].playing = int(aiData["starting_turn"])
+    ##        if "must_quit" in keys:
+    ##            world.get_type("button")[0].do_reset = not bool(
+    ##                aiData["must_quit"]
+    ##            )
+    ##
+    ##    ai_has_been_told_game_is_won = False
+    ##
+    ##    # Set up the FPS clock
+    ##    clock = pygame.time.Clock()
+    ##
+    ##    # While the game is active
+    ##    while client.running:
+    ##        # Event handler
+    ##        for event in pygame.event.get():
+    ##            if event.type == QUIT:
+    ##                RUNNING = False
+    ##
+    ##        # Update the FPS clock and get how much time elapsed since the last frame
+    ##        time_passed = clock.tick(FPS)
+    ##
+    ##        # Process entities
+    ##        world.process(time_passed)
+    ##
+    ##        # Render the world to the screen
+    ##        world.render(screen)
+    ##
+    ##        # If we are playing against a computer,
+    ##        if computer:
+    ##            # Get the game board from the world
+    ##            boards = world.get_type("board")
+    ##            # If there are game board(s) the world found,
+    ##            if boards:
+    ##                # Get the first one
+    ##                board = boards[0]
+    ##                # If it's the AI's turn,
+    ##                if board.playing == 0:
+    ##                    # Reset game is won tracker since presumabley a new game has started
+    ##                    if ai_has_been_told_game_is_won:
+    ##                        ai_has_been_told_game_is_won = False
+    ##                    try:
+    ##                        # Send board data to the AI
+    ##                        AI.update(board.get_data())
+    ##                        # Get the target piece id and destination piece id from the AI
+    ##                        rec_data = AI.turn()
+    ##                        if rec_data != "QUIT":
+    ##                            if rec_data is not None:
+    ##                                target, dest = rec_data
+    ##                                # Play play the target piece id to the destination tile id
+    ##                                # on the game board
+    ##                                success = ai_play(
+    ##                                    str(target), str(dest), board
+    ##                                )
+    ##                                if hasattr(AI, "turn_success"):
+    ##                                    AI.turn_success(bool(success))
+    ##                            # else:
+    ##                            #     print('AI Played None. Still AI\'s Turn.')
+    ##                        else:
+    ##                            # Don't use this as an excuse if your AI can't win
+    ##                            print(
+    ##                                "AI wishes to hault execution. Exiting game."
+    ##                            )
+    ##                            RUNNING = False
+    ##                    except Exception as ex:
+    ##                        traceback.print_exception(ex)
+    ##                        RUNNING = False
+    ##                elif board.playing == 2 and not ai_has_been_told_game_is_won:
+    ##                    # If the game has been won, tell the AI about it
+    ##                    AI.update(board.get_data())
+    ##                    ai_has_been_told_game_is_won = True
+    ##        # Update the display
+    ##        pygame.display.update()
+    ##    # If we have an AI going and it has the stop function,
+    ##    if computer and hasattr(AI, "stop"):
+    ##        # Tell the AI to stop
+    ##        AI.stop()
+    while client.running:
+        resized_window = False
 
-    # Set up the world
-    world = World(background)
+        async with trio.open_nursery() as nursery:
+            for event in pygame.event.get():
+                if event.type == QUIT:
+                    await client.set_state("Halt")
+                elif event.type == KEYUP and event.key == K_ESCAPE:
+                    pygame.event.post(pygame.event.Event(QUIT))
+                elif event.type == WINDOWRESIZED:
+                    SCREEN_SIZE = (event.x, event.y)
+                    resized_window = True
+                sprite_event = sprite.convert_pygame_event(event)
+                # print(sprite_event)
+                nursery.start_soon(client.raise_event, sprite_event)
+            nursery.start_soon(client.think)
+            nursery.start_soon(clock.tick, FPS)
 
-    # Set up players
-    if computer:
-        PLAYERS = ["Player", "Computer"]
-        if aiData and hasattr(aiData, "keys"):
-            keys = aiData.keys()
-            if "player_names" in keys:
-                if len(aiData["player_names"]) == 2:
-                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
-    else:
-        PLAYERS = ["Red Player", "Black Player"]
+        # await client.think()
+        # time_passed = await clock.tick(FPS)
 
-    # Get the screen width and height for a lot of things
-    w, h = SCREEN_SIZE
-
-    # Add entities
-    world.add_entity(Cursor(world))
-    world.add_entity(
-        GameBoard(world, [8] * 2, 45, location=[x // 2 for x in SCREEN_SIZE])
-    )
-    world.add_entity(
-        ValDisplay(
-            world,
-            "VeraSerif.ttf",
-            60,
-            show_win,
-            location=base2d.amol(SCREEN_SIZE, d=2),
-            color=GREEN,
-            renderPriority=5,
-        )
-    )
-    world.add_entity(
-        Button(
-            world,
-            backAnim,
-            "cursor",
-            back_pressed,
-            states=1,
-            location=Vector2(*base2d.amol(SCREEN_SIZE, d=2)) + Vector2(0, 80),
-        )
-    )
-
-    if computer and isinstance(aiData, dict):
-        keys = aiData.keys()
-        if "starting_turn" in keys:
-            world.get_type("board")[0].playing = int(aiData["starting_turn"])
-        if "must_quit" in keys:
-            world.get_type("button")[0].do_reset = not bool(
-                aiData["must_quit"]
+        await client.raise_event(
+            Event(
+                "tick",
+                {
+                    "time_passed": clock.get_time() / 1000,
+                    "fps": clock.get_fps(),
+                },
             )
+        )
 
-    ai_has_been_told_game_is_won = False
+        if resized_window:
+            screen.fill((0xFF, 0xFF, 0xFF))
+            rects = [Rect((0, 0), SCREEN_SIZE)]
+            client.repaint_rect(rects[0])
+            rects.extend(client.draw(screen))
+        else:
+            rects = client.draw(screen)
+        pygame.display.update(rects)
+    client.clear_groups()
 
-    # System is running
-    RUNNING = True
 
-    # While the game is active
-    while RUNNING:
-        # Event handler
-        for event in pygame.event.get():
-            if event.type == QUIT:
-                RUNNING = False
+def run() -> None:
+    "Run asynchronous side of everything"
 
-        # Update the FPS clock and get how much time elapsed since the last frame
-        time_passed = clock.tick(FPS)
-
-        # Process entities
-        world.process(time_passed)
-
-        # Render the world to the screen
-        world.render(screen)
-
-        # If we are playing against a computer,
-        if computer:
-            # Get the game board from the world
-            boards = world.get_type("board")
-            # If there are game board(s) the world found,
-            if boards:
-                # Get the first one
-                board = boards[0]
-                # If it's the AI's turn,
-                if board.playing == 0:
-                    # Reset game is won tracker since presumabley a new game has started
-                    if ai_has_been_told_game_is_won:
-                        ai_has_been_told_game_is_won = False
-                    try:
-                        # Send board data to the AI
-                        AI.update(board.get_data())
-                        # Get the target piece id and destination piece id from the AI
-                        rec_data = AI.turn()
-                        if rec_data != "QUIT":
-                            if rec_data is not None:
-                                target, dest = rec_data
-                                # Play play the target piece id to the destination tile id
-                                # on the game board
-                                success = ai_play(
-                                    str(target), str(dest), board
-                                )
-                                if hasattr(AI, "turn_success"):
-                                    AI.turn_success(bool(success))
-                            # else:
-                            #     print('AI Played None. Still AI\'s Turn.')
-                        else:
-                            # Don't use this as an excuse if your AI can't win
-                            print(
-                                "AI wishes to hault execution. Exiting game."
-                            )
-                            RUNNING = False
-                    except Exception as ex:
-                        traceback.print_exception(ex)
-                        RUNNING = False
-                elif board.playing == 2 and not ai_has_been_told_game_is_won:
-                    # If the game has been won, tell the AI about it
-                    AI.update(board.get_data())
-                    ai_has_been_told_game_is_won = True
-        # Update the display
-        pygame.display.update()
-    # If we have an AI going and it has the stop function,
-    if computer and hasattr(AI, "stop"):
-        # Tell the AI to stop
-        AI.stop()
+    trio.run(async_run)
 
 
 if __name__ == "__main__":
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
+
     # If we're not imported as a module, run.
+    # Make sure the game will display correctly on high DPI monitors on Windows.
+    import platform
+
+    if platform.system() == "Windows":
+        from ctypes import windll  # type: ignore
+
+        try:
+            windll.user32.SetProcessDPIAware()
+        except AttributeError:
+            pass
+        del windll
+    del platform
+
     try:
+        pygame.init()
         run()
     finally:
         pygame.quit()

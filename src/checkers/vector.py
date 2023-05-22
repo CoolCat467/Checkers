@@ -94,11 +94,21 @@ class Vector2(NamedTuple):
     def __truediv__(self, scalar: int | float) -> Self:
         return self.from_iter(c / scalar for c in self)
 
+    def __floordiv__(self, scalar: int | float) -> Self:
+        return self.from_iter(c // scalar for c in self)
+
     def __round__(self, ndigits: int | None = None) -> Self:
         return self.from_iter(round(c, ndigits) for c in self)
 
     def __abs__(self) -> Self:
         return self.from_iter(abs(c) for c in self)
+
+    def __mod__(self, scalar: int | float) -> Self:
+        return self.from_iter(c % scalar for c in self)
+
+    def __divmod__(self, rhs: int | float) -> tuple[Self, Self]:
+        "Return tuple of (self // rhs, self % rhs)"
+        return self // rhs, self % rhs
 
     def dot(self, vec: Iterable[int | float]) -> int | float:
         """Return the dot product of this vector and another"""
