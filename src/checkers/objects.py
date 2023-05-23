@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-# TITLE - DISCRIPTION
+# Objects - Common objects that are useful
 
-"Docstring"
+"Objects"
 
 # Programmed by CoolCat467
 
-__title__ = "TITLE"
+__title__ = "Objects"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
@@ -32,7 +32,7 @@ class Text(sprite.Sprite):
         "Update image"
         self.image = self.font.render(self.__text, True, self.color)
 
-    def __get_text(self) -> None:
+    def __get_text(self) -> str:
         "Get text"
         return self.__text
 

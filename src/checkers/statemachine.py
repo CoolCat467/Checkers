@@ -45,6 +45,10 @@ class BaseState(Generic[Machine]):
         """Get machine from internal weak reference"""
         return self.machine_ref()
 
+    def add_actions(self) -> None:
+        "Preform actions when this state added to a State Machine"
+        return None
+
 
 SyncMachine = TypeVar("SyncMachine", bound="StateMachine", covariant=True)
 
@@ -126,6 +130,7 @@ class StateMachine(BaseStateMachine):
             )
         state.machine_ref = ref(self)
         self.states[state.name] = state
+        state.add_actions()
 
     def add_states(self, states: Iterable[State[Self]]) -> None:
         "Add multiple State instances to internal dictionary."
@@ -184,6 +189,7 @@ class AsyncStateMachine(BaseStateMachine):
             )
         state.machine_ref = ref(self)
         self.states[state.name] = state
+        state.add_actions()
 
     def add_states(self, states: Iterable[AsyncState[Self]]) -> None:
         "Add multiple State instances to internal dictionary."

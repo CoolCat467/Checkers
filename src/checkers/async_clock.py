@@ -9,9 +9,6 @@
 __title__ = "Async Clock"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
-__ver_major__ = 0
-__ver_minor__ = 0
-__ver_patch__ = 0
 
 import pygame.time
 import trio
@@ -74,10 +71,5 @@ class Clock:
         return self.timepassed
 
 
-def run() -> None:
-    "Run program"
-
-
 if __name__ == "__main__":
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
-    run()

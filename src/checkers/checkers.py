@@ -39,7 +39,7 @@ from async_clock import Clock
 from component import Component, ComponentManager, Event
 from pygame.locals import *
 from pygame.surface import Surface
-from statemachine import AsyncState, AsyncStateMachine
+from statemachine import AsyncState
 from vector import Vector2
 
 __title__ = "Checkers"
@@ -47,8 +47,6 @@ __version__ = "0.0.5"
 __author__ = "CoolCat467"
 
 SCREEN_SIZE = (640, 480)
-
-PIC_PATH = "pic/"
 
 FPS = 60
 VSYNC = True
@@ -66,28 +64,6 @@ YELLOW = (255, 255, 0)
 WHITE = (255, 255, 255)
 
 
-##def blit_text(
-##    font_name: str,
-##    font_size: int,
-##    text: str,
-##    color: tuple[int, int, int],
-##    xy: Vector2 | tuple[int, int],
-##    dest: Surface,
-##    middle: bool = True,
-##) -> None:
-##    "Blit rendered text to dest with the font at font_size colored color at x, y"
-##    # Get a surface of the rendered text
-##    surf = render_text(font_name, font_size, text, color)
-##    # If rendering in the middle of the text,
-##    if middle:
-##        # Modify the xy choordinates to be in the middle
-##        w: int
-##        h: int
-##        w, h = surf.get_size()
-##        xy = (xy[0] - w // 2, xy[1] - h // 2)
-##    # Blit the text surface to the destination surface at the xy position
-##    dest.blit(surf, base2d.to_int(xy))
-
 T = TypeVar("T")
 
 Pos = tuple[int, int]
@@ -102,58 +78,6 @@ def render_text(
     # Using the loaded font, render the text in the color of color
     surf = font.render(text, False, color)
     return surf
-
-
-##class Cursor(sprite.Sprite):
-##    "This is the Cursor! It follows the mouse cursor!"
-##    __slots__ = ("carry_tile",)
-##
-##    def __init__(self) -> None:
-##        super().__init__("cursor")
-##
-##        # We are not carrying anything
-##        self.carry_tile = None
-##
-##    def bind_handlers(self) -> None:
-##        self.register_handlers(
-##            {
-##                "cursor_drag": self.handle_drag_event,
-##                "cursor_drop": self.handle_drop_event,
-##            }
-##        )
-##
-##    async def handle_drag_event(
-##        self, event: Event[tuple[Tile, Surface | None]]
-##    ) -> None:
-##        # types: misc error: List or tuple expected as variadic arguments
-##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
-##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/component.py
-##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
-##        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
-##        self.drag(*event)
-##
-##    async def handle_drop_event(self, event: Event[None]) -> None:
-##        self.drop()
-##
-##    def carry(self, image: Surface | None) -> None:
-##        "Set the image we should be carrying to image"
-##        self.image = image
-##        self.visible = self.is_carry()
-##
-##    def is_carry(self) -> bool:
-##        "Return True if we are carrying something"
-##        return not self.image is None
-##
-##    def drag(self, tile: Tile, image: Surface | None) -> None:
-##        "Grab the piece from a tile and carry it"
-##        # types: assignment error: Incompatible types in assignment (expression has type "Tile", variable has type "None")
-##        self.carry_tile = tile
-##        self.carry(image)
-##
-##    def drop(self) -> None:
-##        "Drop the image we're carrying"
-##        self.carry_tile = None
-##        self.carry(None)
 
 
 def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
@@ -172,9 +96,7 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
     return cast(tuple[Pos, Pos, Pos, Pos], tuple_sides)
 
 
-def pawn_modify(
-    moves: tuple[T, T, T, T], piece_type: int
-) -> tuple[T, T] | tuple[T, T, T, T]:
+def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
     "Modifies a list based on piece id to take out invalid moves for pawns"
     assert (
         len(moves) == 4
@@ -241,6 +163,7 @@ class Piece(sprite.Sprite):
                 f"self_destruct_piece_{self.position_name}": self.handle_self_destruct_event,
                 f"piece_move_{self.position_name}": self.handle_move_event,
                 "reached_destination": self.handle_reached_destination_event,
+                f"piece_king_{self.position_name}": self.handle_king_event,
             }
         )
 
@@ -255,6 +178,7 @@ class Piece(sprite.Sprite):
     async def handle_click_event(
         self, event: Event[dict[str, Pos | int]]
     ) -> None:
+        "Raise gameboard_piece_clicked events when clicked"
         await self.raise_event(
             Event(
                 "gameboard_piece_clicked",
@@ -291,7 +215,7 @@ class Piece(sprite.Sprite):
 
         self.register_handler("tick", self.handle_tick_event)
         group = self.groups()[0]
-        group.move_to_front(self)
+        group.move_to_front(self)  # type: ignore[attr-defined]
 
     async def handle_reached_destination_event(
         self, event: Event[None]
@@ -316,6 +240,11 @@ class Piece(sprite.Sprite):
                 1,
             )
         )
+
+    async def handle_king_event(self, event: Event[None]) -> None:
+        """King self during movement animation"""
+        self.piece_type += 2
+        self.set_outlined(False)
 
 
 class Tile(sprite.Sprite):
@@ -366,24 +295,19 @@ class Tile(sprite.Sprite):
     async def handle_click_event(
         self, event: Event[dict[str, Pos | int]]
     ) -> None:
+        "Raise gameboard_tile_clicked events when clicked"
         await self.raise_event(
             Event("gameboard_tile_clicked", self.position_name, 1)
         )
 
     async def handle_self_destruct_event(self, event: Event[None]) -> None:
+        "Remove from all groups and remove self component"
         self.kill()
         self.manager.remove_component(self.name)
 
 
 def generate_tile_image(
-    # types: valid-type error: Variable "pygame.locals.Color" is not valid as a type
-    # types: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
-    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
-    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
-    # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
-    # types: valid-type error: Variable "pygame.locals.Color" is not valid as a type
-    # types: note: See https://mypy.readthedocs.io/en/stable/common_issues.html#variables-vs-type-aliases
-    color: Color
+    color: Color  # type: ignore[valid-type]
     | int
     | str
     | tuple[int, int, int]
@@ -400,8 +324,8 @@ def generate_tile_image(
     return surf
 
 
-# 0 = False = Black = 0, 2
-# 1 = True  = Red   = 1, 3
+# 0 = False = Red   = 0, 2
+# 1 = True  = Black = 1, 3
 
 
 class ActionSet(NamedTuple):
@@ -484,7 +408,7 @@ class GameBoard(sprite.Sprite):
         """Return if piece needs to be kinged given it's type and position"""
         _, y = position
         _, h = self.board_size
-        return (piece_type == 1 and y == 0) or (piece_type == 0 and y == h - 1)
+        return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
 
     def valid_location(self, position: Pos) -> bool:
         """Return if position is valid"""
@@ -528,14 +452,9 @@ class GameBoard(sprite.Sprite):
         valid: dict[Pos, list[Pos]] = {}
 
         # For each side tile in the jumpable tiles for this type of piece,
-        # types: misc error: <nothing> object is not iterable
         for direction, side in pawn_modify(
-            # types: arg-type error: Argument 1 to "pawn_modify" has incompatible type "Tuple[Tuple[int, Tuple[int, int]], ...]"; expected "Tuple[<nothing>, <nothing>, <nothing>, <nothing>]"
-            tuple(enumerate(sides)),
-            piece_type
-            # types: ^
+            tuple(enumerate(sides)), piece_type
         ):
-            # types: has-type error: Cannot determine type of "side"
             side_piece = self.pieces.get(side)
             # Side piece must be one of our enemy's pieces
             if side_piece not in enemy_pieces:
@@ -543,15 +462,12 @@ class GameBoard(sprite.Sprite):
             # Get the direction from the dictionary we made earlier
             # Get the coordiates of the tile on the side of the main tile's
             # side in the same direction as the main tile's side
-            # types: has-type error: Cannot determine type of "side"
-            # types: has-type error: Cannot determine type of "direction"
             side_side = get_sides(side)[direction]
             side_side_piece = self.pieces.get(side_side)
             # If the side exists and it's open,
             if side_side_piece is None and self.valid_location(side_side):
                 # Add it the valid jumps dictionary and add the tile
                 # to the list of end tiles.
-                # types: has-type error: Cannot determine type of "side"
                 valid[side_side] = [side]
 
         # For each end point tile in the list of end point tiles,
@@ -604,36 +520,45 @@ class GameBoard(sprite.Sprite):
         return ActionSet(jumps, moves, ends)
 
     def bind_handlers(self) -> None:
+        "Register handlers"
         self.register_handlers(
             {
                 "init": self.handle_init_event,
                 "gameboard_piece_clicked": self.handle_piece_clicked_event,
                 "gameboard_tile_clicked": self.handle_tile_clicked_event,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
+                "gameboard_restart": self.handle_restart_event,
             }
         )
 
     async def handle_init_event(self, event: Event[None]) -> None:
+        "Start up game"
         # Generate tile data
-        await self.generate_tile_images()
+        self.generate_tile_images()
         self.image = self.generate_board_image()
-        self.generate_pieces()
         self.visible = True
+        await self.handle_restart_event(event)
 
-    ##    def get_data(self) -> dict[str, str | tuple[int, int] | dict[str, Any]]:
-    ##        "Returns imporant data that is safe to send to an AI"
-    ##        # Set up the dictionary we're going to send
-    ##        send = {}
-    ##        # Send the game board size
-    ##        send["board_size"] = tuple(self.board_size)
-    ##        # Send who's won the game
-    ##        send["won"] = str(self.won)
-    ##        # Send all tile data
-    ##        send["tiles"] = {
-    ##            tile.id: tile.get_data() for tile in self.tiles.values()
-    ##        }
-    ##        # Send the dictionary
-    ##        return send
+    async def handle_restart_event(self, event: Event[None]) -> None:
+        "Reset board"
+        async with trio.open_nursery() as nursery:
+            for piece_position in self.pieces:
+                if piece_position in self.actions:
+                    tiles = self.actions[piece_position].ends
+                    for tile_position in tiles:
+                        tile_name = self.get_tile_name(*tile_position)
+                        event = Event(f"self_destruct_tile_{tile_name}", None)
+                        nursery.start_soon(self.raise_event, event)
+                piece_name = self.get_tile_name(*piece_position)
+                event = Event(f"self_destruct_piece_{piece_name}", None)
+                nursery.start_soon(self.raise_event, event)
+
+        self.actions.clear()
+        self.pieces.clear()
+        self.game_won = None
+        self.selected_piece = None
+
+        self.generate_pieces()
 
     async def handle_piece_clicked_event(
         self, event: Event[tuple[str, int]]
@@ -735,7 +660,7 @@ class GameBoard(sprite.Sprite):
 
         if tile_position in self.actions[piece_position].jumps:
             jumped = self.actions[piece_position].jumps[tile_position]
-            positions: list[Pos] = []
+            positions: list[tuple[Vector2, Pos, Pos]] = []
 
             cur_x, cur_y = piece_position
             for jumped_pos in jumped:
@@ -753,7 +678,7 @@ class GameBoard(sprite.Sprite):
             )
 
     async def handle_piece_moved_event(
-        self, event: Event[tuple[str, str, bool]]
+        self, event: Event[tuple[str, Pos, Pos, bool]]
     ) -> None:
         "Handle piece finishing it's movement animation"
         piece_name, start_pos, end_pos, done = event.data
@@ -762,6 +687,7 @@ class GameBoard(sprite.Sprite):
 
         if self.does_piece_king(piece_type, end_pos):
             piece_type += 2
+            await self.raise_event(Event(f"piece_king_{piece_name}", None))
 
         self.pieces[end_pos] = piece_type
 
@@ -788,9 +714,9 @@ class GameBoard(sprite.Sprite):
 
             self.add_piece(self.pieces[end_pos], end_pos)
 
-            self.turn_over()
+            await self.turn_over()
 
-    async def generate_tile_images(self) -> None:
+    def generate_tile_images(self) -> None:
         "Load all the images"
         image: sprite.ImageComponent = self.get_component("image")
         outline: sprite.OutlineComponent = image.get_component("outline")
@@ -920,16 +846,16 @@ class GameBoard(sprite.Sprite):
                 color = (x + y) % len(self.tile_color_map)
                 # Blit the tile image to the surface at the tile's location
                 surf.blit(image.get_image(f"tile_{color}"), (loc_x, loc_y))
-                ##                # Blit the id of the tile at the tile's location
-                ##                surf.blit(
-                ##                    render_text(
-                ##                        "VeraSerif.ttf",
-                ##                        20,
-                ##                        "".join(map(str, (x, y))),
-                ##                        GREEN
-                ##                    ),
-                ##                    (loc_x, loc_y)
-                ##                )
+                ### Blit the id of the tile at the tile's location
+                ##surf.blit(
+                ##    render_text(
+                ##        "VeraSerif.ttf",
+                ##        20,
+                ##        "".join(map(str, (x, y))),
+                ##        GREEN
+                ##    ),
+                ##    (loc_x, loc_y)
+                ##)
                 loc_x += self.tile_size
             # Increment the y counter by tile_size
             loc_y += self.tile_size
@@ -954,16 +880,13 @@ class GameBoard(sprite.Sprite):
                 return (player + 1) % 2
         return None
 
-    def turn_over(self) -> None:
-        "Called when a tile wishes to communicate that the current player's turn is over"
+    async def turn_over(self) -> None:
+        "Continue to next player's turn"
         # Clear actions
         self.actions.clear()
 
         # Toggle the active player
         self.turn = (self.turn + 1) % 2
-        ##        # Tell all tiles to re-evaluate their move information
-        ##        for tile in iter(self.tiles.values()):
-        ##            tile.reevaluate_moves()
 
         # If no one has won,
         if self.game_won is None:
@@ -975,121 +898,7 @@ class GameBoard(sprite.Sprite):
                 self.turn = 2
                 # The winner is the person check_for_win found.
                 self.game_won = win
-
-
-##def show_win(valdisplay: "ValDisplay") -> str:
-##    "Called when the value display requests text to render"
-##    # Get the board
-##    boards = valdisplay.world.get_type("board")
-##    if len(boards):
-##        board = boards[0]
-##    else:
-##        # If the board not exist, nothing to return
-##        return ""
-##    # If the game has been won,
-##    if not board.won is None:
-##        # show that
-##        return f"{PLAYERS[board.won]} Won!"
-##    return ""
-
-
-##class ValDisplay(base2d.GameEntity):
-##    "Entity that displays the value of a string returned by calling value_function(self)"
-##
-##    # types: no-untyped-def error: Function is missing a type annotation for one or more arguments
-##    def __init__(
-##        self,
-##        font_name: str,
-##        font_size: int,
-##        value_function,
-##        **kwargs: Any,
-##    ) -> None:
-##        # types: call-arg error: Too many arguments for "__init__" of "GameEntity"
-##        base2d.GameEntity.__init__(self, "valdisplay", None, **kwargs)
-##        # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-##        # Store the font __title__, font size, and value function
-##        self.font_name = str(font_name)
-##        self.font_size = int(font_size)
-##        self.value = value_function
-##        # By default text is not centered
-##        self.centered = True
-##        # By default text is black
-##        self.color = BLACK
-##
-##        # Read keyword arguments and act on them appropriately.
-##        if "centered" in kwargs.keys():
-##            self.centered = bool(kwargs["centered"])
-##        if "color" in kwargs.keys():
-##            # types: assignment error: Incompatible types in assignment (expression has type "Tuple[Any, ...]", variable has type "Tuple[int, int, int]")
-##            self.color = tuple(kwargs["color"])
-##        if "renderPriority" in kwargs.keys():
-##            self.render_priority = kwargs["renderPriority"]
-##
-##    def render(self, surface: Surface) -> None:
-##        "Render text and blit it to surface"
-##        # types: name-defined error: Name "blit_text" is not defined
-##        blit_text(
-##            self.font_name,
-##            self.font_size,
-##            str(self.value(self)),
-##            self.color,
-##            self.location,
-##            surface,
-##            middle=self.centered,
-##        )
-
-
-##class Button(base2d.BaseButton):
-##    "Button that only shows when a player has won the game"
-##
-##    # types: no-untyped-def error: Function is missing a type annotation for one or more arguments
-##    def __init__(
-##        # types: name-defined error: Name "World" is not defined
-##        self, world: World, anim, trigger, action, states: int = 0, **kwargs
-##    ):
-##        super().__init__(world, anim, trigger, action, states, **kwargs)
-##        self.do_reset = True
-##        self.anim_flip = False
-##
-##    def process(self, time_passed: float) -> None:
-##        "Does regular button processing AND makes it so button only shows when the game has been won"
-##        # Do regular button processing
-##        super().process(time_passed)
-##        # Get the game board
-##        # types: attr-defined error: "Button" has no attribute "world"
-##        boards = self.world.get_type("board")
-##        if len(boards):
-##            board = boards[0]
-##            # Show if the game has been won
-##            self.visible = not board.won is None
-##        if not self.do_reset and not self.anim_flip:
-##            self.anim = [i for i in reversed(self.anim)]
-##            self.anim_flip = True
-
-
-##def gen_button(text: str, size: int) -> Surface:
-##    "Generates a button surface by rendering text with size onto the base button image"
-##    # types: name-defined error: Name "IMAGES" is not defined
-##    base_image = IMAGES["button"]
-##    button_image = base2d.scale_surf(base_image, 4)
-##    xy = base2d.amol(button_image.get_size(), d=2)
-##    # types: name-defined error: Name "blit_text" is not defined
-##    blit_text("VeraSerif.ttf", size, text, GREEN, xy, button_image)
-##    return button_image
-
-
-##def load_ai(name: str) -> None:
-##    "Imports ai and calls AI.init()"
-##    # If the ai __title__ is valid,
-##    if name in find_ais():
-##        # Copy the ai's file to a temporary file
-##        AI = __import__(name)
-##        # If the AI has an init command,
-##        if hasattr(AI, "init"):
-##            # Run it and get any special options the AI wants to run.
-##            aiData = AI.init()
-##        else:
-##            aiData = None
+                await self.raise_event(Event("game_over", self.game_won, 1))
 
 
 def find_ais() -> list[str]:
@@ -1103,30 +912,6 @@ def find_ais() -> list[str]:
             ais.append(filename.split(".py", 1)[0])
     # Return all the AI filenames we found
     return ais
-
-
-def play_ai() -> bool:
-    "If there are AI modules, ask the user if they would like to play one and load it if so"
-    ais = find_ais()
-    if ais:
-        print("\nAI Files found in this folder!")
-        print("Would you like to play against an AI?")
-        inp = input("(y / n) : ").lower()
-        if inp in ("y"):
-            print("\nList of AIs:")
-            for index, name in enumerate(ais, 1):
-                print(f"{index} : {name}")
-            print("\nWhich AI would you like to play against?")
-            inp = input(f"(Number between 1 and {len(ais)}) : ")
-            if inp.isalnum():
-                num = abs(int(inp) - 1) % len(ais)
-                # types: name-defined error: Name "load_ai" is not defined
-                load_ai(ais[num])
-                return True
-            print("Answer is not a number. Starting two player game.")
-            return False
-    print("Starting two player game.")
-    return False
 
 
 class ClickDestinationComponent(Component):
@@ -1173,16 +958,14 @@ class ClickDestinationComponent(Component):
             movement: sprite.MovementComponent = self.get_component("movement")
             movement.speed = 0
 
-    # types: type-arg error: Missing type parameters for generic type "Event"
-    async def click(self, event: Event) -> None:
+    async def click(self, event: Event[dict[str, int]]) -> None:
         "Toggle selected"
         if event.data["button"] == 1:
             self.selected = not self.selected
 
             await self.update_selected()
 
-    # types: type-arg error: Missing type parameters for generic type "Event"
-    async def drag(self, event: Event) -> None:
+    async def drag(self, event: Event[Any]) -> None:
         "Drag sprite"
         if not self.selected:
             self.selected = True
@@ -1190,8 +973,7 @@ class ClickDestinationComponent(Component):
         movement: sprite.MovementComponent = self.get_component("movement")
         movement.speed = 0
 
-    # types: type-arg error: Missing type parameters for generic type "Event"
-    async def mouse_down(self, event: Event) -> None:
+    async def mouse_down(self, event: Event[dict[str, int | Pos]]) -> None:
         "Target click pos if selected"
         if not self.selected:
             return
@@ -1199,18 +981,13 @@ class ClickDestinationComponent(Component):
             movement: sprite.MovementComponent = self.get_component("movement")
             movement.speed = 200
             target: sprite.TargetingComponent = self.get_component("targeting")
+            assert isinstance(event.data["pos"], tuple)
             target.destination = Vector2.from_iter(event.data["pos"])
 
-    # types: type-arg error: Missing type parameters for generic type "Event"
-    async def move_towards_dest(self, event: Event) -> None:
+    async def move_towards_dest(self, event: Event[dict[str, float]]) -> None:
         "Move closer to destination"
         target: sprite.TargetingComponent = self.get_component("targeting")
-        # types: unused-coroutine error: Value of type "Coroutine[Any, Any, None]" must be used
-        # types: note: Are you missing an await?
-        target.move_destination_time(event.data["time_passed"])
-
-
-# types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+        await target.move_destination_time(event.data["time_passed"])
 
 
 class MrFloppy(sprite.Sprite):
@@ -1243,7 +1020,7 @@ class MrFloppy(sprite.Sprite):
         image.add_images(
             {
                 0: floppy,
-                ##            '1': pygame.transform.flip(floppy, False, True)
+                # '1': pygame.transform.flip(floppy, False, True)
                 1: pygame.transform.rotate(floppy, 270),
                 2: pygame.transform.flip(floppy, True, True),
                 3: pygame.transform.rotate(floppy, 90),
@@ -1265,7 +1042,7 @@ class MrFloppy(sprite.Sprite):
 
     def controller(
         self, image_identifiers: list[str | int]
-    ) -> Generator[str | None, None, None]:
+    ) -> Generator[str | int | None, None, None]:
         "Animation controller"
         cidx = 0
         while True:
@@ -1274,10 +1051,7 @@ class MrFloppy(sprite.Sprite):
                 yield None
                 continue
             cidx = (cidx + 1) % count
-            # types: misc error: Incompatible types in "yield" (actual type "Union[str, int]", expected type "Optional[str]")
             yield image_identifiers[cidx]
-
-    # types: ^^^^^^^
 
     async def drag(
         self, event: Event[dict[str, int | tuple[int, int]]]
@@ -1303,7 +1077,7 @@ class FPSCounter(objects.Text):
 
     async def on_tick(self, event: Event[dict[str, float]]) -> None:
         "Update text"
-        ##        self.text = f'FPS: {event.data["fps"]:.2f}'
+        # self.text = f'FPS: {event.data["fps"]:.2f}'
         self.text = f'FPS: {event.data["fps"]:.0f}'
 
     def bind_handlers(self) -> None:
@@ -1315,8 +1089,7 @@ class FPSCounter(objects.Text):
         )
 
 
-# types: type-arg error: Missing type parameters for generic type "AsyncState"
-class HaltState(AsyncState):
+class HaltState(AsyncState["CheckersClient"]):
     "Halt state to set state to None so running becomes False"
     __slots__ = ()
 
@@ -1325,19 +1098,8 @@ class HaltState(AsyncState):
 
     async def check_conditions(self) -> None:
         "Set active state to None."
-        # types: union-attr error: Item "None" of "Optional[Any]" has no attribute "set_state"
+        assert self.machine is not None
         await self.machine.set_state(None)
-
-
-# types: ^^^^
-
-
-##class DataContainerComponent(Component):
-##    "Data container component"
-##    __slots__ = ("data",)
-##    def __init__(self, data: dict[str, Any]) -> None:
-##        super().__init__("data container")
-##        self.data = data
 
 
 class GameState(AsyncState["CheckersClient"]):
@@ -1349,6 +1111,10 @@ class GameState(AsyncState["CheckersClient"]):
 
         self.id: int = 0
         self.manager = ComponentManager(self.name)
+
+    def add_actions(self) -> None:
+        assert self.machine is not None
+        self.machine.manager.add_component(self.manager)
 
     def group_add(self, new_sprite: sprite.Sprite) -> None:
         assert self.machine is not None
@@ -1422,22 +1188,28 @@ class PlayState(GameState):
         assert self.machine is not None
         self.id = self.machine.new_group("play")
 
-        # self.group_add(Cursor())
+        # self.group_add(())
         gameboard = GameBoard((8, 8), 45, randint(0, 1))
         gameboard.location = [x // 2 for x in SCREEN_SIZE]
         self.group_add(gameboard)
 
+        self.manager.register_handler("game_over", self.handle_game_over)
+
         await self.machine.raise_event(Event("init", None))
+
+    async def handle_game_over(self, event: Event[int]) -> None:
+        winner = event.data
+        print(f"Player {winner} Won")
 
 
 class CheckersClient(sprite.GroupProcessor):
     """Checkers Game Client"""
 
-    __slots__ = ()
+    __slots__ = ("manager",)
 
     def __init__(self) -> None:
-        sprite.GroupProcessor.__init__(self)
-        AsyncStateMachine.__init__(self)
+        super().__init__()
+        self.manager = ComponentManager("checkers", "client")
 
         self.add_states(
             (
@@ -1455,12 +1227,7 @@ class CheckersClient(sprite.GroupProcessor):
 
     async def raise_event(self, event: Event[Any]) -> None:
         "Raise component event in all groups"
-        if self.active_state is None:
-            return
-        manager = getattr(self.active_state, "manager", None)
-        if manager is None:
-            return
-        await manager.raise_event(event)
+        await self.manager.raise_event(event)
 
 
 async def async_run() -> None:
@@ -1490,26 +1257,6 @@ async def async_run() -> None:
     # clock = pygame.time.Clock()
     clock = Clock()
 
-    ##    # Get the program path, and use it to find the picture path
-    ##    PROGPATH = os.path.split(os.sys.argv[0])[0]
-    ##    picpath = os.path.join(PROGPATH, PIC_PATH)
-    ##
-    ##    # Create a dictionary containing the image surfaces
-    ##    IMAGES = {}
-    ##    for pic_name in os.listdir(picpath):
-    ##        name = pic_name.split(".png")[0]
-    ##        image = pygame.image.load(picpath + pic_name).convert_alpha()
-    ##        IMAGES[name] = base2d.scale_surf(image, 0.25)
-    ##
-    ##    # Get any additional images
-    ##    background = pygame.Surface(SCREEN_SIZE)
-    ##    background.fill(WHITE)
-    ##
-    ##    # Define animations
-    ##    backAnim = [gen_button("Play Again", 35), gen_button("Quit Game", 35)]
-    ##
-    ##    # Set up the world
-    ##    world = World(background)
     ##
     ##    # Set up players
     ##    if computer:
@@ -1525,32 +1272,6 @@ async def async_run() -> None:
     ##    # Get the screen width and height for a lot of things
     ##    w, h = SCREEN_SIZE
     ##
-    ##    # Add entities
-    ##    world.add_entity(Cursor(world))
-    ##    world.add_entity(
-    ##        GameBoard(world, [8] * 2, 45, location=[x // 2 for x in SCREEN_SIZE])
-    ##    )
-    ##    world.add_entity(
-    ##        ValDisplay(
-    ##            world,
-    ##            "VeraSerif.ttf",
-    ##            60,
-    ##            show_win,
-    ##            location=base2d.amol(SCREEN_SIZE, d=2),
-    ##            color=GREEN,
-    ##            renderPriority=5,
-    ##        )
-    ##    )
-    ##    world.add_entity(
-    ##        Button(
-    ##            world,
-    ##            backAnim,
-    ##            "cursor",
-    ##            back_pressed,
-    ##            states=1,
-    ##            location=Vector2(*base2d.amol(SCREEN_SIZE, d=2)) + Vector2(0, 80),
-    ##        )
-    ##    )
     ##
     ##    if computer and isinstance(aiData, dict):
     ##        keys = aiData.keys()
@@ -1563,70 +1284,43 @@ async def async_run() -> None:
     ##
     ##    ai_has_been_told_game_is_won = False
     ##
-    ##    # Set up the FPS clock
-    ##    clock = pygame.time.Clock()
-    ##
-    ##    # While the game is active
-    ##    while client.running:
-    ##        # Event handler
-    ##        for event in pygame.event.get():
-    ##            if event.type == QUIT:
+    ##    # If we are playing against a computer,
+    ##    if computer:
+    ##        # If it's the AI's turn,
+    ##        if board.playing == 0:
+    ##            # Reset game is won tracker since presumabley a new game has started
+    ##            if ai_has_been_told_game_is_won:
+    ##                ai_has_been_told_game_is_won = False
+    ##            try:
+    ##                # Send board data to the AI
+    ##                AI.update(board.get_data())
+    ##                # Get the target piece id and destination piece id from the AI
+    ##                rec_data = AI.turn()
+    ##                if rec_data != "QUIT":
+    ##                    if rec_data is not None:
+    ##                        target, dest = rec_data
+    ##                        # Play play the target piece id to the destination tile id
+    ##                        # on the game board
+    ##                        success = ai_play(
+    ##                            str(target), str(dest), board
+    ##                        )
+    ##                        if hasattr(AI, "turn_success"):
+    ##                            AI.turn_success(bool(success))
+    ##                    # else:
+    ##                    #     print('AI Played None. Still AI\'s Turn.')
+    ##                else:
+    ##                    # Don't use this as an excuse if your AI can't win
+    ##                    print(
+    ##                        "AI wishes to hault execution. Exiting game."
+    ##                    )
+    ##                    RUNNING = False
+    ##            except Exception as ex:
+    ##                traceback.print_exception(ex)
     ##                RUNNING = False
-    ##
-    ##        # Update the FPS clock and get how much time elapsed since the last frame
-    ##        time_passed = clock.tick(FPS)
-    ##
-    ##        # Process entities
-    ##        world.process(time_passed)
-    ##
-    ##        # Render the world to the screen
-    ##        world.render(screen)
-    ##
-    ##        # If we are playing against a computer,
-    ##        if computer:
-    ##            # Get the game board from the world
-    ##            boards = world.get_type("board")
-    ##            # If there are game board(s) the world found,
-    ##            if boards:
-    ##                # Get the first one
-    ##                board = boards[0]
-    ##                # If it's the AI's turn,
-    ##                if board.playing == 0:
-    ##                    # Reset game is won tracker since presumabley a new game has started
-    ##                    if ai_has_been_told_game_is_won:
-    ##                        ai_has_been_told_game_is_won = False
-    ##                    try:
-    ##                        # Send board data to the AI
-    ##                        AI.update(board.get_data())
-    ##                        # Get the target piece id and destination piece id from the AI
-    ##                        rec_data = AI.turn()
-    ##                        if rec_data != "QUIT":
-    ##                            if rec_data is not None:
-    ##                                target, dest = rec_data
-    ##                                # Play play the target piece id to the destination tile id
-    ##                                # on the game board
-    ##                                success = ai_play(
-    ##                                    str(target), str(dest), board
-    ##                                )
-    ##                                if hasattr(AI, "turn_success"):
-    ##                                    AI.turn_success(bool(success))
-    ##                            # else:
-    ##                            #     print('AI Played None. Still AI\'s Turn.')
-    ##                        else:
-    ##                            # Don't use this as an excuse if your AI can't win
-    ##                            print(
-    ##                                "AI wishes to hault execution. Exiting game."
-    ##                            )
-    ##                            RUNNING = False
-    ##                    except Exception as ex:
-    ##                        traceback.print_exception(ex)
-    ##                        RUNNING = False
-    ##                elif board.playing == 2 and not ai_has_been_told_game_is_won:
-    ##                    # If the game has been won, tell the AI about it
-    ##                    AI.update(board.get_data())
-    ##                    ai_has_been_told_game_is_won = True
-    ##        # Update the display
-    ##        pygame.display.update()
+    ##        elif board.playing == 2 and not ai_has_been_told_game_is_won:
+    ##            # If the game has been won, tell the AI about it
+    ##            AI.update(board.get_data())
+    ##            ai_has_been_told_game_is_won = True
     ##    # If we have an AI going and it has the stop function,
     ##    if computer and hasattr(AI, "stop"):
     ##        # Tell the AI to stop
@@ -1648,9 +1342,6 @@ async def async_run() -> None:
                 nursery.start_soon(client.raise_event, sprite_event)
             nursery.start_soon(client.think)
             nursery.start_soon(clock.tick, FPS)
-
-        # await client.think()
-        # time_passed = await clock.tick(FPS)
 
         await client.raise_event(
             Event(
