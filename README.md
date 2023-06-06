@@ -65,7 +65,7 @@ but acts as an AI in the view of the game. In reality, the AI acts
 as a network connection, allowing two players to play checkers
 across a local network, or even accost separate networks if the
 server is hosted from a address accessible from outside the local
-network. 
+network.
 
 To use the Hacky Checkers Not AI, the user needs to start the
 checkers game program, select they wish to play against an AI,
