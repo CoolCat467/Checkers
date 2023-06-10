@@ -626,7 +626,7 @@ def board_data_to_str(board, flip=False):
 
 
 def str_to_board_info(string):  # , flip=False):
-    "Convert a board data sting into a board info list"
+    "Convert a board data string into a board info list"
     global TIDSHIFT
     # Split the data into each individual tile (dashes), and then spit the individual data declarations.
     data = [i.split("=") for i in string.split("-")]
@@ -664,7 +664,7 @@ def find_change(old, new):
     ## Get valid moves the old board can make
     # Get the start tile id and valid moves that tile can make if there are valid moves
     moves = [[i[0], i[2]] for i in one if i[2] != "N"]
-    # Convert the move information so that each start tile corrosponds to each end tile, insted of
+    # Convert the move information so that each start tile corrosponds to each end tile, instead of
     # refrencing all end tiles.
     moves = sum([[[i[0], f] for f in i[1].split("/")] for i in moves], [])
     # Get all start and end points seperated
@@ -886,7 +886,7 @@ def init():
     modded = []
     for y in range(8):
         for x in range(8):
-            # Generate normal tile ids (nermal da cat lul)
+            # Generate normal tile ids (nermal the cat lul)
             nermal.append(chr(65 + x) + str(8 - y))
             # Generate shifted tile ids
             modded.append(chr(65 + (7 - x)) + str(y + 1))

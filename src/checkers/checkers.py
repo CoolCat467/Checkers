@@ -37,6 +37,7 @@ import sprite
 import trio
 from async_clock import Clock
 from component import Component, ComponentManager, Event
+from network import NetworkEventComponent, Server
 from pygame.locals import *
 from pygame.surface import Surface
 from statemachine import AsyncState
@@ -50,6 +51,7 @@ SCREEN_SIZE = (640, 480)
 
 FPS = 60
 VSYNC = True
+PORT = 31613
 
 PLAYERS = ["Red Player", "Black Player"]
 
@@ -113,7 +115,7 @@ def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
 
 
 class Piece(sprite.Sprite):
-    "Piece"
+    "Piece Sprite"
     __slots__ = (
         "piece_type",
         "board_position",
@@ -213,6 +215,10 @@ class Piece(sprite.Sprite):
         self.destination_tiles.extend(event.data)
         targeting.destination = self.destination_tiles[0][0]
 
+        # Only register tick handler when we need to.
+        # This is because, as a tick event is fired every frame,
+        # if we have like 30 things fireing every frame and they aren't
+        # even moving, that's a lot of processing power wasted.
         self.register_handler("tick", self.handle_tick_event)
         group = self.groups()[0]
         group.move_to_front(self)  # type: ignore[attr-defined]
@@ -248,7 +254,7 @@ class Piece(sprite.Sprite):
 
 
 class Tile(sprite.Sprite):
-    "Outlined tile sprite"
+    "Outlined tile sprite - Only exists for selecting destination"
     __slots__ = ("color", "board_position", "position_name")
 
     def __init__(
@@ -316,11 +322,8 @@ def generate_tile_image(
     size: tuple[int, int],
 ) -> Surface:
     "Generate the image used for a tile"
-    # Make a blank surface of the size we're given
     surf = pygame.Surface(size)
-    # Fill the blank surface with the color given
     surf.fill(color)
-    # Return a rectangular (or square if width and height of size are the same) image of the color given
     return surf
 
 
@@ -525,9 +528,12 @@ class GameBoard(sprite.Sprite):
             {
                 "init": self.handle_init_event,
                 "gameboard_piece_clicked": self.handle_piece_clicked_event,
+                "gameboard_select_piece": self.handle_select_piece_event,
                 "gameboard_tile_clicked": self.handle_tile_clicked_event,
+                "gameboard_select_tile": self.handle_select_tile_event,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
                 "gameboard_restart": self.handle_restart_event,
+                "gameboard_preform_turn": self.handle_preform_turn_event,
             }
         )
 
@@ -540,7 +546,7 @@ class GameBoard(sprite.Sprite):
         await self.handle_restart_event(event)
 
     async def handle_restart_event(self, event: Event[None]) -> None:
-        "Reset board"
+        """Reset board"""
         async with trio.open_nursery() as nursery:
             for piece_position in self.pieces:
                 if piece_position in self.actions:
@@ -560,14 +566,12 @@ class GameBoard(sprite.Sprite):
 
         self.generate_pieces()
 
-    async def handle_piece_clicked_event(
-        self, event: Event[tuple[str, int]]
-    ) -> None:
-        "Update selected piece and outlines accordingly"
-        piece_name, piece_type = event.data
+    async def handle_select_piece_event(self, event: Event[str]) -> None:
+        """Seperate event to handle selection of a piece
 
-        if piece_type % 2 != self.turn:
-            return
+        Seperated so AIs can call select piece without
+        interference from screen click events"""
+        piece_name = event.data
 
         selected_piece: str | None
 
@@ -585,8 +589,21 @@ class GameBoard(sprite.Sprite):
             selected_piece = None
         await self.select_piece(selected_piece)
 
+    async def handle_piece_clicked_event(
+        self, event: Event[tuple[str, int]]
+    ) -> None:
+        """Update selected piece and outlines accordingly"""
+        piece_name, piece_type = event.data
+
+        if piece_type % 2 != self.turn:
+            return
+        if self.turn == self.ai_player:
+            return
+
+        await self.raise_event(Event("gameboard_select_piece", piece_name))
+
     def get_actions_set(self, piece_position: Pos) -> ActionSet:
-        "Calculate and return ActionSet if required"
+        """Calculate and return ActionSet if required"""
         if piece_position in self.actions:
             new_action_set = self.actions[piece_position]
         else:
@@ -595,7 +612,7 @@ class GameBoard(sprite.Sprite):
         return new_action_set
 
     async def select_piece(self, piece_name: str | None) -> None:
-        "Update glowing tiles from new selected piece"
+        """Update glowing tiles from new selected piece"""
         ignore: set[tuple[int, int]] = set()
 
         if piece_name is not None:
@@ -631,7 +648,14 @@ class GameBoard(sprite.Sprite):
         self.selected_piece = piece_name
 
     async def handle_tile_clicked_event(self, event: Event[str]) -> None:
-        "Start preforming move"
+        """Preform move if it's not the AI player's turn"""
+        if self.turn == self.ai_player:
+            return
+
+        await self.raise_event(Event("gameboard_select_tile", event.data))
+
+    async def handle_select_tile_event(self, event: Event[str]) -> None:
+        """Start preforming move"""
         # No one allowed to move during animation
         self.turn += 2
 
@@ -680,7 +704,7 @@ class GameBoard(sprite.Sprite):
     async def handle_piece_moved_event(
         self, event: Event[tuple[str, Pos, Pos, bool]]
     ) -> None:
-        "Handle piece finishing it's movement animation"
+        """Handle piece finishing one part of it's movement animation"""
         piece_name, start_pos, end_pos, done = event.data
 
         piece_type = self.pieces.pop(start_pos)
@@ -717,7 +741,7 @@ class GameBoard(sprite.Sprite):
             await self.turn_over()
 
     def generate_tile_images(self) -> None:
-        "Load all the images"
+        """Load all the images"""
         image: sprite.ImageComponent = self.get_component("image")
         outline: sprite.OutlineComponent = image.get_component("outline")
         outline.size = 2
@@ -768,13 +792,13 @@ class GameBoard(sprite.Sprite):
             image.add_image(f"{name}_outlined", outline_ident)
 
     def get_tile_location(self, position: Pos) -> Vector2:
-        "Return the center point of a given tile position"
+        """Return the center point of a given tile position"""
         location = Vector2.from_iter(position) * self.tile_size
         center = self.tile_size // 2
         return location + (center, center) + self.rect.topleft
 
     def add_piece(self, piece_type: int, position: Pos) -> str:
-        "Add piece given type and position"
+        """Add piece given type and position"""
         group = self.groups()[-1]
         # Get the proper name of the tile we're creating ('A1' to 'H8')
         name = self.get_tile_name(*position)
@@ -789,7 +813,7 @@ class GameBoard(sprite.Sprite):
         return piece.name
 
     def add_tile(self, position: Pos) -> str:
-        "Add outlined tile given position"
+        """Add outlined tile given position"""
         group = self.groups()[-1]
         # Get the proper name of the tile we're creating ('A1' to 'H8')
         x, y = position
@@ -802,7 +826,7 @@ class GameBoard(sprite.Sprite):
         return tile.name
 
     def generate_pieces(self) -> None:
-        "Generate data about each tile"
+        """Generate data about each tile"""
         board_width, board_height = self.board_size
         # Reset tile data
         loc_y = 0
@@ -827,7 +851,7 @@ class GameBoard(sprite.Sprite):
             loc_y += self.tile_size
 
     def generate_board_image(self) -> Surface:
-        "Generate an image of a game board"
+        """Generate an image of a game board"""
         image: sprite.ImageComponent = self.get_component("image")
 
         board_width, board_height = self.board_size
@@ -881,7 +905,7 @@ class GameBoard(sprite.Sprite):
         return None
 
     async def turn_over(self) -> None:
-        "Continue to next player's turn"
+        """Continue to next player's turn"""
         # Clear actions
         self.actions.clear()
 
@@ -899,6 +923,16 @@ class GameBoard(sprite.Sprite):
                 # The winner is the person check_for_win found.
                 self.game_won = win
                 await self.raise_event(Event("game_over", self.game_won, 1))
+        elif self.turn == self.ai_player:
+            await self.raise_event(Event("game_ready_for_next", None, 1))
+
+    async def handle_preform_turn_event(
+        self, event: Event[tuple[str, str]]
+    ) -> None:
+        """Preform a turn"""
+        piece_name, tile_name = event.data
+        await self.raise_event(Event("gameboard_select_piece", piece_name))
+        await self.raise_event(Event("gameboard_select_tile", tile_name))
 
 
 def find_ais() -> list[str]:
@@ -1089,6 +1123,62 @@ class FPSCounter(objects.Text):
         )
 
 
+class AzulServer(Server):
+    """Azul server"""
+
+    __slots__ = ("client_count",)
+
+    def __init__(self) -> None:
+        super().__init__("server")
+        self.client_count = 0
+
+    def bind_handlers(self) -> None:
+        """Register start_server and stop_server"""
+        self.register_handlers(
+            {
+                "start_server": self.start_server,
+                "stop_server": self.stop_server,
+            }
+        )
+
+    async def stop_server(self, event: Event[None] | None = None) -> None:
+        """Stop serving and disconnect all NetworkEventComponents"""
+        self.stop_serving()
+        component_names = []
+        async with trio.open_nursery() as nursery:
+            for component in self.get_all_components():
+                if isinstance(component, NetworkEventComponent):
+                    nursery.start_soon(component.stream.aclose)
+                    component_names.append(component.name)
+        for component_name in component_names:
+            self.remove_component(component_name)
+
+    async def start_server(self, event: Event[None] | None = None) -> None:
+        """Serve clients"""
+        await self.stop_server()
+        self.client_count = 0
+        await self.serve(PORT, backlog=0)
+
+    async def handler(self, stream: trio.SocketStream) -> None:
+        """Accept clients"""
+        self.client_count += 1
+        try:
+            client = NetworkEventComponent.from_stream(
+                f"client_{self.client_count}", stream
+            )
+            if self.client_count >= 2:
+                self.stop_serving()
+            self.add_component(client)
+
+            client.register_clientbound_event(0, "repost_event")
+            client.register_serverbound_event("repost_event", 1)
+
+            await client.write_event(await client.read_event())
+        finally:
+            self.client_count -= 1
+            await stream.aclose()
+
+
 class HaltState(AsyncState["CheckersClient"]):
     "Halt state to set state to None so running becomes False"
     __slots__ = ()
@@ -1174,6 +1264,22 @@ class TitleState(GameState):
         await self.machine.raise_event(Event("init", None))
 
     async def check_conditions(self) -> str:
+        return "play_hosting"
+
+
+class PlayHostingState(AsyncState["CheckersClient"]):
+    def __init__(self) -> None:
+        super().__init__("play_hosting")
+
+    def add_actions(self) -> None:
+        assert self.machine is not None
+        self.machine.manager.add_component(AzulServer())
+
+    async def entry_actions(self) -> None:
+        assert self.machine is not None
+        # await self.machine.manager.raise_event(Event("start_server", None))
+
+    async def check_conditions(self) -> str:
         return "play"
 
 
@@ -1184,6 +1290,16 @@ class PlayState(GameState):
     def __init__(self) -> None:
         super().__init__("play")
 
+    def add_actions(self) -> None:
+        super().add_actions()
+        self.manager.register_handlers(
+            {
+                "game_over": self.handle_game_over,
+                ##                "game_ready_for_next": self.handle_ready_for_next,
+                ##                "game_preform_turn": self.hande_preform_turn,
+            }
+        )
+
     async def entry_actions(self) -> None:
         assert self.machine is not None
         self.id = self.machine.new_group("play")
@@ -1193,13 +1309,24 @@ class PlayState(GameState):
         gameboard.location = [x // 2 for x in SCREEN_SIZE]
         self.group_add(gameboard)
 
-        self.manager.register_handler("game_over", self.handle_game_over)
-
         await self.machine.raise_event(Event("init", None))
 
     async def handle_game_over(self, event: Event[int]) -> None:
+        "Handle game over event"
         winner = event.data
         print(f"Player {winner} Won")
+
+    async def handle_preform_turn(self, event: Event[tuple[str, str]]) -> None:
+        "Handle preform turn action"
+        assert self.machine is not None
+        data = event.data
+        if len(data) != 2:
+            return
+        for item in data:
+            if not isinstance(item, str):
+                # types: unreachable error: Statement is unreachable
+                return
+        await self.machine.raise_event(Event("gameboard_preform_turn", data))
 
 
 class CheckersClient(sprite.GroupProcessor):
@@ -1216,6 +1343,7 @@ class CheckersClient(sprite.GroupProcessor):
                 HaltState(),
                 InitializeState(),
                 TitleState(),
+                PlayHostingState(),
                 PlayState(),
             )
         )
