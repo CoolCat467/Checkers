@@ -145,7 +145,7 @@ class ComponentManager(Component):
         self.bind_handlers()
 
     def __repr__(self) -> str:
-        return f"<ComponentManager Components: {self.__components}>"
+        return f"<{self.__class__.__name__} Components: {self.__components}>"
 
     def __add_self_as_component(self, name: str) -> None:
         "Add this manager as component to self without binding."
@@ -172,26 +172,32 @@ class ComponentManager(Component):
             self.__event_handlers[event_name] = set()
         self.__event_handlers[event_name].add((handler_coro, component_name))
 
-    async def raise_event(self, event: Event[Any]) -> None:
-        "Raise event for all components that have handlers registered"
+    async def raise_event_in_nursery(
+        self, event: Event[Any], nursery: trio.Nursery
+    ) -> None:
+        """Raise event in a particular trio nursery"""
         # Forward leveled events up; They'll come back to us soon enough.
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
             return
 
-        async with trio.open_nursery() as nursery:
-            # Call all registered handlers for this event
-            if event.name in self.__event_handlers:
-                for handler, name in self.__event_handlers[event.name]:
-                    nursery.start_soon(handler, event)
+        # Call all registered handlers for this event
+        if event.name in self.__event_handlers:
+            for handler, name in self.__event_handlers[event.name]:
+                nursery.start_soon(handler, event)
 
-            # Forward events to contained managers
-            for component in self.get_all_components():
-                # Skip self component if exists
-                if component is self:
-                    continue
-                if isinstance(component, ComponentManager):
-                    nursery.start_soon(component.raise_event, event)
+        # Forward events to contained managers
+        for component in self.get_all_components():
+            # Skip self component if exists
+            if component is self:
+                continue
+            if isinstance(component, ComponentManager):
+                nursery.start_soon(component.raise_event, event)
+
+    async def raise_event(self, event: Event[Any]) -> None:
+        "Raise event for all components that have handlers registered"
+        async with trio.open_nursery() as nursery:
+            await self.raise_event_in_nursery(event, nursery)
 
     def add_component(self, component: Component) -> None:
         "Add component to this manager"
@@ -262,6 +268,25 @@ class ComponentManager(Component):
 
     def __del__(self) -> None:
         self.unbind_components()
+
+
+class ExternalRaiseManager(ComponentManager):
+    """Component Manager, but raises events in an external nursery"""
+
+    __slots__ = ("nursery",)
+
+    def __init__(
+        self, name: str, nursery: trio.Nursery, own_name: str | None = None
+    ) -> None:
+        super().__init__(name, own_name)
+        self.nursery = nursery
+
+    async def raise_event(self, event: Event[Any]) -> None:
+        await self.raise_event_in_nursery(event, self.nursery)
+
+    async def raise_event_internal(self, event: Event[Any]) -> None:
+        "Raise event in internal nursery"
+        await super().raise_event(event)
 
 
 F = TypeVar("F", bound=Callable[..., Any])

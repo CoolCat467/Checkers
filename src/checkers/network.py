@@ -29,6 +29,10 @@ from component import Component, ComponentManager, Event
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
 
+class Timeout(Exception):
+    __slots__ = ()
+
+
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     """Network Component (client)"""
 
@@ -60,7 +64,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             if len(recieved) == 0:
                 # No information at all
                 if len(content) == 0:
-                    raise IOError(
+                    raise Timeout(
                         "Server did not respond with any information. "
                         "This may be from a connection timeout."
                     )
@@ -117,6 +121,11 @@ class NetworkEventComponent(NetworkComponent):
         if self.manager_exists:
             self.register_handler(event_name, self.write_event)
 
+    def register_serverbound_events(self, event_map: dict[str, int]) -> None:
+        """Map event names to serverbound packet ids"""
+        for event_name, packet_id in event_map.items():
+            self.register_serverbound_event(event_name, packet_id)
+
     async def write_event(self, event: Event[bytearray]) -> None:
         """Send event to network"""
         await self.write_value(
@@ -131,11 +140,18 @@ class NetworkEventComponent(NetworkComponent):
         event_data = await self.read_bytearray()
         return Event(event_name, event_data)
 
+    async def raise_event_from_server(self) -> None:
+        """Raise event recieved from server"""
+        try:
+            event = await self.read_event()
+        except Timeout:
+            return
+        await self.raise_event(event)
+
     async def raise_events_from_server(self) -> None:
         """Raise events recieved from server"""
         while True:
-            event = await self.read_event()
-            await self.raise_event(event)
+            await self.raise_event_from_server()
 
     def register_clientbound_event(
         self, packet_id: int, event_name: str
@@ -150,6 +166,11 @@ class NetworkEventComponent(NetworkComponent):
                 "which will would lead to infinite looping over network"
             )
         self._id_name_map[packet_id] = event_name
+
+    def register_clientbound_events(self, packet_map: dict[int, str]) -> None:
+        """Map clientbound packet ids to event names"""
+        for packet_id, event_name in packet_map.items():
+            self.register_clientbound_event(packet_id, event_name)
 
 
 class Server(ComponentManager):

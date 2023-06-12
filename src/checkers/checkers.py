@@ -36,7 +36,9 @@ import pygame
 import sprite
 import trio
 from async_clock import Clock
-from component import Component, ComponentManager, Event
+from base_io import StructFormat
+from buffer import Buffer
+from component import Component, ComponentManager, Event, ExternalRaiseManager
 from network import NetworkEventComponent, Server
 from pygame.locals import *
 from pygame.surface import Surface
@@ -188,7 +190,7 @@ class Piece(sprite.Sprite):
                     self.position_name,
                     self.piece_type,
                 ),
-                1,
+                3,
             )
         )
 
@@ -496,7 +498,10 @@ class GameBoard(sprite.Sprite):
                 if end_pos not in valid:
                     # Add that destination to the dictionary and every
                     # tile you have to jump to get there.
-                    valid[end_pos] = valid[end_tile] + jumped_pieces
+                    no_duplicates = [
+                        p for p in jumped_pieces if p not in valid[end_tile]
+                    ]
+                    valid[end_pos] = valid[end_tile] + no_duplicates
 
         return valid
 
@@ -1123,21 +1128,181 @@ class FPSCounter(objects.Text):
         )
 
 
-class AzulServer(Server):
+class GameClient(NetworkEventComponent):
+    __slots__ = ("reading",)
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+        self.reading = False
+
+        self.register_serverbound_events(
+            {
+                "piece_click_serverbound": 0,
+                "tile_click_serverbound": 1,
+            }
+        )
+        self.register_clientbound_events(
+            {
+                0: "select_piece_clientbound",
+                1: "select_tile_clientbound",
+                2: "no_actions_from_server",
+                ##            0: "gameboard_select_piece",
+                ##            1: "gameboard_select_tile",
+            }
+        )
+
+    def bind_handlers(self) -> None:
+        super().bind_handlers()
+        self.register_handlers(
+            {
+                "gameboard_piece_clicked": self.write_piece_click,
+                "gameboard_tile_clicked": self.write_tile_click,
+                "select_piece_clientbound": self.read_piece_select,
+                "select_tile_clientbound": self.read_tile_select,
+                "network_stop": self.handle_network_stop,
+                "client_connect": self.handle_client_connect,
+                "tick": self.handle_tick,
+            }
+        )
+
+    async def handle_tick(self, event: Event[dict[str, float]]) -> None:
+        """Raise events from server"""
+        if hasattr(self, "stream") and not self.reading:
+            self.reading = True
+            await self.raise_event_from_server()
+            self.reading = False
+
+    async def handle_client_connect(
+        self, event: Event[tuple[str, int]]
+    ) -> None:
+        "Have client connect to address"
+        if not hasattr(self, "stream"):
+            print("client start connect")
+            await self.connect(*event.data)
+
+    async def write_piece_click(self, event: Event[tuple[str, int]]) -> None:
+        """Write piece click event"""
+        if not hasattr(self, "stream"):
+            return
+        piece_name, piece_type = event.data
+
+        buffer = Buffer()
+        buffer.write_utf(piece_name)
+        buffer.write_value(StructFormat.UINT, piece_type)
+
+        await self.write_event(Event("piece_click_serverbound", buffer))
+
+    async def write_tile_click(self, event: Event[str]) -> None:
+        """Write tile click event"""
+        tile_name = event.data
+
+        buffer = Buffer()
+        buffer.write_utf(tile_name)
+
+        await self.write_event(Event("tile_click_serverbound", buffer))
+
+    async def read_piece_select(self, event: Event[bytearray]) -> None:
+        buffer = Buffer(event.data)
+
+        piece_name = buffer.read_utf()
+
+        await self.raise_event(Event("gameboard_select_piece", piece_name))
+
+    async def read_tile_select(self, event: Event[bytearray]) -> None:
+        buffer = Buffer(event.data)
+
+        piece_name = buffer.read_utf()
+
+        await self.raise_event(Event("gameboard_select_tile", piece_name))
+
+    async def handle_network_stop(self, event: Event[None]) -> None:
+        if hasattr(self, "stream"):
+            print("client close")
+            await self.close()
+
+
+class ServerClient(NetworkEventComponent):
+    __slots__ = ()
+
+    def __init__(self, name: str) -> None:
+        super().__init__(name)
+
+        self.timeout = 2
+
+        self.register_serverbound_events(
+            {
+                "select_piece_clientbound": 0,
+                "select_tile_clientbound": 1,
+                "no_data_from_server": 2,
+            }
+        )
+
+    def bind_handlers(self) -> None:
+        super().bind_handlers()
+        self.register_handlers(
+            {
+                "select_piece_clientbound": self.read_piece_select,
+                "select_tile_clientbound": self.read_tile_select,
+                "network_stop": self.handle_network_stop,
+            }
+        )
+
+    async def write_piece_click(self, event: Event[tuple[str, int]]) -> None:
+        """Write piece click event"""
+        piece_name, piece_type = event.data
+
+        buffer = Buffer()
+        buffer.write_utf(piece_name)
+        buffer.write_value(StructFormat.UINT, piece_type)
+
+        await self.write_event(Event("piece_click_serverbound", buffer))
+
+    async def write_tile_click(self, event: Event[str]) -> None:
+        """Write tile click event"""
+        tile_name = event.data
+
+        buffer = Buffer()
+        buffer.write_utf(tile_name)
+
+        await self.write_event(Event("tile_click_serverbound", buffer))
+
+    async def read_piece_select(self, event: Event[bytearray]) -> None:
+        buffer = Buffer(event.data)
+
+        piece_name = buffer.read_utf()
+
+        await self.raise_event(Event("gameboard_select_piece", piece_name))
+
+    async def read_tile_select(self, event: Event[bytearray]) -> None:
+        buffer = Buffer(event.data)
+
+        piece_name = buffer.read_utf()
+
+        await self.raise_event(Event("gameboard_select_tile", piece_name))
+
+    async def handle_network_stop(self, event: Event[None]) -> None:
+        print("client close")
+        await self.close()
+
+
+class GameServer(Server):
     """Azul server"""
 
     __slots__ = ("client_count",)
 
     def __init__(self) -> None:
-        super().__init__("server")
+        super().__init__("gameserver")
         self.client_count = 0
 
     def bind_handlers(self) -> None:
         """Register start_server and stop_server"""
         self.register_handlers(
             {
-                "start_server": self.start_server,
-                "stop_server": self.stop_server,
+                "server_start": self.start_server,
+                "network_stop": self.stop_server,
+                "select_piece_clientbound": self.handle_select_piece,
+                "select_tile_clientbound": self.handle_select_tile,
             }
         )
 
@@ -1155,6 +1320,7 @@ class AzulServer(Server):
 
     async def start_server(self, event: Event[None] | None = None) -> None:
         """Serve clients"""
+        print("server: starting server")
         await self.stop_server()
         self.client_count = 0
         await self.serve(PORT, backlog=0)
@@ -1162,21 +1328,31 @@ class AzulServer(Server):
     async def handler(self, stream: trio.SocketStream) -> None:
         """Accept clients"""
         self.client_count += 1
-        try:
-            client = NetworkEventComponent.from_stream(
-                f"client_{self.client_count}", stream
-            )
-            if self.client_count >= 2:
-                self.stop_serving()
-            self.add_component(client)
-
-            client.register_clientbound_event(0, "repost_event")
-            client.register_serverbound_event("repost_event", 1)
-
-            await client.write_event(await client.read_event())
-        finally:
-            self.client_count -= 1
+        if self.client_count >= 2:
+            self.stop_serving()
+        if self.client_count > 2:
             await stream.aclose()
+        print("server: client connected")
+
+        client = ServerClient.from_stream(
+            f"client_{self.client_count}", stream
+        )
+        self.add_component(client)
+
+        while True:
+            print("server: waiting for client event")
+            await client.raise_event_from_server()
+            await client.write_event(Event("no_data_from_server", bytearray()))
+
+    ##        finally:
+    ##            self.client_count -= 1
+    ##            await stream.aclose()
+
+    async def handle_select_piece(self, event: Event[bytearray]) -> None:
+        print(event)
+
+    async def handle_select_tile(self, event: Event[bytearray]) -> None:
+        print(event)
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -1264,20 +1440,54 @@ class TitleState(GameState):
         await self.machine.raise_event(Event("init", None))
 
     async def check_conditions(self) -> str:
-        return "play_hosting"
+        return "play"  # "play_hosting" # "play_joining"
 
 
 class PlayHostingState(AsyncState["CheckersClient"]):
+    "Start running server"
+    __slots__ = ()
+
     def __init__(self) -> None:
         super().__init__("play_hosting")
 
     def add_actions(self) -> None:
+        "Add server component"
         assert self.machine is not None
-        self.machine.manager.add_component(AzulServer())
+        self.machine.manager.add_component(GameServer())
 
     async def entry_actions(self) -> None:
+        "Start hosting server"
         assert self.machine is not None
-        # await self.machine.manager.raise_event(Event("start_server", None))
+        await self.machine.raise_event(Event("server_start", None))
+        await trio.sleep(0.1)  # Wait for server to start
+        await self.machine.raise_event(
+            Event("client_connect", ("127.0.0.1", PORT))
+        )
+
+    async def check_conditions(self) -> str:
+        return "play"
+
+
+class PlayJoiningState(AsyncState["CheckersClient"]):
+    "Start running client"
+    __slots__ = ()
+
+    def __init__(self) -> None:
+        super().__init__("play_joining")
+
+    def add_actions(self) -> None:
+        "Add server component"
+        assert self.machine is not None
+        client = GameClient("network")
+
+        self.machine.manager.add_component(client)
+
+    async def entry_actions(self) -> None:
+        "Start hosting server"
+        assert self.machine is not None
+        await self.machine.raise_event(
+            Event("client_connect", ("127.0.0.1", PORT))
+        )
 
     async def check_conditions(self) -> str:
         return "play"
@@ -1295,8 +1505,8 @@ class PlayState(GameState):
         self.manager.register_handlers(
             {
                 "game_over": self.handle_game_over,
-                ##                "game_ready_for_next": self.handle_ready_for_next,
-                ##                "game_preform_turn": self.hande_preform_turn,
+                # "game_ready_for_next": self.handle_ready_for_next,
+                # "game_preform_turn": self.hande_preform_turn,
             }
         )
 
@@ -1311,6 +1521,12 @@ class PlayState(GameState):
 
         await self.machine.raise_event(Event("init", None))
 
+    async def exit_actions(self) -> None:
+        assert self.machine is not None
+        await super().exit_actions()
+        # Fire server stop event so server shuts down if it exists
+        await self.machine.raise_event(Event("network_stop", None))
+
     async def handle_game_over(self, event: Event[int]) -> None:
         "Handle game over event"
         winner = event.data
@@ -1324,7 +1540,6 @@ class PlayState(GameState):
             return
         for item in data:
             if not isinstance(item, str):
-                # types: unreachable error: Statement is unreachable
                 return
         await self.machine.raise_event(Event("gameboard_preform_turn", data))
 
@@ -1334,9 +1549,9 @@ class CheckersClient(sprite.GroupProcessor):
 
     __slots__ = ("manager",)
 
-    def __init__(self) -> None:
+    def __init__(self, manager: ComponentManager) -> None:
         super().__init__()
-        self.manager = ComponentManager("checkers", "client")
+        self.manager = manager
 
         self.add_states(
             (
@@ -1344,6 +1559,7 @@ class CheckersClient(sprite.GroupProcessor):
                 InitializeState(),
                 TitleState(),
                 PlayHostingState(),
+                PlayJoiningState(),
                 PlayState(),
             )
         )
@@ -1371,124 +1587,130 @@ async def async_run() -> None:
     pygame.key.set_repeat(1000, 30)
     screen.fill((0xFF, 0xFF, 0xFF))
 
-    client = CheckersClient()
-
-    background = pygame.image.load(
-        path.join("data", "background.png")
-    ).convert()
-    client.clear(screen, background)
-
-    client.set_timing_threshold(1000 / FPS)
-
-    await client.set_state("initialize")
-
-    # clock = pygame.time.Clock()
-    clock = Clock()
-
-    ##
-    ##    # Set up players
-    ##    if computer:
-    ##        PLAYERS = ["Player", "Computer"]
-    ##        if aiData and hasattr(aiData, "keys"):
-    ##            keys = aiData.keys()
-    ##            if "player_names" in keys:
-    ##                if len(aiData["player_names"]) == 2:
-    ##                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
-    ##    else:
-    ##        PLAYERS = ["Red Player", "Black Player"]
-    ##
-    ##    # Get the screen width and height for a lot of things
-    ##    w, h = SCREEN_SIZE
-    ##
-    ##
-    ##    if computer and isinstance(aiData, dict):
-    ##        keys = aiData.keys()
-    ##        if "starting_turn" in keys:
-    ##            world.get_type("board")[0].playing = int(aiData["starting_turn"])
-    ##        if "must_quit" in keys:
-    ##            world.get_type("button")[0].do_reset = not bool(
-    ##                aiData["must_quit"]
-    ##            )
-    ##
-    ##    ai_has_been_told_game_is_won = False
-    ##
-    ##    # If we are playing against a computer,
-    ##    if computer:
-    ##        # If it's the AI's turn,
-    ##        if board.playing == 0:
-    ##            # Reset game is won tracker since presumabley a new game has started
-    ##            if ai_has_been_told_game_is_won:
-    ##                ai_has_been_told_game_is_won = False
-    ##            try:
-    ##                # Send board data to the AI
-    ##                AI.update(board.get_data())
-    ##                # Get the target piece id and destination piece id from the AI
-    ##                rec_data = AI.turn()
-    ##                if rec_data != "QUIT":
-    ##                    if rec_data is not None:
-    ##                        target, dest = rec_data
-    ##                        # Play play the target piece id to the destination tile id
-    ##                        # on the game board
-    ##                        success = ai_play(
-    ##                            str(target), str(dest), board
-    ##                        )
-    ##                        if hasattr(AI, "turn_success"):
-    ##                            AI.turn_success(bool(success))
-    ##                    # else:
-    ##                    #     print('AI Played None. Still AI\'s Turn.')
-    ##                else:
-    ##                    # Don't use this as an excuse if your AI can't win
-    ##                    print(
-    ##                        "AI wishes to hault execution. Exiting game."
-    ##                    )
-    ##                    RUNNING = False
-    ##            except Exception as ex:
-    ##                traceback.print_exception(ex)
-    ##                RUNNING = False
-    ##        elif board.playing == 2 and not ai_has_been_told_game_is_won:
-    ##            # If the game has been won, tell the AI about it
-    ##            AI.update(board.get_data())
-    ##            ai_has_been_told_game_is_won = True
-    ##    # If we have an AI going and it has the stop function,
-    ##    if computer and hasattr(AI, "stop"):
-    ##        # Tell the AI to stop
-    ##        AI.stop()
-    while client.running:
-        resized_window = False
-
-        async with trio.open_nursery() as nursery:
-            for event in pygame.event.get():
-                if event.type == QUIT:
-                    await client.set_state("Halt")
-                elif event.type == KEYUP and event.key == K_ESCAPE:
-                    pygame.event.post(pygame.event.Event(QUIT))
-                elif event.type == WINDOWRESIZED:
-                    SCREEN_SIZE = (event.x, event.y)
-                    resized_window = True
-                sprite_event = sprite.convert_pygame_event(event)
-                # print(sprite_event)
-                nursery.start_soon(client.raise_event, sprite_event)
-            nursery.start_soon(client.think)
-            nursery.start_soon(clock.tick, FPS)
-
-        await client.raise_event(
-            Event(
-                "tick",
-                {
-                    "time_passed": clock.get_time() / 1000,
-                    "fps": clock.get_fps(),
-                },
-            )
+    async with trio.open_nursery() as main_nursery:
+        event_manager = ExternalRaiseManager(
+            "checkers", main_nursery, "client"
         )
+        client = CheckersClient(event_manager)
 
-        if resized_window:
-            screen.fill((0xFF, 0xFF, 0xFF))
-            rects = [Rect((0, 0), SCREEN_SIZE)]
-            client.repaint_rect(rects[0])
-            rects.extend(client.draw(screen))
-        else:
-            rects = client.draw(screen)
-        pygame.display.update(rects)
+        background = pygame.image.load(
+            path.join("data", "background.png")
+        ).convert()
+        client.clear(screen, background)
+
+        client.set_timing_threshold(1000 / FPS)
+
+        await client.set_state("initialize")
+
+        # clock = pygame.time.Clock()
+        clock = Clock()
+
+        ##
+        ##    # Set up players
+        ##    if computer:
+        ##        PLAYERS = ["Player", "Computer"]
+        ##        if aiData and hasattr(aiData, "keys"):
+        ##            keys = aiData.keys()
+        ##            if "player_names" in keys:
+        ##                if len(aiData["player_names"]) == 2:
+        ##                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
+        ##    else:
+        ##        PLAYERS = ["Red Player", "Black Player"]
+        ##
+        ##    # Get the screen width and height for a lot of things
+        ##    w, h = SCREEN_SIZE
+        ##
+        ##
+        ##    if computer and isinstance(aiData, dict):
+        ##        keys = aiData.keys()
+        ##        if "starting_turn" in keys:
+        ##            world.get_type("board")[0].playing = int(aiData["starting_turn"])
+        ##        if "must_quit" in keys:
+        ##            world.get_type("button")[0].do_reset = not bool(
+        ##                aiData["must_quit"]
+        ##            )
+        ##
+        ##    ai_has_been_told_game_is_won = False
+        ##
+        ##    # If we are playing against a computer,
+        ##    if computer:
+        ##        # If it's the AI's turn,
+        ##        if board.playing == 0:
+        ##            # Reset game is won tracker since presumabley a new game has started
+        ##            if ai_has_been_told_game_is_won:
+        ##                ai_has_been_told_game_is_won = False
+        ##            try:
+        ##                # Send board data to the AI
+        ##                AI.update(board.get_data())
+        ##                # Get the target piece id and destination piece id from the AI
+        ##                rec_data = AI.turn()
+        ##                if rec_data != "QUIT":
+        ##                    if rec_data is not None:
+        ##                        target, dest = rec_data
+        ##                        # Play play the target piece id to the destination tile id
+        ##                        # on the game board
+        ##                        success = ai_play(
+        ##                            str(target), str(dest), board
+        ##                        )
+        ##                        if hasattr(AI, "turn_success"):
+        ##                            AI.turn_success(bool(success))
+        ##                    # else:
+        ##                    #     print('AI Played None. Still AI\'s Turn.')
+        ##                else:
+        ##                    # Don't use this as an excuse if your AI can't win
+        ##                    print(
+        ##                        "AI wishes to hault execution. Exiting game."
+        ##                    )
+        ##                    RUNNING = False
+        ##            except Exception as ex:
+        ##                traceback.print_exception(ex)
+        ##                RUNNING = False
+        ##        elif board.playing == 2 and not ai_has_been_told_game_is_won:
+        ##            # If the game has been won, tell the AI about it
+        ##            AI.update(board.get_data())
+        ##            ai_has_been_told_game_is_won = True
+        ##    # If we have an AI going and it has the stop function,
+        ##    if computer and hasattr(AI, "stop"):
+        ##        # Tell the AI to stop
+        ##        AI.stop()
+        while client.running:
+            resized_window = False
+
+            async with trio.open_nursery() as event_nursery:
+                for event in pygame.event.get():
+                    if event.type == QUIT:
+                        await client.set_state("Halt")
+                    elif event.type == KEYUP and event.key == K_ESCAPE:
+                        pygame.event.post(pygame.event.Event(QUIT))
+                    elif event.type == WINDOWRESIZED:
+                        SCREEN_SIZE = (event.x, event.y)
+                        resized_window = True
+                    sprite_event = sprite.convert_pygame_event(event)
+                    # print(sprite_event)
+                    event_nursery.start_soon(
+                        event_manager.raise_event, sprite_event
+                    )
+                event_nursery.start_soon(client.think)
+                event_nursery.start_soon(clock.tick, FPS)
+
+            await client.raise_event(
+                Event(
+                    "tick",
+                    {
+                        "time_passed": clock.get_time() / 1000,
+                        "fps": clock.get_fps(),
+                    },
+                )
+            )
+
+            if resized_window:
+                screen.fill((0xFF, 0xFF, 0xFF))
+                rects = [Rect((0, 0), SCREEN_SIZE)]
+                client.repaint_rect(rects[0])
+                rects.extend(client.draw(screen))
+            else:
+                rects = client.draw(screen)
+            pygame.display.update(rects)
     client.clear_groups()
 
 
