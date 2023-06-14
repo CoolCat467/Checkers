@@ -33,7 +33,7 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
             dx = raw_dx * 2 - 1
             nx = cx + dx
             sides.append((nx, ny))
-    return sides
+    return tuple(sides)
 
 
 def pawn_modify(moves: tuple[T, T, T, T], piece_type: int) -> tuple[T, T]:

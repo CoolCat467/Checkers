@@ -41,7 +41,7 @@ tests = [
 ]
 
 [tool.setuptools.package-data]
-sanescansrv = ["py.typed", "pic/*.png", "*.ttf"]
+checkers = ["py.typed", "pic/*.png", "*.ttf"]
 
 [project.urls]
 "Homepage" = "https://github.com/CoolCat467/Checkers"
