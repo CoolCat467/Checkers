@@ -115,9 +115,7 @@ class ClientTimer(Thread):
         self.cid = clientId
         self.timer = float(waitTime)
         self.wakeup = bool(wakeupMsg)
-        self.msg = ("[%s] %s;" % (str(self.cid), str(wakeupMsg))).encode(
-            "utf-8"
-        )
+        self.msg = (f"[{self.cid!s}] {wakeupMsg!s};").encode()
         self.start()
 
     def run(self):
@@ -230,13 +228,13 @@ def run():
     # For each connected client,
     for client in clients.values():
         # Get the text ready to send
-        send = 'You: "%s" Clients: "%s";' % (str(client.name), clientNames)
+        send = f'You: "{client.name!s}" Clients: "{clientNames}";'
         # Send the text to the client with the utf-8 encoding
         client.send_all(send.encode("utf-8"))
     print("Server: Message sent.")
     print("Server: Beginning Chat...")
     # While no inactive clients exist,
-    while not (False in [client.is_alive() for client in clients.values()]):
+    while False not in [client.is_alive() for client in clients.values()]:
         try:
             # If there is chat data,
             if chatData:

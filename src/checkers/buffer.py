@@ -48,7 +48,7 @@ class Buffer(BaseSyncWriter, BaseSyncReader, bytearray):
             data = self[self.pos : len(self)]
             bytes_read = len(self) - self.pos
             self.pos = len(self)
-            raise IOError(
+            raise OSError(
                 "Requested to read more data than available."
                 f" Read {bytes_read} bytes: {data}, out of {length} requested bytes."
             )

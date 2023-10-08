@@ -149,18 +149,18 @@ def turn():
                 ##                print(possible_moves)
                 for move in possible_moves:
                     y = tiles[move]["xy"][1]
-                    if not y in y_pos:
+                    if y not in y_pos:
                         y_pos[y] = []
                     y_pos[y].append([target, move])
             max_y = max(y_pos)
             best_y = y_pos[max_y]
-            for target, dest in best_y:
+            for target, _dest in best_y:
                 if int(tiles[target]["piece"]) >= 2:
                     # If kinged is best, make it start to come back
                     y_pos = {}
                     for move in selectTiles[target]:
                         y = tiles[move]["xy"][1]
-                        if not y in y_pos:
+                        if y not in y_pos:
                             y_pos[y] = []
                         y_pos[y].append([target, move])
                     min_y = min(y_pos)

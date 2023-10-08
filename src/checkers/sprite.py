@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Client Sprite and Renderer
 
 "Client Sprite and Renderer"

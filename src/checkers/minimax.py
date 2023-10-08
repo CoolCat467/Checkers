@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Minimax - Boilerplate code for Minimax AIs
 
 "Minimax AI Base"

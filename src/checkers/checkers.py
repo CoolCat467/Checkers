@@ -800,7 +800,7 @@ class GameBoard(sprite.Sprite):
         """Return the center point of a given tile position"""
         location = Vector2.from_iter(position) * self.tile_size
         center = self.tile_size // 2
-        return location + (center, center) + self.rect.topleft
+        return (*location, center, center, *self.rect.topleft)
 
     def add_piece(self, piece_type: int, position: Pos) -> str:
         """Add piece given type and position"""

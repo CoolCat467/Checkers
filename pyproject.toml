@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=42.0", "wheel"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -14,6 +14,10 @@ license = {file = "LICENSE"}
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
     "Typing :: Typed",
 ]
@@ -22,31 +26,13 @@ dependencies = [
     "pygame~=2.3.0",
 ]
 
-[project.optional-dependencies]
-dev = [
-    "mypy~=1.3.0",              # must match .pre-commit-config.yaml
-    "pre-commit",
-    "pre-commit-hooks~=4.4.0",  # must match .pre-commit-config.yaml
-    "tox~=4.5.1",
-]
-format = [
-    "black~=23.3.0",            # must match .pre-commit-config.yaml
-    "isort~=5.12.0",            # must match .pre-commit-config.yaml
-    "pycln~=2.1.3",             # must match .pre-commit-config.yaml
-]
-tests = [
-    "flake8~=6.0.0",            # must match .pre-commit-config.yaml
-    "flake8-bugbear~=23.5.9",   # must match .pre-commit-config.yaml
-    "flake8-noqa~=1.3.1",       # must match .pre-commit-config.yaml
-]
-
-[tool.setuptools.package-data]
-checkers = ["py.typed", "pic/*.png", "*.ttf"]
-
 [project.urls]
 "Homepage" = "https://github.com/CoolCat467/Checkers"
 "Source" = "https://github.com/CoolCat467/Checkers"
 "Bug Tracker" = "https://github.com/CoolCat467/Checkers/issues"
+
+[tool.setuptools.package-data]
+checkers = ["py.typed", "pic/*.png", "*.ttf"]
 
 [tool.mypy]
 mypy_path = "src"
@@ -59,6 +45,7 @@ no_implicit_optional = true
 no_implicit_reexport = true
 show_column_numbers = true
 show_error_codes = true
+show_traceback = true
 strict = true
 strict_equality = true
 warn_redundant_casts = true
@@ -71,61 +58,58 @@ warn_unused_ignores = true
 line-length = 79
 target-version = ['py311']
 
-[tool.isort]
-profile = "black"
-combine_as_imports = true
-line_length = 79
-skip = [".git", ".github", ".venv"]
+[tool.ruff.isort]
+combine-as-imports = true
 
 [tool.pycln]
 all = true
 disable_all_dunder_policy = true
 
+[tool.ruff]
+line-length = 79
+fix = true
+
+include = ["*.py", "*.pyi", "**/pyproject.toml"]
+select = [
+    "RUF",  # Ruff-specific rules
+    "E",  # Error
+    "F",  # pyflakes
+    "W",  # Warning
+    "I",  # isort
+    "YTT",  # flake8-2020
+    "A",  # flake8-builtins
+    "B",  # flake8-bugbear
+    "UP",  # pyupgrade
+    "S",  # flake8-bandit
+]
+extend-ignore = [
+    'E501',  # line-too-long
+    "S101",  # use of assert for tests and type narrowing
+]
+
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    minversion = 3.11.0
-    envlist = py311, pycln, black, isort, flake8, mypy
+    envlist = py311, mypy
     isolated_build = false
 
     [gh-actions]
     python =
-        3.11: py311, pytest, flake8, mypy
+        3.11: py311, pytest, mypy
 
     [testenv]
-    basepython = python3.11
     setenv =
         PYTHONPATH = {toxinidir}
 
-    [testenv:flake8]
+    [testenv:pytest]
     deps =
-        flake8
-        flake8-bugbear
-        flake8-noqa
-    commands = flake8 src tests
+        pytest
+        pytest-cov
+        pytest-trio
+    commands = pytest --basetemp={envtmpdir}
 
     [testenv:mypy]
     deps =
         mypy
     commands = mypy src
-
-    [format]
-    basepython = python3.11
-    setenv =
-        PYTHONPATH = {toxinidir}
-
-    [format:pycln]
-    deps =
-        pycln
-    commands = pycln src tests
-
-    [format:black]
-    deps =
-        black
-    commands = black src tests
-
-    [format:isort]
-    deps =
-        isort
-    commands = isort src tests
 """

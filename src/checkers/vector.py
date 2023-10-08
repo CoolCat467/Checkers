@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Vector2 Class for games
 
 "Vector2 Class for games"

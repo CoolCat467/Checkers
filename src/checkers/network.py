@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Network - Module for sending events over the network
 
 "Network - Module for sending events over the network"
@@ -11,11 +10,10 @@ __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
 
+from collections.abc import Callable, Iterable
 from typing import (
     Any,
     AnyStr,
-    Callable,
-    Iterable,
     NoReturn,
     Self,
     SupportsIndex,
@@ -57,7 +55,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """Read length bytes from stream"""
         content = bytearray()
         while max_read_count := length - len(content):
-            recieved = bytes()
+            recieved = b""
             with trio.move_on_after(self.timeout):
                 recieved = await self.stream.receive_some(max_read_count)
                 content.extend(recieved)
@@ -69,7 +67,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
                         "This may be from a connection timeout."
                     )
                 # Only sent a few bytes, but we requested more
-                raise IOError(
+                raise OSError(
                     f"Server stopped responding (got {len(content)} bytes, "
                     f"but expected {length} bytes)."
                     f" Partial obtained data: {content!r}"

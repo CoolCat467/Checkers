@@ -114,7 +114,7 @@ def get_colors(
     for x in range(width):
         for y in range(height):
             color = cast(tuple[int, int, int], surface.get_at((x, y))[:3])
-            if not color in colors:
+            if color not in colors:
                 colors.append(color)
     return tuple(colors)
 
@@ -276,7 +276,7 @@ class BaseButton(GameEntity):
 
     def __init__(
         self,
-        world: "WorldBase",
+        world: WorldBase,
         anim: Sequence[pygame.surface.Surface],
         trigger: str,
         action: Callable[[BaseButton], Any],
@@ -359,7 +359,7 @@ class WorldBase:
     def get(self, entity_id: int) -> GameEntity | None:
         "Find an entity, given it's id, and return None if it's not found"
         # find the entity, given it's id, (or None if it's not found)
-        if (not entity_id is None) and (entity_id in self.entities):
+        if (entity_id is not None) and (entity_id in self.entities):
             return self.entities[entity_id]
         return None
 

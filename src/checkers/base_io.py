@@ -11,9 +11,8 @@ from abc import ABC, abstractmethod
 from collections.abc import Awaitable, Callable
 from enum import Enum
 from itertools import count
-from typing import Literal, TypeVar, Union, overload
+from typing import Literal, TypeAlias, TypeVar, overload
 
-from typing_extensions import TypeAlias
 from utils import from_twos_complement, to_twos_complement
 
 __all__ = [
@@ -57,24 +56,9 @@ class StructFormat(str, Enum):
     ULONGLONG = "Q"
 
 
-INT_FORMATS_TYPE: TypeAlias = Union[
-    Literal[StructFormat.BYTE],
-    Literal[StructFormat.UBYTE],
-    Literal[StructFormat.SHORT],
-    Literal[StructFormat.USHORT],
-    Literal[StructFormat.INT],
-    Literal[StructFormat.UINT],
-    Literal[StructFormat.LONG],
-    Literal[StructFormat.ULONG],
-    Literal[StructFormat.LONGLONG],
-    Literal[StructFormat.ULONGLONG],
-]
+INT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.BYTE] | (Literal[StructFormat.UBYTE] | (Literal[StructFormat.SHORT] | (Literal[StructFormat.USHORT] | (Literal[StructFormat.INT] | (Literal[StructFormat.UINT] | (Literal[StructFormat.LONG] | (Literal[StructFormat.ULONG] | (Literal[StructFormat.LONGLONG] | Literal[StructFormat.ULONGLONG]))))))))
 
-FLOAT_FORMATS_TYPE: TypeAlias = Union[
-    Literal[StructFormat.FLOAT],
-    Literal[StructFormat.DOUBLE],
-    Literal[StructFormat.HALFFLOAT],
-]
+FLOAT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.FLOAT] | (Literal[StructFormat.DOUBLE] | Literal[StructFormat.HALFFLOAT])
 
 # endregion
 
@@ -414,7 +398,7 @@ class BaseAsyncReader(ABC):
             # Ensure that we stop reading and raise an error if the size gets over the maximum
             # (if the current amount of bits is higher than allowed size in bits)
             if result > value_max:
-                raise IOError(
+                raise OSError(
                     f"Received varint was outside the range of {max_bits}-bit int."
                 )
 
@@ -475,7 +459,7 @@ class BaseAsyncReader(ABC):
         """
         length = await self.read_varint()
         if length > 131068:
-            raise IOError(
+            raise OSError(
                 f"Maximum read limit for utf strings is 131068 bytes, got {length}."
             )
 
@@ -483,7 +467,7 @@ class BaseAsyncReader(ABC):
         chars = data.decode("utf-8")
 
         if len(chars) > 32767:
-            raise IOError(
+            raise OSError(
                 f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}."
             )
 
@@ -566,7 +550,7 @@ class BaseSyncReader(ABC):
             # Ensure that we stop reading and raise an error if the size gets over the maximum
             # (if the current amount of bits is higher than allowed size in bits)
             if result > value_max:
-                raise IOError(
+                raise OSError(
                     f"Received varint was outside the range of {max_bits}-bit int."
                 )
 
@@ -627,7 +611,7 @@ class BaseSyncReader(ABC):
         """
         length = self.read_varint()
         if length > 131068:
-            raise IOError(
+            raise OSError(
                 f"Maximum read limit for utf strings is 131068 bytes, got {length}."
             )
 
@@ -635,7 +619,7 @@ class BaseSyncReader(ABC):
         chars = data.decode("utf-8")
 
         if len(chars) > 32767:
-            raise IOError(
+            raise OSError(
                 f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}."
             )
 

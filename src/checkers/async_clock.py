@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Async Clock - Asyncronous version of pygame.time.Clock
 
 "Asyncronous FPS clock"

@@ -111,7 +111,7 @@ class State:
     ) -> dict[Pos, int]:
         """Convert board data from game to internal representation"""
         pieces: dict[Pos, int] = {}
-        for tile_name, tile_data in tiles.items():
+        for _tile_name, tile_data in tiles.items():
             piece_type = tile_data["piece"]
             if piece_type in {None, "None"}:
                 continue
@@ -382,7 +382,7 @@ def turn() -> tuple[str, str] | None:
     "This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."
     print("\nAI brain data:")
     value, action = CheckersMinimax.adaptive_depth_minimax(CURRENT_STATE, 4, 5)
-    print(f"Current State: {repr(CURRENT_STATE)}")
+    print(f"Current State: {CURRENT_STATE!r}")
     assert isinstance(action, tuple)
     from_, to_ = action
     assert isinstance(from_, str)

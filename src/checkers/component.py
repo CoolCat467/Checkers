@@ -1,5 +1,4 @@
 #!/usr/bin/env python3
-# -*- coding: utf-8 -*-
 # Component - Components instead of chaotic class hierarchy mess
 
 "Component system module"
@@ -183,7 +182,7 @@ class ComponentManager(Component):
 
         # Call all registered handlers for this event
         if event.name in self.__event_handlers:
-            for handler, name in self.__event_handlers[event.name]:
+            for handler, _name in self.__event_handlers[event.name]:
                 nursery.start_soon(handler, event)
 
         # Forward events to contained managers
@@ -300,7 +299,7 @@ def comps_must_exist(component_names: tuple[str, ...]) -> Callable[[F], F]:
 
         @functools.wraps(func)
         def must_exist_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            if not isinstance(self, (Component, ComponentManager)):
+            if not isinstance(self, Component | ComponentManager):
                 raise TypeError(
                     "comps_must_exist must wrap a "
                     "Component or ComponentManager function, "

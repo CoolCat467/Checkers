@@ -695,7 +695,7 @@ def find_change(old, new):
             # Get the move as it would appear in the valid moves list
             se = [s, e]  # [TIDSHIFT[s], TIDSHIFT[e]]
             # If the move is valid and is not already in the list of moves to return,
-            if se in moves and not se in allmoves:
+            if se in moves and se not in allmoves:
                 # Add the move the the list of moves
                 allmoves.append(se)
     # Return all the valid moves that were made we found
@@ -950,7 +950,7 @@ def init():
     OPPONENT = CLIENTS[(CLIENTS.index(CID) + 1) % len(CLIENTS)]
     # Send the server a message that we wish to be woken up every <WAKEUP> secconds
     S.sendall(
-        ("[S] Wakeup %s %s" % (str(round(WAKEUP)), WAKEUPMSG)).encode("utf-8")
+        (f"[S] Wakeup {round(WAKEUP)!s} {WAKEUPMSG}").encode()
     )
     # If we are going to be the first client active,
     if int(CID) != 0:
@@ -959,7 +959,7 @@ def init():
             "AI: Waiting for opponent to make a move. (A black screen/freezing is normal)"
         )
         # Send the resync message to ourselves so at least the screen isn't black
-        S.sendall(("[%s] %s" % (CID, WAKEUPMSG)).encode("utf-8"))
+        S.sendall((f"[{CID}] {WAKEUPMSG}").encode())
     else:
         # Otherwise, tell them the screen might freeze during the opponent's turn
         print(
