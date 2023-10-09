@@ -13,16 +13,13 @@ __title__ = "Get to other side + best jump AI"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
-REGISTERED = True
-# Please send your finnished version of your AI to CoolCat467 at Github
-# for review and testing and obain permission to change this flag to True
-
 import random
+from typing import Any
 
 global BOARD
 
 
-def update(boardData):
+def update(boardData: dict[str, Any]) -> None:
     """This function is called by the game to inform the ai of any changes that have occored on the game board"""
     global BOARD
     BOARD = boardData
@@ -100,7 +97,7 @@ def update(boardData):
 ##                      }
 
 
-def turn():
+def turn() -> tuple[str, str] | None:
     """This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."""
     global BOARD
     # If the game is not won,
@@ -164,13 +161,17 @@ def turn():
                             y_pos[y] = []
                         y_pos[y].append([target, move])
                     min_y = min(y_pos)
-                    return random.choice(y_pos[min_y])
+                    return random.choice(  # noqa: S311  # Not important to be cryptographically safe
+                        y_pos[min_y]
+                    )
             ##            target = random.choice(selectable)
             ##            # Get the possible moves that piece can make
             ##            possibleMoves = selectTiles[target]
             ##            # Choose a random valid destination that piece can make as our destination tile id
             ##            destination= random.choice(possibleMoves)#[len(possibleMoves)-1]
-            return random.choice(best_y)
+            return random.choice(  # noqa: S311  # Not important to be cryptographically safe
+                best_y
+            )
         else:
             # If we can make jumps,
             # Get the jump with the most jumps possible
@@ -189,18 +190,18 @@ def turn():
     # ONLY USE THIS IF IT IS TRULY NECESSARY
 
 
-def turnSuccess(tf):
+def turnSuccess(tf: bool) -> None:
     """This function is called immidiately after the ai's play is made, telling it if it was successfull or not"""
     if not tf:
         print("AI: Something went wrong playing move...")
 
 
-def stop():
+def stop() -> None:
     """This function is called immidiately after the game's window is closed"""
     pass
 
 
-def init():
+def init() -> None:
     """This function is called immidiately after the game imports the AI"""
     # We dunno what the board looks like, so set it to blank.
     global BOARD
@@ -209,4 +210,4 @@ def init():
 
 
 print("AI: AI Module Loaded")
-print("AI: " + __title__ + " Created by " + __author__)
+print(f"AI: {__title__} Created by {__author__}")

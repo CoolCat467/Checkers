@@ -56,9 +56,35 @@ class StructFormat(str, Enum):
     ULONGLONG = "Q"
 
 
-INT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.BYTE] | (Literal[StructFormat.UBYTE] | (Literal[StructFormat.SHORT] | (Literal[StructFormat.USHORT] | (Literal[StructFormat.INT] | (Literal[StructFormat.UINT] | (Literal[StructFormat.LONG] | (Literal[StructFormat.ULONG] | (Literal[StructFormat.LONGLONG] | Literal[StructFormat.ULONGLONG]))))))))
+INT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.BYTE] | (
+    Literal[StructFormat.UBYTE]
+    | (
+        Literal[StructFormat.SHORT]
+        | (
+            Literal[StructFormat.USHORT]
+            | (
+                Literal[StructFormat.INT]
+                | (
+                    Literal[StructFormat.UINT]
+                    | (
+                        Literal[StructFormat.LONG]
+                        | (
+                            Literal[StructFormat.ULONG]
+                            | (
+                                Literal[StructFormat.LONGLONG]
+                                | Literal[StructFormat.ULONGLONG]
+                            )
+                        )
+                    )
+                )
+            )
+        )
+    )
+)
 
-FLOAT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.FLOAT] | (Literal[StructFormat.DOUBLE] | Literal[StructFormat.HALFFLOAT])
+FLOAT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.FLOAT] | (
+    Literal[StructFormat.DOUBLE] | Literal[StructFormat.HALFFLOAT]
+)
 
 # endregion
 

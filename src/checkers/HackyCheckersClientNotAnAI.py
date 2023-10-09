@@ -11,6 +11,7 @@
 
 import os
 import socket
+import traceback
 from random import choice
 
 # Import choice for the event that something wierd happens
@@ -22,15 +23,9 @@ BUFSIZE = 1040  # Standard message size is somewere around 300 bytes long, so th
 WAKEUP = 60 * 3.5  # Wake up/Re-sync every three and a half minnutes
 WAKEUPMSG = "Wake up and re-sync you fool!"  # Re-sync message lul
 
-NAME = "Socket Checkers Client (Not an AI)"
-AUTHOR = "CoolCat467"
+__title__ = "Socket Checkers Client (Not an AI)"
+__author__ = "CoolCat467"
 __version__ = "0.0.1"
-
-REGISTERED = True
-# Please send your finnished version of your AI to CoolCat467 at Github
-# for review and testing and obain permission to change this flag to True.
-# Flag doesn't really do much anyways, just a thing to indicate this AI has
-# been tested by the creator for proper functionality.
 
 global BOARD
 
@@ -702,14 +697,15 @@ def find_change(old, new):
     return allmoves
 
 
-def disconnect_from_server():
+def disconnect_from_server() -> None:
     "Disconnect from the server socket"
     global S
     try:
         S.send(b"[S] bye")
-    except BaseException:
-        pass
-    S.close()
+    except BaseException as exc:
+        traceback.print_exception(exc)
+    finally:
+        S.close()
 
 
 def update(boardData):
@@ -836,14 +832,12 @@ def turn():
                 if changes:
                     # Instead of returning the last one, return a random one.
                     # (hopefully re-sync?)
-                    return choice(changes)
+                    return choice(changes)  # noqa: S311
         elif frm == "S":  # If the message is from the server,
             # If the message is our set re-sync message,
             if msg == WAKEUPMSG:
                 # Prepare to send our opponent board data
-                send = (
-                    "[" + OPPONENT + "] " + board_data_to_str(boardData, True)
-                )
+                send = f"[{OPPONENT}] " + board_data_to_str(BOARD, True)
                 # Send our message to the server
                 S.sendall(send.encode("utf-8"))
     return None
@@ -949,9 +943,7 @@ def init():
     # Get our opponent's id
     OPPONENT = CLIENTS[(CLIENTS.index(CID) + 1) % len(CLIENTS)]
     # Send the server a message that we wish to be woken up every <WAKEUP> secconds
-    S.sendall(
-        (f"[S] Wakeup {round(WAKEUP)!s} {WAKEUPMSG}").encode()
-    )
+    S.sendall((f"[S] Wakeup {round(WAKEUP)!s} {WAKEUPMSG}").encode())
     # If we are going to be the first client active,
     if int(CID) != 0:
         # Tell the user we are waiting for our opponent to make a move
@@ -979,4 +971,4 @@ def init():
 
 
 print("AI: NOT AI Module Loaded")
-print("AI: " + NAME + " Created by " + AUTHOR)
+print(f"AI: {__title__} Created by {__author__}")

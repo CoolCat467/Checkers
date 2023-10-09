@@ -70,11 +70,13 @@ def turn():
             # Get a list of selectable target tiles
             selectable = list(selectTiles.keys())
             # Choose a random target from the selectable target tile list
-            target = random.choice(selectable)
+            target = random.choice(  # noqa: S311  # Not important to be cryptographically safe
+                selectable
+            )
             # Get the possible moves that piece can make
             possibleMoves = selectTiles[target]
             # Choose a random valid destination that piece can make as our destination tile id
-            destination = random.choice(
+            destination = random.choice(  # noqa: S311  # Not important to be cryptographically safe
                 possibleMoves
             )  # [len(possibleMoves)-1]
         else:

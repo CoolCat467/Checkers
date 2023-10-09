@@ -356,12 +356,13 @@ class MovementComponent(Component):
     "Component that moves sprite in direction of heading with speed."
     __slots__ = ("heading", "speed")
 
-    def __init__(
-        self, heading: Vector2 = Vector2(0, 0), speed: int = 0
-    ) -> None:
+    def __init__(self, heading: Vector2 | None = None, speed: int = 0) -> None:
         super().__init__("movement")
 
-        self.heading = heading
+        if heading is None:
+            self.heading = Vector2(0, 0)
+        else:
+            self.heading = heading
         self.speed = speed
 
     def point_toward(self, position: Iterable[int | float]) -> None:

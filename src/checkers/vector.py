@@ -79,10 +79,10 @@ class Vector2(NamedTuple):
     def __add__(  # type: ignore[override]
         self, rhs: Iterable[int | float]
     ) -> Self:
-        return self.from_iter(a + b for a, b in zip(self, rhs))
+        return self.from_iter(a + b for a, b in zip(self, rhs, strict=True))
 
     def __sub__(self, rhs: Iterable[int | float]) -> Self:
-        return self.from_iter(a - b for a, b in zip(self, rhs))
+        return self.from_iter(a - b for a, b in zip(self, rhs, strict=True))
 
     def __neg__(self) -> Self:
         return self.from_iter(-c for c in self)
@@ -111,7 +111,7 @@ class Vector2(NamedTuple):
 
     def dot(self, vec: Iterable[int | float]) -> int | float:
         """Return the dot product of this vector and another"""
-        return sum(a * b for a, b in zip(self, vec))
+        return sum(a * b for a, b in zip(self, vec, strict=True))
 
     def __matmul__(self, vec: Iterable[int | float]) -> int | float:
         """Return the dot product of this vector and another"""

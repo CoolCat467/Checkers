@@ -2,8 +2,8 @@
 # Server for two hacky NOT AI clients
 # -*- coding: utf-8 -*-
 
-NAME = "Checkers Socket Server"
-AUTHOR = "CoolCat467"
+__title__ = "Checkers Socket Server"
+__author__ = "CoolCat467"
 __version__ = "0.0.1"
 
 import os
@@ -368,8 +368,6 @@ if __name__ == "__main__":
             run()
         except BaseException as e:
             print("Server:", e, file=os.sys.stderr)
-    # Ensure the server socket closes no matter what.
-    try:
+    finally:
+        # Ensure the server socket closes no matter what.
         serversocket.close()
-    except BaseException:
-        pass

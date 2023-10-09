@@ -40,7 +40,9 @@ from base_io import StructFormat
 from buffer import Buffer
 from component import Component, ComponentManager, Event, ExternalRaiseManager
 from network import NetworkEventComponent, Server
-from pygame.locals import *
+from pygame.color import Color
+from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
+from pygame.rect import Rect
 from pygame.surface import Surface
 from statemachine import AsyncState
 from vector import Vector2
@@ -1515,7 +1517,13 @@ class PlayState(GameState):
         self.id = self.machine.new_group("play")
 
         # self.group_add(())
-        gameboard = GameBoard((8, 8), 45, randint(0, 1))
+        gameboard = GameBoard(
+            (8, 8),
+            45,
+            randint(  # noqa: S311  # Not important to be cryptographically safe
+                0, 1
+            ),
+        )
         gameboard.location = [x // 2 for x in SCREEN_SIZE]
         self.group_add(gameboard)
 
