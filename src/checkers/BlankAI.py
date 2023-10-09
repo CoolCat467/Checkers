@@ -43,4 +43,4 @@ def init() -> dict[str, object] | None:
 ##    return send
 
 print("AI: NOT AI Module Loaded")
-print("AI: " + NAME + " Created by " + AUTHOR)
+print(f"AI: {__title__} Created by {__author__}")
