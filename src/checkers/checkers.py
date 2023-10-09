@@ -607,6 +607,7 @@ class GameBoard(sprite.Sprite):
         if self.turn == self.ai_player:
             return
 
+        # CHANGE to piece_click_serverbound
         await self.raise_event(Event("gameboard_select_piece", piece_name))
 
     def get_actions_set(self, piece_position: Pos) -> ActionSet:
@@ -802,7 +803,7 @@ class GameBoard(sprite.Sprite):
         """Return the center point of a given tile position"""
         location = Vector2.from_iter(position) * self.tile_size
         center = self.tile_size // 2
-        return (*location, center, center, *self.rect.topleft)
+        return location + (center, center) + self.rect.topleft  # noqa: RUF005
 
     def add_piece(self, piece_type: int, position: Pos) -> str:
         """Add piece given type and position"""
@@ -811,7 +812,10 @@ class GameBoard(sprite.Sprite):
         name = self.get_tile_name(*position)
 
         piece = Piece(
-            piece_type, position, name, self.get_tile_location(position)
+            piece_type=piece_type,
+            position=position,
+            position_name=name,
+            location=self.get_tile_location(position),
         )
         self.add_component(piece)
         group.add(piece)  # type: ignore[arg-type]
@@ -1138,13 +1142,13 @@ class GameClient(NetworkEventComponent):
 
         self.reading = False
 
-        self.register_serverbound_events(
+        self.register_network_write_events(
             {
                 "piece_click_serverbound": 0,
                 "tile_click_serverbound": 1,
             }
         )
-        self.register_clientbound_events(
+        self.register_read_network_events(
             {
                 0: "select_piece_clientbound",
                 1: "select_tile_clientbound",
@@ -1172,7 +1176,7 @@ class GameClient(NetworkEventComponent):
         """Raise events from server"""
         if hasattr(self, "stream") and not self.reading:
             self.reading = True
-            await self.raise_event_from_server()
+            await self.raise_event_from_read_network()
             self.reading = False
 
     async def handle_client_connect(
@@ -1180,7 +1184,7 @@ class GameClient(NetworkEventComponent):
     ) -> None:
         "Have client connect to address"
         if not hasattr(self, "stream"):
-            print("client start connect")
+            print(f"{self.__class__.__name__}: start connect")
             await self.connect(*event.data)
 
     async def write_piece_click(self, event: Event[tuple[str, int]]) -> None:
@@ -1193,6 +1197,8 @@ class GameClient(NetworkEventComponent):
         buffer.write_utf(piece_name)
         buffer.write_value(StructFormat.UINT, piece_type)
 
+        print(f"{self.__class__.__name__}: writing piece_click_serverbound")
+
         await self.write_event(Event("piece_click_serverbound", buffer))
 
     async def write_tile_click(self, event: Event[str]) -> None:
@@ -1202,12 +1208,16 @@ class GameClient(NetworkEventComponent):
         buffer = Buffer()
         buffer.write_utf(tile_name)
 
+        print(f"{self.__class__.__name__}: writing tile_click_serverbound")
+
         await self.write_event(Event("tile_click_serverbound", buffer))
 
     async def read_piece_select(self, event: Event[bytearray]) -> None:
         buffer = Buffer(event.data)
 
         piece_name = buffer.read_utf()
+
+        print(f"{self.__class__.__name__}: reading gameboard_select_piece")
 
         await self.raise_event(Event("gameboard_select_piece", piece_name))
 
@@ -1216,12 +1226,17 @@ class GameClient(NetworkEventComponent):
 
         piece_name = buffer.read_utf()
 
+        print(f"{self.__class__.__name__}: reading gameboard_select_tile")
+
         await self.raise_event(Event("gameboard_select_tile", piece_name))
 
     async def handle_network_stop(self, event: Event[None]) -> None:
         if hasattr(self, "stream"):
-            print("client close")
+            print(f"{self.__class__.__name__}: close")
             await self.close()
+
+    def __del__(self) -> None:
+        print(f"del {self.__class__.__name__}")
 
 
 class ServerClient(NetworkEventComponent):
@@ -1232,21 +1247,31 @@ class ServerClient(NetworkEventComponent):
 
         self.timeout = 2
 
-        self.register_serverbound_events(
+        self.register_network_write_events(
             {
                 "select_piece_clientbound": 0,
-                "select_tile_clientbound": 1,
+                ##                "select_tile_clientbound": 1,
                 "no_data_from_server": 2,
             }
         )
+        self.register_read_network_events(
+            {
+                0: "client_select_piece",
+            }
+        )
+
+    async def handle_debug_print_event(self, event: Event) -> None:
+        print(f"handle_debug_print_event {event = }")
 
     def bind_handlers(self) -> None:
         super().bind_handlers()
         self.register_handlers(
             {
-                "select_piece_clientbound": self.read_piece_select,
+                "client_select_piece": self.read_piece_select,
                 "select_tile_clientbound": self.read_tile_select,
                 "network_stop": self.handle_network_stop,
+                "read_piece_select": self.read_piece_select,
+                ##                "debug_print_event": self.handle_debug_print_event,
             }
         )
 
@@ -1258,6 +1283,8 @@ class ServerClient(NetworkEventComponent):
         buffer.write_utf(piece_name)
         buffer.write_value(StructFormat.UINT, piece_type)
 
+        print(f"{self.__class__.__name__} writing piece_click_serverbound")
+
         await self.write_event(Event("piece_click_serverbound", buffer))
 
     async def write_tile_click(self, event: Event[str]) -> None:
@@ -1267,6 +1294,8 @@ class ServerClient(NetworkEventComponent):
         buffer = Buffer()
         buffer.write_utf(tile_name)
 
+        print(f"{self.__class__.__name__} writing tile_click_serverbound")
+
         await self.write_event(Event("tile_click_serverbound", buffer))
 
     async def read_piece_select(self, event: Event[bytearray]) -> None:
@@ -1274,22 +1303,31 @@ class ServerClient(NetworkEventComponent):
 
         piece_name = buffer.read_utf()
 
-        await self.raise_event(Event("gameboard_select_piece", piece_name))
+        print(f"{self.__class__.__name__} reading gameboard_select_piece")
+
+        await self.raise_event(Event("gameboard_select_piece", piece_name, 1))
+
+    ##        await self.write_event(Event("select_piece_clientbound", event.data))
 
     async def read_tile_select(self, event: Event[bytearray]) -> None:
         buffer = Buffer(event.data)
 
         piece_name = buffer.read_utf()
 
+        print(f"{self.__class__.__name__} reading gameboard_select_tile")
+
         await self.raise_event(Event("gameboard_select_tile", piece_name))
 
     async def handle_network_stop(self, event: Event[None]) -> None:
-        print("client close")
+        print(f"{self.__class__.__name__}: close")
         await self.close()
+
+    def __del__(self) -> None:
+        print(f"del {self.__class__.__name__}")
 
 
 class GameServer(Server):
-    """Azul server"""
+    """Checkers server"""
 
     __slots__ = ("client_count",)
 
@@ -1322,7 +1360,7 @@ class GameServer(Server):
 
     async def start_server(self, event: Event[None] | None = None) -> None:
         """Serve clients"""
-        print("server: starting server")
+        print(f"{self.__class__.__name__}: starting server")
         await self.stop_server()
         self.client_count = 0
         await self.serve(PORT, backlog=0)
@@ -1334,7 +1372,7 @@ class GameServer(Server):
             self.stop_serving()
         if self.client_count > 2:
             await stream.aclose()
-        print("server: client connected")
+        print(f"{self.__class__.__name__}: client connected")
 
         client = ServerClient.from_stream(
             f"client_{self.client_count}", stream
@@ -1342,9 +1380,14 @@ class GameServer(Server):
         self.add_component(client)
 
         while True:
-            print("server: waiting for client event")
-            await client.raise_event_from_server()
-            await client.write_event(Event("no_data_from_server", bytearray()))
+            try:
+                ##                print(f"{self.__class__.__name__}: waiting for client event")
+                await client.write_event(
+                    Event("no_data_from_server", bytearray())
+                )
+                await client.raise_event_from_read_network()
+            except trio.ClosedResourceError:
+                break
 
     ##        finally:
     ##            self.client_count -= 1
@@ -1355,6 +1398,9 @@ class GameServer(Server):
 
     async def handle_select_tile(self, event: Event[bytearray]) -> None:
         print(event)
+
+    def __del__(self) -> None:
+        print(f"del {self.__class__.__name__}")
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -1497,10 +1543,12 @@ class PlayJoiningState(AsyncState["CheckersClient"]):
 
 class PlayState(GameState):
     "Game Play State"
-    __slots__ = ()
+    __slots__ = ("winner",)
 
     def __init__(self) -> None:
         super().__init__("play")
+
+        self.winner: int | None = None
 
     def add_actions(self) -> None:
         super().add_actions()
@@ -1513,6 +1561,8 @@ class PlayState(GameState):
         )
 
     async def entry_actions(self) -> None:
+        self.winner = None
+
         assert self.machine is not None
         self.id = self.machine.new_group("play")
 
@@ -1535,10 +1585,15 @@ class PlayState(GameState):
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
 
+    async def check_conditions(self) -> str | None:
+        if self.winner is None:
+            return None
+        return "title"
+
     async def handle_game_over(self, event: Event[int]) -> None:
-        "Handle game over event"
-        winner = event.data
-        print(f"Player {winner} Won")
+        """Handle game over event."""
+        self.winner = event.data
+        print(f"Player {self.winner} Won")
 
     async def handle_preform_turn(self, event: Event[tuple[str, str]]) -> None:
         "Handle preform turn action"

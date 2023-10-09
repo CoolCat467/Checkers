@@ -90,85 +90,92 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 class NetworkEventComponent(NetworkComponent):
     """Network Event Component - Send events over the network"""
 
-    __slots__ = ("_id_name_map", "_name_id_map")
+    __slots__ = (
+        "_read_packet_id_to_event_name",
+        "_write_event_name_to_packet_id",
+    )
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
-        self._id_name_map: dict[int, str] = {}
-        self._name_id_map: dict[str, int] = {}
+        self._read_packet_id_to_event_name: dict[int, str] = {}
+        self._write_event_name_to_packet_id: dict[str, int] = {}
 
     def bind_handlers(self) -> None:
         """Register serverbound event handlers"""
         self.register_handlers(
-            {name: self.write_event for name in self._name_id_map}
+            {
+                name: self.write_event
+                for name in self._write_event_name_to_packet_id
+            }
         )
 
-    def register_serverbound_event(
+    def register_network_write_event(
         self, event_name: str, packet_id: int
     ) -> None:
         """Map event name to serverbound packet id"""
-        if event_name in self._name_id_map:
+        if event_name in self._write_event_name_to_packet_id:
             raise ValueError(f"{event_name!r} event already registered!")
-        if self._id_name_map.get(packet_id) == event_name:
+        if self._read_packet_id_to_event_name.get(packet_id) == event_name:
             raise ValueError(
                 f"{event_name!r} events are also being recieved"
                 f"from server with packet id {packet_id!r}, "
                 "which will would lead to infinite looping over network"
             )
-        self._name_id_map[event_name] = packet_id
+        self._write_event_name_to_packet_id[event_name] = packet_id
         if self.manager_exists:
             self.register_handler(event_name, self.write_event)
 
-    def register_serverbound_events(self, event_map: dict[str, int]) -> None:
+    def register_network_write_events(self, event_map: dict[str, int]) -> None:
         """Map event names to serverbound packet ids"""
         for event_name, packet_id in event_map.items():
-            self.register_serverbound_event(event_name, packet_id)
+            self.register_network_write_event(event_name, packet_id)
 
     async def write_event(self, event: Event[bytearray]) -> None:
         """Send event to network"""
         await self.write_value(
-            StructFormat.UINT, self._name_id_map[event.name]
+            StructFormat.UINT, self._write_event_name_to_packet_id[event.name]
         )
         await self.write_bytearray(event.data)
 
     async def read_event(self) -> Event[bytearray]:
         """Recieve event from network"""
         packet_id = await self.read_value(StructFormat.UINT)
-        event_name = self._id_name_map[packet_id]
+        event_name = self._read_packet_id_to_event_name[packet_id]
+        print(f"{self.__class__.__name__}: read_event {event_name = }")
         event_data = await self.read_bytearray()
         return Event(event_name, event_data)
 
-    async def raise_event_from_server(self) -> None:
+    async def raise_event_from_read_network(self) -> None:
         """Raise event recieved from server"""
         try:
             event = await self.read_event()
-        except Timeout:
+        except (Timeout, trio.ClosedResourceError):
             return
         await self.raise_event(event)
 
-    async def raise_events_from_server(self) -> None:
+    async def raise_events_from_read_network(self) -> None:
         """Raise events recieved from server"""
         while True:
-            await self.raise_event_from_server()
+            await self.raise_event_from_read_network()
 
-    def register_clientbound_event(
+    def register_read_network_event(
         self, packet_id: int, event_name: str
     ) -> None:
         """Map clientbound packet id to event name"""
-        if packet_id in self._id_name_map:
+        if packet_id in self._read_packet_id_to_event_name:
             raise ValueError(f"Packet ID {packet_id!r} already registered!")
-        if self._name_id_map.get(event_name) == packet_id:
+        if self._write_event_name_to_packet_id.get(event_name) == packet_id:
             raise ValueError(
                 f"Packet id {packet_id!r} packets are also being recieved"
                 f"from server with as {event_name!r} events, "
                 "which will would lead to infinite looping over network"
             )
-        self._id_name_map[packet_id] = event_name
+        self._read_packet_id_to_event_name[packet_id] = event_name
 
-    def register_clientbound_events(self, packet_map: dict[int, str]) -> None:
+    def register_read_network_events(self, packet_map: dict[int, str]) -> None:
         """Map clientbound packet ids to event names"""
         for packet_id, event_name in packet_map.items():
-            self.register_clientbound_event(packet_id, event_name)
+            self.register_read_network_event(packet_id, event_name)
 
 
 class Server(ComponentManager):
@@ -243,8 +250,8 @@ def run() -> None:
 
         await client.connect("127.0.0.1", port)
 
-        client.register_serverbound_event("echo_event", 0)
-        client.register_clientbound_event(1, "reposted_event")
+        client.register_network_write_event("echo_event", 0)
+        client.register_read_network_event(1, "reposted_event")
 
         event = Event("echo_event", b"I will give my cat food to bob", 3)
 
@@ -262,8 +269,8 @@ def run() -> None:
             async def handler(self, stream: trio.SocketStream) -> None:
                 client = NetworkEventComponent.from_stream("client", stream)
 
-                client.register_clientbound_event(0, "repost_event")
-                client.register_serverbound_event("repost_event", 1)
+                client.register_read_network_event(0, "repost_event")
+                client.register_network_write_event("repost_event", 1)
 
                 await client.write_event(await client.read_event())
                 await stream.aclose()
