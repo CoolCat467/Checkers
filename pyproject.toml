@@ -23,7 +23,7 @@ classifiers = [
 ]
 keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "ai-support", "networked-game"]
 dependencies = [
-    "pygame~=2.3.0",
+    "pygame~=2.5.2",
 ]
 
 [project.urls]

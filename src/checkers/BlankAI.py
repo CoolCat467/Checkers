@@ -6,35 +6,30 @@
 # AI, it's filename should have the words
 # 'AI' in it.
 
-NAME = "<AI NAME>"
-AUTHOR = "<AUTHOR>"
+__title__ = "<AI NAME>"
+__author__ = "<AUTHOR>"
 __version__ = "0.0.0"
 
-REGISTERED = False
-# Please send your finnished version of your AI to CoolCat467 at Github
-# for review and testing and obain permission to change this flag to True
 
-
-def update(boardData):
+def update(board_data: dict[str, object]) -> None:
     """This function is called by the game to inform the ai of any changes that have occored on the game board"""
     pass
 
 
-def turn():
+def turn() -> tuple[str, str] | None:
     """This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."""
     return None
 
 
-def turnSuccess(tf):
+def turnSuccess(tf: bool) -> None:
     """This function is called immidiately after the ai's play is made, telling it if it was successfull or not"""
 
 
-def stop():
+def stop() -> None:
     """This function is called immidiately after the game's window is closed"""
-    pass
 
 
-def init():
+def init() -> dict[str, object] | None:
     """This function is called immidiately after the game imports the AI"""
 
 
