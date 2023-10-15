@@ -104,6 +104,10 @@ class Component:
         self.__manager = ref(manager)
         self.bind_handlers()
 
+    def has_handler(self, event_name: str) -> bool:
+        """Return if manager has event handlers registered for a given event"""
+        return self.manager.has_handler(event_name)
+
     async def raise_event(self, event: Event[Any]) -> None:
         "Raise event for bound manager"
         await self.manager.raise_event(event)
@@ -171,6 +175,10 @@ class ComponentManager(Component):
             self.__event_handlers[event_name] = set()
         self.__event_handlers[event_name].add((handler_coro, component_name))
 
+    def has_handler(self, event_name: str) -> bool:
+        """Return if there are event handlers registered for a given event"""
+        return bool(self.__event_handlers.get(event_name))
+
     async def raise_event_in_nursery(
         self, event: Event[Any], nursery: trio.Nursery
     ) -> None:
@@ -179,6 +187,9 @@ class ComponentManager(Component):
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
             return
+
+        ##        if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
+        ##            print(f'''{self.__class__.__name__}:\n{event = }''')
 
         # Call all registered handlers for this event
         if event.name in self.__event_handlers:

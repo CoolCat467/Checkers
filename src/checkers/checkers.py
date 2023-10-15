@@ -23,12 +23,13 @@
 
 # from __future__ import annotations
 
-import math
 import os
-from collections.abc import Generator, Iterable, Sequence
+import random
+import traceback
+from collections import deque
+from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
 from os import path
-from random import randint
-from typing import Any, NamedTuple, TypeVar, cast
+from typing import Any, TypeVar
 
 import base2d
 import objects
@@ -39,11 +40,13 @@ from async_clock import Clock
 from base_io import StructFormat
 from buffer import Buffer
 from component import Component, ComponentManager, Event, ExternalRaiseManager
-from network import NetworkEventComponent, Server
+from network import NetworkEventComponent, Server, TimeoutException
+from objects import Button
 from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 from pygame.surface import Surface
+from state import ActionSet, State
 from statemachine import AsyncState
 from vector import Vector2
 
@@ -84,38 +87,6 @@ def render_text(
     # Using the loaded font, render the text in the color of color
     surf = font.render(text, False, color)
     return surf
-
-
-def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
-    "Returns the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates"
-    cx, cy = xy
-    sides = []
-    for raw_dy in range(2):
-        dy = raw_dy * 2 - 1
-        ny = cy + dy
-        for raw_dx in range(2):
-            dx = raw_dx * 2 - 1
-            nx = cx + dx
-            sides.append((nx, ny))
-    tuple_sides = tuple(sides)
-    assert len(tuple_sides) == 4
-    return cast(tuple[Pos, Pos, Pos, Pos], tuple_sides)
-
-
-def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
-    "Modifies a list based on piece id to take out invalid moves for pawns"
-    assert (
-        len(moves) == 4
-    ), "List size MUST be four for this to return valid results!"
-    if (
-        piece_type == 0
-    ):  # If it's a white pawn, it can only move to top left and top right
-        return moves[:2]
-    if (
-        piece_type == 1
-    ):  # If it's a black pawn, it can only move to bottom left anf bottom right
-        return moves[2:]
-    return moves
 
 
 class Piece(sprite.Sprite):
@@ -166,10 +137,10 @@ class Piece(sprite.Sprite):
             {
                 "click": self.handle_click_event,
                 f"piece_outline_{self.position_name}": self.handle_set_outline_event,
-                f"self_destruct_piece_{self.position_name}": self.handle_self_destruct_event,
+                f"destroy_piece_{self.position_name}": self.handle_self_destruct_event,
                 f"piece_move_{self.position_name}": self.handle_move_event,
                 "reached_destination": self.handle_reached_destination_event,
-                f"piece_king_{self.position_name}": self.handle_king_event,
+                f"piece_update_{self.position_name}": self.handle_update_event,
             }
         )
 
@@ -190,6 +161,7 @@ class Piece(sprite.Sprite):
                 "gameboard_piece_clicked",
                 (
                     self.position_name,
+                    self.board_position,
                     self.piece_type,
                 ),
                 3,
@@ -205,9 +177,11 @@ class Piece(sprite.Sprite):
         self.kill()
         self.manager.remove_component(self.name)
 
-    async def handle_tick_event(self, event: Event[dict[str, float]]) -> None:
+    async def handle_tick_event(
+        self, event: Event[sprite.TickEventData]
+    ) -> None:
         "Move toward destination"
-        time_passed = event.data["time_passed"]
+        time_passed = event.data.time_passed
         targeting: sprite.TargetingComponent = self.get_component("targeting")
         await targeting.move_destination_time(time_passed)
 
@@ -223,7 +197,8 @@ class Piece(sprite.Sprite):
         # This is because, as a tick event is fired every frame,
         # if we have like 30 things fireing every frame and they aren't
         # even moving, that's a lot of processing power wasted.
-        self.register_handler("tick", self.handle_tick_event)
+        if not self.has_handler("tick"):
+            self.register_handler("tick", self.handle_tick_event)
         group = self.groups()[0]
         group.move_to_front(self)  # type: ignore[attr-defined]
 
@@ -251,9 +226,9 @@ class Piece(sprite.Sprite):
             )
         )
 
-    async def handle_king_event(self, event: Event[None]) -> None:
-        """King self during movement animation"""
-        self.piece_type += 2
+    async def handle_update_event(self, event: Event[int]) -> None:
+        """Update self during movement animation"""
+        self.piece_type = event.data
         self.set_outlined(False)
 
 
@@ -307,7 +282,14 @@ class Tile(sprite.Sprite):
     ) -> None:
         "Raise gameboard_tile_clicked events when clicked"
         await self.raise_event(
-            Event("gameboard_tile_clicked", self.position_name, 1)
+            Event(
+                "gameboard_tile_clicked",
+                (
+                    self.position_name,
+                    self.board_position,
+                ),
+                3,
+            )
         )
 
     async def handle_self_destruct_event(self, event: Event[None]) -> None:
@@ -317,7 +299,7 @@ class Tile(sprite.Sprite):
 
 
 def generate_tile_image(
-    color: Color  # type: ignore[valid-type]
+    color: Color
     | int
     | str
     | tuple[int, int, int]
@@ -335,71 +317,47 @@ def generate_tile_image(
 # 1 = True  = Black = 1, 3
 
 
-class ActionSet(NamedTuple):
-    """Represents a set of actions"""
-
-    jumps: dict[Pos, list[Pos]]
-    moves: tuple[Pos, ...]
-    ends: set[Pos]
-
-
 class GameBoard(sprite.Sprite):
     "Entity that stores data about the game board and renders it"
     __slots__ = (
         "board_size",
         "tile_size",
-        "tile_color_map",
         "tile_surfs",
-        "piece_map",
-        "turn",
-        "game_won",
-        "selected_piece",
         "pieces",
-        "actions",
-        "ai_player",
+    )
+
+    # Define Tile Color Map and Piece Map
+    tile_color_map = (BLACK, RED)
+
+    # Define Black Pawn color to be more of a dark grey so you can see it
+    black = (127, 127, 127)
+    red = (160, 0, 0)
+
+    # Define each piece by giving what color it should be and an image
+    # to recolor
+    piece_map = (
+        (red, "data/Pawn.png"),
+        (black, "data/Pawn.png"),
+        (red, "data/King.png"),
+        (black, "data/King.png"),
     )
 
     def __init__(
         self,
         board_size: tuple[int, int],
         tile_size: int,
-        turn: int,
-        ai_player: int | None = None,
     ) -> None:
         super().__init__("board")
 
         self.add_component(sprite.ImageComponent())
 
-        # Define Tile Color Map and Piece Map
-        self.tile_color_map = (BLACK, RED)
-
-        # Define Black Pawn color to be more of a dark grey so you can see it
-        black = (127, 127, 127)
-        red = (160, 0, 0)
-
-        # Define each piece by giving what color it should be and an image
-        # to recolor
-        self.piece_map = (
-            (red, "data/Pawn.png"),
-            (black, "data/Pawn.png"),
-            (red, "data/King.png"),
-            (black, "data/King.png"),
-        )
-
         # Store the Board Size and Tile Size
         self.board_size = board_size
         self.tile_size = tile_size
 
-        # Set playing side
-        self.turn = turn
-        self.pieces: dict[Pos, int] = {}
-        self.actions: dict[Pos, ActionSet] = {}
-        self.game_won: int | None = None
-        self.ai_player = ai_player
-
-        self.selected_piece: str | None = None
-
         self.update_location_on_resize = True
+
+        self.pieces: dict[tuple[int, int], int] = {}
 
     def get_tile_name(self, x: int, y: int) -> str:
         """Get name of a given tile"""
@@ -411,136 +369,24 @@ class GameBoard(sprite.Sprite):
         y = self.board_size[1] - int(name[1:])
         return (x, y)
 
-    def does_piece_king(self, piece_type: int, position: Pos) -> bool:
-        """Return if piece needs to be kinged given it's type and position"""
-        _, y = position
-        _, h = self.board_size
-        return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
-
-    def valid_location(self, position: Pos) -> bool:
-        """Return if position is valid"""
-        x, y = position
-        w, h = self.board_size
-        return 0 <= x and 0 <= y and x < w and y < h
-
-    def get_jumps(
-        self,
-        position: Pos,
-        piece_type: int | None = None,
-        _recursion: int = 0,
-    ) -> dict[Pos, list[Pos]]:
-        """Gets valid jumps a piece can make
-
-        position is a xy coordinate tuple pointing to a board position
-            that may or may not have a piece on it.
-        piece_type is the piece type at position. If not
-            given, position must point to a tile with a piece on it
-
-        Returns dictionary that maps end positions to
-        jumped pieces to get there"""
-        if piece_type is None:
-            piece_type = self.pieces[position]
-
-        # If we are kinged, get a pawn version of ourselves.
-        # Take that plus one mod 2 to get the pawn of the enemy
-        enemy_pawn = (piece_type + 1) % 2
-        # Then get the pawn and the king in a list so we can see if a piece
-        # is our enemy
-        enemy_pieces = {enemy_pawn, enemy_pawn + 2}
-
-        # Get the side choordinates of the tile and make them tuples so
-        # the scan later works properly.
-        sides = get_sides(position)
-        # Make a dictionary to find what direction a tile is in if you
-        # give it the tile.
-        # end position : jumped pieces
-
-        # Make a dictionary for the valid jumps and the pieces they jump
-        valid: dict[Pos, list[Pos]] = {}
-
-        # For each side tile in the jumpable tiles for this type of piece,
-        for direction, side in pawn_modify(
-            tuple(enumerate(sides)), piece_type
-        ):
-            side_piece = self.pieces.get(side)
-            # Side piece must be one of our enemy's pieces
-            if side_piece not in enemy_pieces:
-                continue
-            # Get the direction from the dictionary we made earlier
-            # Get the coordiates of the tile on the side of the main tile's
-            # side in the same direction as the main tile's side
-            side_side = get_sides(side)[direction]
-            side_side_piece = self.pieces.get(side_side)
-            # If the side exists and it's open,
-            if side_side_piece is None and self.valid_location(side_side):
-                # Add it the valid jumps dictionary and add the tile
-                # to the list of end tiles.
-                valid[side_side] = [side]
-
-        # For each end point tile in the list of end point tiles,
-        for end_tile in tuple(valid):
-            # Get the dictionary from the jumps you could make
-            # from that end tile
-            w, h = self.board_size
-            if _recursion + 1 > math.ceil((w**2 + h**2) ** 0.25):
-                break
-            # If the piece has made it to the opposite side,
-            piece_type_copy = piece_type
-            if self.does_piece_king(piece_type_copy, end_tile):
-                # King that piece
-                piece_type_copy += 2
-                _recursion = -1
-            add_valid = self.get_jumps(
-                end_tile, piece_type_copy, _recursion=_recursion + 1
-            )
-            # For each key in the new dictionary of valid tile's keys,
-            for end_pos, jumped_pieces in add_valid.items():
-                # If the key is not already existant in the list of
-                # valid destinations,
-                if end_pos not in valid:
-                    # Add that destination to the dictionary and every
-                    # tile you have to jump to get there.
-                    no_duplicates = [
-                        p for p in jumped_pieces if p not in valid[end_tile]
-                    ]
-                    valid[end_pos] = valid[end_tile] + no_duplicates
-
-        return valid
-
-    def get_moves(self, position: Pos) -> tuple[Pos, ...]:
-        "Gets valid moves piece at position can make, not including jumps"
-        piece_type = self.pieces[position]
-        # Get the side xy choords of the tile's xy pos,
-        # then modify results for pawns
-        moves = pawn_modify(get_sides(position), piece_type)
-        return tuple(
-            [
-                m
-                for m in filter(self.valid_location, moves)
-                if m not in self.pieces
-            ]
-        )
-
-    def calculate_actions(self, position: Pos) -> ActionSet:
-        "Calculate all the actions the piece at given position can make"
-        jumps = self.get_jumps(position)
-        moves = self.get_moves(position)
-        ends = set(jumps)
-        ends.update(moves)
-        return ActionSet(jumps, moves, ends)
-
     def bind_handlers(self) -> None:
         "Register handlers"
         self.register_handlers(
             {
                 "init": self.handle_init_event,
-                "gameboard_piece_clicked": self.handle_piece_clicked_event,
+                "gameboard_create_piece": self.handle_create_piece_event,
                 "gameboard_select_piece": self.handle_select_piece_event,
-                "gameboard_tile_clicked": self.handle_tile_clicked_event,
-                "gameboard_select_tile": self.handle_select_tile_event,
-                "gameboard_piece_moved": self.handle_piece_moved_event,
-                "gameboard_restart": self.handle_restart_event,
-                "gameboard_preform_turn": self.handle_preform_turn_event,
+                "gameboard_create_tile": self.handle_create_tile_event,
+                "gameboard_delete_tile": self.handle_delete_tile_event,
+                "gameboard_delete_piece": self.handle_delete_piece_event,
+                "gameboard_update_piece": self.handle_update_piece_event,
+                "gameboard_move_piece": self.handle_move_piece_event,
+                # "gameboard_piece_clicked": self.handle_piece_clicked_event,
+                # "gameboard_tile_clicked": self.handle_tile_clicked_event,
+                # "gameboard_select_tile": self.handle_select_tile_event,
+                ##                "gameboard_piece_moved": self.handle_piece_moved_event,
+                ##                "gameboard_restart": self.handle_restart_event,
+                ##                "gameboard_preform_turn": self.handle_preform_turn_event,
             }
         )
 
@@ -550,203 +396,191 @@ class GameBoard(sprite.Sprite):
         self.generate_tile_images()
         self.image = self.generate_board_image()
         self.visible = True
-        await self.handle_restart_event(event)
 
-    async def handle_restart_event(self, event: Event[None]) -> None:
-        """Reset board"""
-        async with trio.open_nursery() as nursery:
-            for piece_position in self.pieces:
-                if piece_position in self.actions:
-                    tiles = self.actions[piece_position].ends
-                    for tile_position in tiles:
-                        tile_name = self.get_tile_name(*tile_position)
-                        event = Event(f"self_destruct_tile_{tile_name}", None)
-                        nursery.start_soon(self.raise_event, event)
-                piece_name = self.get_tile_name(*piece_position)
-                event = Event(f"self_destruct_piece_{piece_name}", None)
-                nursery.start_soon(self.raise_event, event)
+    ##        await self.handle_restart_event(event)
 
-        self.actions.clear()
-        self.pieces.clear()
-        self.game_won = None
-        self.selected_piece = None
+    ##    async def handle_restart_event(self, event: Event[None]) -> None:
+    ##        """Reset board"""
+    ##        ##        async with trio.open_nursery() as nursery:
+    ##        ##            for piece_position in self.pieces:
+    ##        ##                if piece_position in self.actions:
+    ##        ##                    tiles = self.actions[piece_position].ends
+    ##        ##                    for tile_position in tiles:
+    ##        ##                        tile_name = self.get_tile_name(*tile_position)
+    ##        ##                        event = Event(f"self_destruct_tile_{tile_name}", None)
+    ##        ##                        nursery.start_soon(self.raise_event, event)
+    ##        ##                piece_name = self.get_tile_name(*piece_position)
+    ##        ##                event = Event(f"destroy_piece_{piece_name}", None)
+    ##        ##                nursery.start_soon(self.raise_event, event)
+    ##        ##
+    ##        ##        self.actions.clear()
+    ##        self.pieces.clear()
+    ##
+    ##    ##        self.game_won = None
 
-        self.generate_pieces()
-
-    async def handle_select_piece_event(self, event: Event[str]) -> None:
-        """Seperate event to handle selection of a piece
-
-        Seperated so AIs can call select piece without
-        interference from screen click events"""
-        piece_name = event.data
-
-        selected_piece: str | None
-
-        if piece_name != self.selected_piece:
-            if self.selected_piece is not None:
-                await self.raise_event(
-                    Event(f"piece_outline_{self.selected_piece}", False)
-                )
-            selected_piece = piece_name
-            await self.raise_event(Event(f"piece_outline_{piece_name}", True))
-        else:
-            await self.raise_event(
-                Event(f"piece_outline_{self.selected_piece}", False)
-            )
-            selected_piece = None
-        await self.select_piece(selected_piece)
-
-    async def handle_piece_clicked_event(
-        self, event: Event[tuple[str, int]]
+    async def handle_select_piece_event(
+        self, event: Event[tuple[Pos, bool]]
     ) -> None:
-        """Update selected piece and outlines accordingly"""
-        piece_name, piece_type = event.data
+        """Send piece outline event"""
+        piece_pos, outline_value = event.data
+        piece_name = self.get_tile_name(*piece_pos)
+        await self.raise_event(
+            Event(f"piece_outline_{piece_name}", outline_value)
+        )
 
-        if piece_type % 2 != self.turn:
-            return
-        if self.turn == self.ai_player:
-            return
+    ##    async def handle_tile_clicked_event(self, event: Event[str]) -> None:
+    ##        """Preform move if it's not the AI player's turn"""
+    ####        if self.turn == self.ai_player:
+    ####            return
+    ##
+    ##        await self.raise_event(Event("gameboard_select_tile", event.data))
 
-        # CHANGE to piece_click_serverbound
-        await self.raise_event(Event("gameboard_select_piece", piece_name))
+    ##    async def handle_select_tile_event(self, event: Event[str]) -> None:
+    ##        """Start preforming move"""
+    ##        # No one allowed to move during animation
+    ##
+    ##        tile_name = event.data
+    ##        piece_name = self.selected_piece
+    ##
+    ##        assert piece_name is not None
+    ##
+    ##        tile_position = self.get_tile_pos(tile_name)
+    ##        piece_position = self.get_tile_pos(piece_name)
+    ##
+    ##        assert tile_position in self.actions[piece_position].ends
+    ##
+    ##        await self.raise_event(Event(f"piece_outline_{piece_name}", False))
+    ##
+    ##        if tile_position in self.actions[piece_position].moves:
+    ##            tile_location = self.get_tile_location(tile_position)
+    ##
+    ##            await self.raise_event(
+    ##                Event(
+    ##                    f"piece_move_{piece_name}",
+    ##                    [(tile_location, piece_position, tile_position)],
+    ##                )
+    ##            )
+    ##
+    ##        if tile_position in self.actions[piece_position].jumps:
+    ##            jumped = self.actions[piece_position].jumps[tile_position]
+    ##            positions: list[tuple[Vector2, Pos, Pos]] = []
+    ##
+    ##            cur_x, cur_y = piece_position
+    ##            for jumped_pos in jumped:
+    ##                start_pos = (cur_x, cur_y)
+    ##
+    ##                jumped_x, jumped_y = jumped_pos
+    ##                # Rightshift 1 is more efficiant way to multiply by 2
+    ##                cur_x += (jumped_x - cur_x) << 1
+    ##                cur_y += (jumped_y - cur_y) << 1
+    ##
+    ##                tile_location = self.get_tile_location((cur_x, cur_y))
+    ##                positions.append((tile_location, start_pos, (cur_x, cur_y)))
+    ##            await self.raise_event(
+    ##                Event(f"piece_move_{piece_name}", positions)
+    ##            )
 
-    def get_actions_set(self, piece_position: Pos) -> ActionSet:
-        """Calculate and return ActionSet if required"""
-        if piece_position in self.actions:
-            new_action_set = self.actions[piece_position]
-        else:
-            new_action_set = self.calculate_actions(piece_position)
-            self.actions[piece_position] = new_action_set
-        return new_action_set
+    ##    async def handle_piece_moved_event(
+    ##        self, event: Event[tuple[str, Pos, Pos, bool]]
+    ##    ) -> None:
+    ##        """Handle piece finishing one part of it's movement animation"""
+    ##        piece_name, start_pos, end_pos, done = event.data
 
-    async def select_piece(self, piece_name: str | None) -> None:
-        """Update glowing tiles from new selected piece"""
-        ignore: set[tuple[int, int]] = set()
+    ##        piece_type = self.pieces.pop(start_pos)
+    ##
+    ##        if self.does_piece_king(piece_type, end_pos):
+    ##            # types: ^^^^^^^^^^
+    ##            piece_type += 2
+    ##            await self.raise_event(Event(f"piece_king_{piece_name}", None))
 
-        if piece_name is not None:
-            # Calculate actions if required
-            new_action_set = self.get_actions_set(
-                self.get_tile_pos(piece_name)
-            )
-            ignore = new_action_set.ends
+    ##        self.pieces[end_pos] = piece_type
 
-        ignored: set[tuple[int, int]] = set()
+    ##        start_x, start_y = start_pos
+    ##        end_x, end_y = end_pos
+    ##
+    ##        delta_x = end_x - start_x
+    ##        delta_y = end_y - start_y
+    ##        if abs(delta_x) > 1 and abs(delta_y) > 1:
+    ##            # Leftshift 1 is more efficiant way to divide by 2
+    ##            jumped_x = start_x + (delta_x >> 1)
+    ##            jumped_y = start_y + (delta_y >> 1)
+    ##
+    ##            if self.pieces.pop((jumped_x, jumped_y), None) is not None:
+    ##                jumped_name = self.get_tile_name(jumped_x, jumped_y)
+    ##                await self.raise_event(
+    ##                    Event(f"destroy_piece_{jumped_name}", None)
+    ##                )
 
-        # Remove outlined tiles from previous selection if existed
-        if self.selected_piece is not None:
-            action_set = self.get_actions_set(
-                self.get_tile_pos(self.selected_piece)
-            )
-            ignored = action_set.ends & ignore
-            remove = action_set.ends - ignore
-            async with trio.open_nursery() as nursery:
-                for tile_position in remove:
-                    tile_name = self.get_tile_name(*tile_position)
-                    event = Event(f"self_destruct_tile_{tile_name}", None)
-                    nursery.start_soon(self.raise_event, event)
+    ##        if done:
+    ##        await self.raise_event(Event(f"destroy_piece_{piece_name}", None))
+    ##        self.add_piece(piece_type, end_pos)
 
-        if piece_name is None:
-            self.selected_piece = None
-            return
-
-        # For each end point
-        for tile_position in new_action_set.ends - ignored:
-            self.add_tile(tile_position)
-
-        self.selected_piece = piece_name
-
-    async def handle_tile_clicked_event(self, event: Event[str]) -> None:
-        """Preform move if it's not the AI player's turn"""
-        if self.turn == self.ai_player:
-            return
-
-        await self.raise_event(Event("gameboard_select_tile", event.data))
-
-    async def handle_select_tile_event(self, event: Event[str]) -> None:
-        """Start preforming move"""
-        # No one allowed to move during animation
-        self.turn += 2
-
-        tile_name = event.data
-        piece_name = self.selected_piece
-
-        assert piece_name is not None
-
-        tile_position = self.get_tile_pos(tile_name)
-        piece_position = self.get_tile_pos(piece_name)
-
-        assert tile_position in self.actions[piece_position].ends
-
-        await self.raise_event(Event(f"piece_outline_{piece_name}", False))
-        await self.select_piece(None)
-
-        if tile_position in self.actions[piece_position].moves:
-            tile_location = self.get_tile_location(tile_position)
-
-            await self.raise_event(
-                Event(
-                    f"piece_move_{piece_name}",
-                    [(tile_location, piece_position, tile_position)],
-                )
-            )
-
-        if tile_position in self.actions[piece_position].jumps:
-            jumped = self.actions[piece_position].jumps[tile_position]
-            positions: list[tuple[Vector2, Pos, Pos]] = []
-
-            cur_x, cur_y = piece_position
-            for jumped_pos in jumped:
-                start_pos = (cur_x, cur_y)
-
-                jumped_x, jumped_y = jumped_pos
-                # Rightshift 1 is more efficiant way to multiply by 2
-                cur_x += (jumped_x - cur_x) << 1
-                cur_y += (jumped_y - cur_y) << 1
-
-                tile_location = self.get_tile_location((cur_x, cur_y))
-                positions.append((tile_location, start_pos, (cur_x, cur_y)))
-            await self.raise_event(
-                Event(f"piece_move_{piece_name}", positions)
-            )
-
-    async def handle_piece_moved_event(
-        self, event: Event[tuple[str, Pos, Pos, bool]]
+    async def handle_create_piece_event(
+        self, event: Event[tuple[Pos, int]]
     ) -> None:
-        """Handle piece finishing one part of it's movement animation"""
-        piece_name, start_pos, end_pos, done = event.data
+        """Handle create_piece event"""
+        piece_pos, piece_type = event.data
+        self.add_piece(piece_type, piece_pos)
 
-        piece_type = self.pieces.pop(start_pos)
+    async def handle_create_tile_event(self, event: Event[Pos]) -> None:
+        """Handle create_tile event"""
+        tile_pos = event.data
+        self.add_tile(tile_pos)
 
-        if self.does_piece_king(piece_type, end_pos):
-            piece_type += 2
-            await self.raise_event(Event(f"piece_king_{piece_name}", None))
+    async def handle_delete_tile_event(self, event: Event[Pos]) -> None:
+        """Handle delete_tile event"""
+        tile_pos = event.data
+        tile_name = self.get_tile_name(*tile_pos)
+        await self.raise_event(Event(f"self_destruct_tile_{tile_name}", None))
 
-        self.pieces[end_pos] = piece_type
+    async def handle_delete_piece_event(self, event: Event[Pos]) -> None:
+        """Handle delete_piece event"""
+        ##        print(f'handle_delete_piece_event {event = }')
+        piece_pos = event.data
+        piece_name = self.get_tile_name(*piece_pos)
+        await self.raise_event(Event(f"destroy_piece_{piece_name}", None))
+        self.pieces.pop(piece_pos)
 
-        start_x, start_y = start_pos
-        end_x, end_y = end_pos
+    async def handle_update_piece_event(
+        self, event: Event[tuple[Pos, int]]
+    ) -> None:
+        """Handle update_piece event"""
+        print(f"handle_update_piece_event {event = }")
+        piece_pos, piece_type = event.data
+        self.pieces[piece_pos] = piece_type
+        piece_name = self.get_tile_name(*piece_pos)
+        await self.raise_event(Event(f"piece_update_{piece_name}", piece_type))
 
-        delta_x = end_x - start_x
-        delta_y = end_y - start_y
-        if abs(delta_x) > 1 and abs(delta_y) > 1:
-            # Leftshift 1 is more efficiant way to divide by 2
-            jumped_x = start_x + (delta_x >> 1)
-            jumped_y = start_y + (delta_y >> 1)
+    async def handle_move_piece_event(
+        self, event: Event[tuple[Pos, Pos]]
+    ) -> None:
+        """Handle move_piece event"""
+        from_pos, to_pos = event.data
+        ##        print(f'handle_move_piece_event {event = }')
+        ##        positions: list[tuple[Vector2, Pos, Pos]] = []
+        ##        await self.raise_event(
+        ##            Event(f"piece_move_{piece_name}", positions)
+        ##        )
+        from_name = self.get_tile_name(*from_pos)
+        to_location = self.get_tile_location(to_pos)
 
-            if self.pieces.pop((jumped_x, jumped_y), None) is not None:
-                jumped_name = self.get_tile_name(jumped_x, jumped_y)
-                await self.raise_event(
-                    Event(f"self_destruct_piece_{jumped_name}", None)
-                )
+        self.add_piece(
+            self.pieces.pop(from_pos),
+            to_pos,
+            self.get_tile_location(from_pos),
+        )
 
-        if done:
-            await self.raise_event(
-                Event(f"self_destruct_piece_{piece_name}", None)
+        await self.raise_event(Event(f"destroy_piece_{from_name}", None))
+        ##        self.pieces.pop(from_pos)
+
+        to_name = self.get_tile_name(*to_pos)
+
+        await self.raise_event(
+            Event(
+                f"piece_move_{to_name}",
+                [(to_location, from_pos, to_pos)],
             )
-
-            self.add_piece(self.pieces[end_pos], end_pos)
-
-            await self.turn_over()
+        )
 
     def generate_tile_images(self) -> None:
         """Load all the images"""
@@ -805,18 +639,28 @@ class GameBoard(sprite.Sprite):
         center = self.tile_size // 2
         return location + (center, center) + self.rect.topleft  # noqa: RUF005
 
-    def add_piece(self, piece_type: int, position: Pos) -> str:
+    def add_piece(
+        self,
+        piece_type: int,
+        position: Pos,
+        location: Pos | None = None,
+        visible: bool = True,
+    ) -> str:
         """Add piece given type and position"""
         group = self.groups()[-1]
         # Get the proper name of the tile we're creating ('A1' to 'H8')
         name = self.get_tile_name(*position)
 
+        if location is None:
+            location = self.get_tile_location(position)
+
         piece = Piece(
             piece_type=piece_type,
             position=position,
             position_name=name,
-            location=self.get_tile_location(position),
+            location=location,
         )
+        piece.visible = visible
         self.add_component(piece)
         group.add(piece)  # type: ignore[arg-type]
 
@@ -835,31 +679,6 @@ class GameBoard(sprite.Sprite):
         self.add_component(tile)
         group.add(tile)  # type: ignore[arg-type]
         return tile.name
-
-    def generate_pieces(self) -> None:
-        """Generate data about each tile"""
-        board_width, board_height = self.board_size
-        # Reset tile data
-        loc_y = 0
-        # Get where pieces should be placed
-        z_to_1 = round(board_height / 3)  # White
-        z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
-        # For each xy position in the area of where tiles should be,
-        for y in range(board_height):
-            # Reset the x pos to 0
-            loc_x = 0
-            for x in range(board_width):
-                # Get the color of that spot by adding x and y mod the number of different colors
-                color = (x + y) % len(self.tile_color_map)
-                # If a piece should be placed on that tile and the tile is not Red,
-                if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
-                    # Set the piece to White Pawn or Black Pawn depending on the current y pos
-                    piece = int(y <= z_to_1)
-                    self.add_piece(piece, (x, y))
-                # Increment the x counter by tile_size
-                loc_x += self.tile_size
-            # Increment the y counter by tile_size
-            loc_y += self.tile_size
 
     def generate_board_image(self) -> Surface:
         """Generate an image of a game board"""
@@ -896,53 +715,15 @@ class GameBoard(sprite.Sprite):
             loc_y += self.tile_size
         return surf
 
-    def check_for_win(self) -> int | None:
-        """Return player number if they won else None"""
-        # For each of the two players,
-        for player in range(2):
-            # Get that player's possible pieces
-            player_pieces = {player, player + 2}
-            # For each tile in the playable tiles,
-            for position, piece_type in self.pieces.items():
-                # If the tile's piece is one of the player's pieces,
-                if piece_type in player_pieces:
-                    if self.get_actions_set(position).ends:
-                        # Player has at least one move, no need to continue
-                        break
-            else:
-                # Continued without break, so player either has no moves
-                # or no possible moves, so their opponent wins
-                return (player + 1) % 2
-        return None
-
     async def turn_over(self) -> None:
         """Continue to next player's turn"""
-        # Clear actions
-        self.actions.clear()
-
-        # Toggle the active player
-        self.turn = (self.turn + 1) % 2
-
-        # If no one has won,
-        if self.game_won is None:
-            # Check for wins
-            win = self.check_for_win()
-            # If someone has won,
-            if win is not None:
-                # Don't let anybody move
-                self.turn = 2
-                # The winner is the person check_for_win found.
-                self.game_won = win
-                await self.raise_event(Event("game_over", self.game_won, 1))
-        elif self.turn == self.ai_player:
-            await self.raise_event(Event("game_ready_for_next", None, 1))
+        await self.raise_event(Event("game_ready_for_next", None, 1))
 
     async def handle_preform_turn_event(
         self, event: Event[tuple[str, str]]
     ) -> None:
         """Preform a turn"""
         piece_name, tile_name = event.data
-        await self.raise_event(Event("gameboard_select_piece", piece_name))
         await self.raise_event(Event("gameboard_select_tile", tile_name))
 
 
@@ -1098,9 +879,7 @@ class MrFloppy(sprite.Sprite):
             cidx = (cidx + 1) % count
             yield image_identifiers[cidx]
 
-    async def drag(
-        self, event: Event[dict[str, int | tuple[int, int]]]
-    ) -> None:
+    async def drag(self, event: Event[dict[str, int | Pos]]) -> None:
         "Move by relative from drag"
         if event.data["button"] != 1:
             return
@@ -1134,27 +913,69 @@ class FPSCounter(objects.Text):
         )
 
 
+def generate_pieces(
+    board_width: int, board_height: int, colors: int = 2
+) -> dict[Pos, int]:
+    """Generate data about each piece"""
+    pieces: dict[Pos, int] = {}
+    # Get where pieces should be placed
+    z_to_1 = round(board_height / 3)  # White
+    z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
+    # For each xy position in the area of where tiles should be,
+    for y in range(board_height):
+        # Reset the x pos to 0
+        for x in range(board_width):
+            # Get the color of that spot by adding x and y mod the number of different colors
+            color = (x + y) % colors
+            # If a piece should be placed on that tile and the tile is not Red,
+            if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
+                # Set the piece to White Pawn or Black Pawn depending on the current y pos
+                piece_type = int(y <= z_to_1)
+                pieces[(x, y)] = piece_type
+    return pieces
+
+
+def read_position(buffer: Buffer) -> Pos:
+    """Read a position tuple from buffer."""
+    pos_x = buffer.read_value(StructFormat.UBYTE)
+    pos_y = buffer.read_value(StructFormat.UBYTE)
+
+    return pos_x, pos_y
+
+
+def write_position(buffer: Buffer, pos: Pos) -> None:
+    """Write a position tuple to buffer."""
+    pos_x, pos_y = pos
+    buffer.write_value(StructFormat.UBYTE, pos_x)
+    buffer.write_value(StructFormat.UBYTE, pos_y)
+
+
 class GameClient(NetworkEventComponent):
-    __slots__ = ("reading",)
+    __slots__ = ()
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
 
-        self.reading = False
+        self.timeout = 5
 
         self.register_network_write_events(
             {
-                "piece_click_serverbound": 0,
-                "tile_click_serverbound": 1,
+                "select_piece->server": 0,
+                "select_tile->server": 1,
             }
         )
         self.register_read_network_events(
             {
-                0: "select_piece_clientbound",
-                1: "select_tile_clientbound",
-                2: "no_actions_from_server",
-                ##            0: "gameboard_select_piece",
-                ##            1: "gameboard_select_tile",
+                0: "no_actions->client",
+                1: "server->create_piece",
+                2: "server->select_piece",
+                3: "server->create_tile",
+                4: "server->delete_tile",
+                5: "server->delete_piece",
+                6: "server->update_piece",
+                7: "server->move_piece",
+                8: "server->animation_state",
+                9: "server->game_over",
             }
         )
 
@@ -1162,178 +983,410 @@ class GameClient(NetworkEventComponent):
         super().bind_handlers()
         self.register_handlers(
             {
+                ##                "no_actions->client": self.print_no_actions,
                 "gameboard_piece_clicked": self.write_piece_click,
                 "gameboard_tile_clicked": self.write_tile_click,
-                "select_piece_clientbound": self.read_piece_select,
-                "select_tile_clientbound": self.read_tile_select,
+                "server->create_piece": self.read_create_piece,
+                "server->select_piece": self.read_select_piece,
+                "server->create_tile": self.read_create_tile,
+                "server->delete_tile": self.read_delete_tile,
+                "server->delete_piece": self.read_delete_piece,
+                "server->update_piece": self.read_update_piece,
+                "server->move_piece": self.read_move_piece,
+                "server->game_over": self.read_game_over,
+                ##                "select_piece_clientbound": self.read_piece_select,
+                ##                "select_tile_clientbound": self.read_tile_select,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
                 "tick": self.handle_tick,
             }
         )
 
+    async def print_no_actions(self, event: Event[bytearray]) -> None:
+        print(f"print_no_actions {event = }")
+
     async def handle_tick(self, event: Event[dict[str, float]]) -> None:
         """Raise events from server"""
-        if hasattr(self, "stream") and not self.reading:
-            self.reading = True
-            await self.raise_event_from_read_network()
-            self.reading = False
+        if self.not_connected:
+            return
+        success, exception = await self.raise_event_from_read_network()
+        if success:
+            return
+
+        if isinstance(exception, trio.ClosedResourceError):
+            return
+
+        traceback.print_exception(exception)
+        print(
+            f"{self.__class__.__name__}: Failed to read event from network, stopping"
+        )
+
+        await self.raise_event(Event("network_stop", None))
 
     async def handle_client_connect(
         self, event: Event[tuple[str, int]]
     ) -> None:
         "Have client connect to address"
-        if not hasattr(self, "stream"):
-            print(f"{self.__class__.__name__}: start connect")
-            await self.connect(*event.data)
-
-    async def write_piece_click(self, event: Event[tuple[str, int]]) -> None:
-        """Write piece click event"""
-        if not hasattr(self, "stream"):
+        if not self.not_connected:
             return
-        piece_name, piece_type = event.data
+        await self.connect(*event.data)
 
-        buffer = Buffer()
-        buffer.write_utf(piece_name)
-        buffer.write_value(StructFormat.UINT, piece_type)
-
-        print(f"{self.__class__.__name__}: writing piece_click_serverbound")
-
-        await self.write_event(Event("piece_click_serverbound", buffer))
-
-    async def write_tile_click(self, event: Event[str]) -> None:
-        """Write tile click event"""
-        tile_name = event.data
-
-        buffer = Buffer()
-        buffer.write_utf(tile_name)
-
-        print(f"{self.__class__.__name__}: writing tile_click_serverbound")
-
-        await self.write_event(Event("tile_click_serverbound", buffer))
-
-    async def read_piece_select(self, event: Event[bytearray]) -> None:
+    async def read_create_piece(self, event: Event[bytearray]) -> None:
+        """Read create_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_create_piece {event = }')
         buffer = Buffer(event.data)
 
-        piece_name = buffer.read_utf()
+        piece_pos = read_position(buffer)
+        piece_type = buffer.read_value(StructFormat.UBYTE)
 
-        print(f"{self.__class__.__name__}: reading gameboard_select_piece")
+        await self.raise_event(
+            Event("gameboard_create_piece", (piece_pos, piece_type))
+        )
 
-        await self.raise_event(Event("gameboard_select_piece", piece_name))
-
-    async def read_tile_select(self, event: Event[bytearray]) -> None:
+    async def read_select_piece(self, event: Event[bytearray]) -> None:
+        """Read create_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_select_piece {event = }')
         buffer = Buffer(event.data)
 
-        piece_name = buffer.read_utf()
+        piece_pos = read_position(buffer)
+        outline_value = buffer.read_value(StructFormat.BOOL)
 
-        print(f"{self.__class__.__name__}: reading gameboard_select_tile")
-
-        await self.raise_event(Event("gameboard_select_tile", piece_name))
-
-    async def handle_network_stop(self, event: Event[None]) -> None:
-        if hasattr(self, "stream"):
-            print(f"{self.__class__.__name__}: close")
-            await self.close()
-
-    def __del__(self) -> None:
-        print(f"del {self.__class__.__name__}")
-
-
-class ServerClient(NetworkEventComponent):
-    __slots__ = ()
-
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-
-        self.timeout = 2
-
-        self.register_network_write_events(
-            {
-                "select_piece_clientbound": 0,
-                ##                "select_tile_clientbound": 1,
-                "no_data_from_server": 2,
-            }
-        )
-        self.register_read_network_events(
-            {
-                0: "client_select_piece",
-            }
+        await self.raise_event(
+            Event("gameboard_select_piece", (piece_pos, outline_value))
         )
 
-    async def handle_debug_print_event(self, event: Event) -> None:
-        print(f"handle_debug_print_event {event = }")
+    async def read_create_tile(self, event: Event[bytearray]) -> None:
+        """Read create_tile event"""
+        ##        print(f'{self.__class__.__name__}: read_create_piece {event = }')
+        buffer = Buffer(event.data)
 
-    def bind_handlers(self) -> None:
-        super().bind_handlers()
-        self.register_handlers(
-            {
-                "client_select_piece": self.read_piece_select,
-                "select_tile_clientbound": self.read_tile_select,
-                "network_stop": self.handle_network_stop,
-                "read_piece_select": self.read_piece_select,
-                ##                "debug_print_event": self.handle_debug_print_event,
-            }
-        )
+        tile_pos = read_position(buffer)
 
-    async def write_piece_click(self, event: Event[tuple[str, int]]) -> None:
+        await self.raise_event(Event("gameboard_create_tile", tile_pos))
+
+    async def read_delete_tile(self, event: Event[bytearray]) -> None:
+        """Read delete_tile event"""
+        ##        print(f'{self.__class__.__name__}: read_delete_piece {event = }')
+        buffer = Buffer(event.data)
+
+        tile_pos = read_position(buffer)
+
+        await self.raise_event(Event("gameboard_delete_tile", tile_pos))
+
+    async def write_piece_click(
+        self, event: Event[tuple[str, Pos, int]]
+    ) -> None:
         """Write piece click event"""
-        piece_name, piece_type = event.data
+        if self.not_connected:
+            return
+        piece_name, piece_position, piece_type = event.data
 
         buffer = Buffer()
-        buffer.write_utf(piece_name)
+        write_position(buffer, piece_position)
+        ##        buffer.write_utf(piece_name)
         buffer.write_value(StructFormat.UINT, piece_type)
 
-        print(f"{self.__class__.__name__} writing piece_click_serverbound")
+        ##        print(f"{self.__class__.__name__}: writing select_piece->server")
 
-        await self.write_event(Event("piece_click_serverbound", buffer))
+        await self.write_event(Event("select_piece->server", buffer))
 
-    async def write_tile_click(self, event: Event[str]) -> None:
+    async def write_tile_click(self, event: Event[tuple[str, Pos]]) -> None:
         """Write tile click event"""
-        tile_name = event.data
+        tile_name, tile_position = event.data
+        pos_x, pos_y = tile_position
 
         buffer = Buffer()
-        buffer.write_utf(tile_name)
+        write_position(buffer, tile_position)
+        ##        buffer.write_utf(tile_name)
 
-        print(f"{self.__class__.__name__} writing tile_click_serverbound")
+        ##        print(f"{self.__class__.__name__}: writing select_tile->server")
 
-        await self.write_event(Event("tile_click_serverbound", buffer))
+        await self.write_event(Event("select_tile->server", buffer))
 
-    async def read_piece_select(self, event: Event[bytearray]) -> None:
+    async def read_delete_piece(self, event: Event[bytearray]) -> None:
+        """Read delete_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_delete_piece {event = }')
         buffer = Buffer(event.data)
 
-        piece_name = buffer.read_utf()
+        tile_pos = read_position(buffer)
 
-        print(f"{self.__class__.__name__} reading gameboard_select_piece")
+        await self.raise_event(Event("gameboard_delete_piece", tile_pos))
 
-        await self.raise_event(Event("gameboard_select_piece", piece_name, 1))
-
-    ##        await self.write_event(Event("select_piece_clientbound", event.data))
-
-    async def read_tile_select(self, event: Event[bytearray]) -> None:
+    async def read_update_piece(self, event: Event[bytearray]) -> None:
+        """Read update_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_update_piece {event = }')
         buffer = Buffer(event.data)
 
-        piece_name = buffer.read_utf()
+        piece_pos = read_position(buffer)
+        piece_type = buffer.read_value(StructFormat.UBYTE)
 
-        print(f"{self.__class__.__name__} reading gameboard_select_tile")
+        await self.raise_event(
+            Event("gameboard_update_piece", (piece_pos, piece_type))
+        )
 
-        await self.raise_event(Event("gameboard_select_tile", piece_name))
+    async def read_move_piece(self, event: Event[bytearray]) -> None:
+        """Read move_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_move_piece {event = }')
+        buffer = Buffer(event.data)
+
+        piece_current_pos = read_position(buffer)
+        piece_new_pos = read_position(buffer)
+
+        await self.raise_event(
+            Event("gameboard_move_piece", (piece_current_pos, piece_new_pos))
+        )
+
+    async def read_game_over(self, event: Event[bytearray]) -> None:
+        """Read update_piece event"""
+        ##        print(f'{self.__class__.__name__}: read_game_over {event = }')
+        buffer = Buffer(event.data)
+
+        winner = buffer.read_value(StructFormat.UBYTE)
+
+        await self.raise_event(Event("game_winner", winner))
 
     async def handle_network_stop(self, event: Event[None]) -> None:
-        print(f"{self.__class__.__name__}: close")
+        """Send EOF if connected and close socket."""
+        if self.not_connected:
+            return
+        else:
+            await self.send_eof()
         await self.close()
 
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")
 
 
+class ServerClient(NetworkEventComponent):
+    __slots__ = ("client_id",)
+
+    def __init__(self, client_id: int) -> None:
+        self.client_id = client_id
+        super().__init__(f"client_{client_id}")
+
+        self.timeout = 3
+
+        self.register_network_write_events(
+            {
+                "server[write]->no_actions": 0,
+                "server[write]->create_piece": 1,
+                "server[write]->select_piece": 2,
+                "server[write]->create_tile": 3,
+                "server[write]->delete_tile": 4,
+                "server[write]->delete_piece": 5,
+                "server[write]->update_piece": 6,
+                "server[write]->move_piece": 7,
+                "server[write]->animation_state": 8,
+                "server[write]->game_over": 9,
+            }
+        )
+        self.register_read_network_events(
+            {
+                ##                0: "client->no_actions",
+                0: f"client[{self.client_id}]->select_piece",
+                1: f"client[{self.client_id}]->select_tile",
+            }
+        )
+
+    def bind_handlers(self) -> None:
+        super().bind_handlers()
+        self.register_handlers(
+            {
+                f"client[{self.client_id}]->select_piece": self.handle_raw_select_piece,
+                f"client[{self.client_id}]->select_tile": self.handle_raw_select_tile,
+                "create_piece->network": self.handle_create_piece,
+                "select_piece->network": self.handle_piece_select,
+                "create_tile->network": self.handle_create_tile,
+                "delete_tile->network": self.handle_delete_tile,
+                "delete_piece->network": self.handle_delete_piece,
+                "update_piece->network": self.handle_update_piece,
+                "move_piece->network": self.handle_move_piece,
+                "animation_state->network": self.handle_animation_state,
+                "game_over->network": self.handle_game_over,
+            }
+        )
+
+    async def handle_raw_select_piece(self, event: Event[bytearray]) -> None:
+        ##        print(f"{self.__class__.__name__}: reading client[raw]->select_piece")
+
+        buffer = Buffer(event.data)
+
+        ##        piece_name = buffer.read_utf()
+        pos_x, pos_y = read_position(buffer)
+
+        await self.raise_event(
+            Event("network->select_piece", (self.client_id, (pos_x, pos_y)))
+        )
+
+    async def handle_raw_select_tile(self, event: Event[bytearray]) -> None:
+        ##        print(f"{self.__class__.__name__}: reading network->select_tile")
+        buffer = Buffer(event.data)
+
+        ##        tile_name = buffer.read_utf()
+        pos_x, pos_y = read_position(buffer)
+
+        await self.raise_event(
+            Event("network->select_tile", (self.client_id, (pos_x, pos_y)))
+        )
+
+    async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_create_piece {event = }')
+        piece_pos, piece_type = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, piece_pos)
+        buffer.write_value(StructFormat.UBYTE, piece_type)
+
+        await self.write_event(Event("server[write]->create_piece", buffer))
+
+    async def handle_piece_select(
+        self, event: Event[tuple[Pos, bool]]
+    ) -> None:
+        piece_pos, outline_value = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, piece_pos)
+        buffer.write_value(StructFormat.BOOL, outline_value)
+
+        await self.write_event(Event("server[write]->select_piece", buffer))
+
+    async def handle_create_tile(self, event: Event[Pos]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_create_piece {event = }')
+        tile_pos = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, tile_pos)
+
+        await self.write_event(Event("server[write]->create_tile", buffer))
+
+    async def handle_delete_tile(self, event: Event[Pos]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_delete_tile {event = }')
+        tile_pos = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, tile_pos)
+
+        await self.write_event(Event("server[write]->delete_tile", buffer))
+
+    async def handle_delete_piece(self, event: Event[Pos]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_delete_piece {event = }')
+        piece_pos = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, piece_pos)
+
+        await self.write_event(Event("server[write]->delete_piece", buffer))
+
+    async def handle_update_piece(self, event: Event[tuple[Pos, int]]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_update_piece {event = }')
+        piece_pos, piece_type = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, piece_pos)
+        buffer.write_value(StructFormat.UBYTE, piece_type)
+
+        await self.write_event(Event("server[write]->update_piece", buffer))
+
+    async def handle_move_piece(self, event: Event[tuple[Pos, Pos]]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_move_piece {event = }')
+        piece_current_pos, piece_new_pos = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, piece_current_pos)
+        write_position(buffer, piece_new_pos)
+
+        await self.write_event(Event("server[write]->move_piece", buffer))
+
+    async def handle_animation_state(self, event: Event[bool]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_animation_state {event = }')
+        state = event.data
+
+        buffer = Buffer()
+
+        buffer.write_value(StructFormat.BOOL, state)
+
+        await self.write_event(Event("server[write]->animation_state", buffer))
+
+    async def handle_game_over(self, event: Event[int]) -> None:
+        ##        print(f'{self.__class__.__name__}: handle_game_over {event = }')
+        winner = event.data
+
+        buffer = Buffer()
+
+        buffer.write_value(StructFormat.UBYTE, winner)
+
+        await self.write_event(Event("server[write]->game_over", buffer))
+
+
+class CheckersState(State):
+    __slots__ = ("action_queue",)
+
+    def __init__(
+        self,
+        size: Pos,
+        turn: bool,
+        pieces: dict[Pos, int],
+        /,
+        pre_calculated_actions: dict[Pos, ActionSet] | None = None,
+    ) -> None:
+        super().__init__(size, turn, pieces, pre_calculated_actions)
+        self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
+
+    def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
+        super().piece_kinged(piece_pos, new_type)
+        self.action_queue.append(("king", (piece_pos, new_type)))
+
+    def piece_moved(self, start_pos: Pos, end_pos: Pos) -> None:
+        super().piece_moved(start_pos, end_pos)
+        self.action_queue.append(
+            (
+                "move",
+                (
+                    start_pos,
+                    end_pos,
+                ),
+            )
+        )
+
+    def piece_jumped(self, jumped_piece_pos: Pos) -> None:
+        super().piece_jumped(jumped_piece_pos)
+        self.action_queue.append(("jump", (jumped_piece_pos,)))
+
+    def get_action_queue(self) -> deque[tuple[str, Iterable[Pos | int]]]:
+        """Return action queue"""
+        return self.action_queue
+
+
 class GameServer(Server):
     """Checkers server"""
 
-    __slots__ = ("client_count",)
+    __slots__ = (
+        "client_count",
+        "state",
+        "client_players",
+        "player_selections",
+        "actions_queue",
+        "players_can_interact",
+    )
+
+    board_size = (8, 8)
 
     def __init__(self) -> None:
         super().__init__("gameserver")
-        self.client_count = 0
+
+        self.client_count: int
+        self.state: CheckersState = CheckersState(self.board_size, False, {})
+
+        self.client_players: dict[int, int] = {}
+        self.player_selections: dict[int, Pos] = {}
+        self.players_can_interact: bool = False
 
     def bind_handlers(self) -> None:
         """Register start_server and stop_server"""
@@ -1341,8 +1394,9 @@ class GameServer(Server):
             {
                 "server_start": self.start_server,
                 "network_stop": self.stop_server,
-                "select_piece_clientbound": self.handle_select_piece,
-                "select_tile_clientbound": self.handle_select_tile,
+                "server_send_game_start": self.handle_server_start_new_game,
+                "network->select_piece": self.handle_network_select_piece,
+                "network->select_tile": self.handle_network_select_tile,
             }
         )
 
@@ -1353,10 +1407,21 @@ class GameServer(Server):
         async with trio.open_nursery() as nursery:
             for component in self.get_all_components():
                 if isinstance(component, NetworkEventComponent):
-                    nursery.start_soon(component.stream.aclose)
+                    nursery.start_soon(component.close)
                     component_names.append(component.name)
         for component_name in component_names:
             self.remove_component(component_name)
+
+    def new_game_init(self, turn: bool) -> None:
+        self.client_players.clear()
+        self.player_selections.clear()
+
+        pieces = generate_pieces(*self.board_size)
+        self.state = CheckersState(self.board_size, turn, pieces)
+        self.client_players = {
+            client_id: client_id % 2 for client_id in range(self.client_count)
+        }
+        self.players_can_interact = True
 
     async def start_server(self, event: Event[None] | None = None) -> None:
         """Serve clients"""
@@ -1365,39 +1430,229 @@ class GameServer(Server):
         self.client_count = 0
         await self.serve(PORT, backlog=0)
 
+    async def handle_server_start_new_game(self, event: Event[None]) -> None:
+        """Handle game start."""
+        ##        print(f"{self.__class__.__name__}: handle_server_start_new_game")
+        async with trio.open_nursery() as nursery:
+            for piece_pos, _piece_type in self.state.get_pieces():
+                nursery.start_soon(
+                    self.raise_event,
+                    Event("delete_piece->network", piece_pos),
+                )
+        # Using non-cryptographically secure random because it doesn't matter
+        self.new_game_init(bool(random.randint(0, 1)))  # noqa: S311
+        async with trio.open_nursery() as nursery:
+            for piece_pos, piece_type in self.state.get_pieces():
+                nursery.start_soon(
+                    self.raise_event,
+                    Event("create_piece->network", (piece_pos, piece_type)),
+                )
+
+    async def client_network_loop(self, client: ServerClient) -> None:
+        """Network loop for given ServerClient."""
+        while True:
+            try:
+                ##                print(f"{client.name} client_network_loop tick")
+                await client.write_event(
+                    Event("server[write]->no_actions", bytearray())
+                )
+                (
+                    success,
+                    exception,
+                ) = await client.raise_event_from_read_network()
+                if isinstance(exception, TimeoutException):
+                    continue
+                if not success:
+                    break
+            except (trio.ClosedResourceError, trio.BrokenResourceError):
+                break
+
     async def handler(self, stream: trio.SocketStream) -> None:
         """Accept clients"""
+        print(f"{self.__class__.__name__}: client connected")
+        new_client_id = self.client_count
         self.client_count += 1
         if self.client_count >= 2:
             self.stop_serving()
         if self.client_count > 2:
             await stream.aclose()
-        print(f"{self.__class__.__name__}: client connected")
 
-        client = ServerClient.from_stream(
-            f"client_{self.client_count}", stream
-        )
+        client = ServerClient.from_stream(new_client_id, stream=stream)
         self.add_component(client)
 
-        while True:
-            try:
-                ##                print(f"{self.__class__.__name__}: waiting for client event")
-                await client.write_event(
-                    Event("no_data_from_server", bytearray())
+        if self.client_count >= 2:
+            await self.raise_event(Event("server_send_game_start", None))
+
+        try:
+            await self.client_network_loop(client)
+        finally:
+            await client.close()
+
+    async def handle_network_select_piece(
+        self, event: Event[tuple[int, Pos]]
+    ) -> None:
+        """Handle piece event from client"""
+        ##        print(f'{self.__class__.__name__}: handle_network_select_piece {event = }')
+        client_id, tile_pos = event.data
+
+        player = self.client_players[client_id]
+
+        if player != self.state.turn:
+            ##            print(f"{player = } cannot select piece {tile_pos = } because it is not that player's turn")
+            return
+
+        if not self.players_can_interact:
+            ##            print(f"{player = } cannot select piece {tile_pos = } because players_can_interact is False")
+            return
+        if not self.state.can_player_select_piece(player, tile_pos):
+            ##            print(f"{player = } cannot select piece {tile_pos = }")
+            await self.player_select_piece(player, None)
+            return
+        if tile_pos == self.player_selections.get(player):
+            ##            print(f"{player = } toggle select -> No select")
+            await self.player_select_piece(player, None)
+            return
+        await self.player_select_piece(player, tile_pos)
+
+    async def player_select_piece(
+        self, player: int, piece_pos: Pos | None
+    ) -> None:
+        """Update glowing tiles from new selected piece"""
+        ignore: set[Pos] = set()
+
+        if piece_pos is not None:
+            # Calculate actions if required
+            new_action_set = self.state.get_actions_set(piece_pos)
+            ignore = new_action_set.ends
+
+        ignored: set[Pos] = set()
+
+        # Remove outlined tiles from previous selection if existed
+        if prev_selection := self.player_selections.get(player):
+            action_set = self.state.get_actions_set(prev_selection)
+            ignored = action_set.ends & ignore
+            remove = action_set.ends - ignore
+            async with trio.open_nursery() as nursery:
+                for tile_position in remove:
+                    nursery.start_soon(
+                        self.raise_event,
+                        Event("delete_tile->network", tile_position),
+                    )
+                if piece_pos != prev_selection:
+                    nursery.start_soon(
+                        self.raise_event,
+                        Event(
+                            "select_piece->network", (prev_selection, False)
+                        ),
+                    )
+
+        if piece_pos is None:
+            if prev_selection:
+                del self.player_selections[player]
+            return
+
+        self.player_selections[player] = piece_pos
+
+        # For each end point
+        async with trio.open_nursery() as nursery:
+            for tile_position in new_action_set.ends - ignored:
+                nursery.start_soon(
+                    self.raise_event,
+                    Event("create_tile->network", tile_position),
                 )
-                await client.raise_event_from_read_network()
-            except trio.ClosedResourceError:
-                break
+            nursery.start_soon(
+                self.raise_event,
+                Event(
+                    "select_piece->network",
+                    (self.player_selections[player], True),
+                ),
+            )
 
-    ##        finally:
-    ##            self.client_count -= 1
-    ##            await stream.aclose()
+    async def handle_move_animation(self, from_pos: Pos, to_pos: Pos) -> None:
+        """Handle move animation."""
+        await self.raise_event(
+            Event("move_piece->network", (from_pos, to_pos))
+        )
 
-    async def handle_select_piece(self, event: Event[bytearray]) -> None:
-        print(event)
+    async def handle_jump_animation(self, jumped_pos: Pos) -> None:
+        """Handle jump animation."""
+        await self.raise_event(Event("delete_piece->network", jumped_pos))
 
-    async def handle_select_tile(self, event: Event[bytearray]) -> None:
-        print(event)
+    async def handle_king_animation(
+        self, kinged_pos: Pos, piece_type: int
+    ) -> None:
+        """Handle jump animation."""
+        await self.raise_event(
+            Event("update_piece->network", (kinged_pos, piece_type))
+        )
+
+    async def handle_action_animations(
+        self, actions: deque[tuple[str, Iterable[Pos]]]
+    ) -> None:
+        """Handle action animations"""
+        while actions:
+            name, params = actions.popleft()
+            if name == "move":
+                await self.handle_move_animation(*params)
+            elif name == "jump":
+                await self.handle_jump_animation(*params)
+            elif name == "king":
+                await self.handle_king_animation(*params)
+            else:
+                raise NotImplementedError(f"Animation for action {name}")
+
+    async def handle_network_select_tile(
+        self, event: Event[tuple[int, Pos]]
+    ) -> None:
+        """Handle select tile event from network."""
+        ##        print(
+        ##            f"{self.__class__.__name__}: handle_network_select_tile {event = }"
+        ##        )
+        client_id, tile_pos = event.data
+
+        player = self.client_players[client_id]
+
+        if not self.players_can_interact:
+            print(
+                f"{player = } cannot select tile {tile_pos = } because players_can_interact is False"
+            )
+            return
+        if player != self.state.turn:
+            return
+        piece_pos = self.player_selections.get(player)
+        if piece_pos is None:
+            print(
+                f"{player = } cannot select tile {tile_pos = } because has no selection"
+            )
+            return
+        ##        print(f"{piece_pos = }")
+        if tile_pos not in self.state.get_actions_set(piece_pos).ends:
+            print(f"{player = } cannot select tile because not valid move")
+            return
+
+        self.players_can_interact = False  # No one moves during animation
+        await self.player_select_piece(player, None)
+
+        action = self.state.action_from_points(piece_pos, tile_pos)
+        ##        print(f"{action = }")
+
+        ##        print(f'{self.state.turn = }')
+
+        new_state = self.state.preform_action(action)
+        action_queue = self.state.get_action_queue()
+        self.state = new_state
+
+        ##        print(f'{action_queue = }')
+        await self.handle_action_animations(action_queue)
+
+        ##        print(f'{self.state.turn = }')
+
+        win_value = self.state.check_for_win()
+        if win_value is not None:
+            await self.raise_event(Event("game_over->network", win_value))
+            return
+
+        self.players_can_interact = True
 
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")
@@ -1442,6 +1697,18 @@ class GameState(AsyncState["CheckersClient"]):
         self.machine.remove_group(self.id)
         self.manager.unbind_components()
 
+    def change_state(
+        self, new_state: str | None
+    ) -> Callable[[], Awaitable[None]]:
+        """Return an async function that will change state to `new_state`"""
+
+        async def set_state(*args: object, **kwargs: object) -> None:
+            if self.machine is None:
+                return
+            await self.machine.set_state(new_state)
+
+        return set_state
+
 
 class InitializeState(AsyncState["CheckersClient"]):
     "Initialize Checkers"
@@ -1483,12 +1750,33 @@ class TitleState(GameState):
         assert self.machine is not None
         self.id = self.machine.new_group("title")
 
-        # self.group_add()
+        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+
+        hosting_button = Button("hosting_button", font)
+        hosting_button.visible = True
+        hosting_button.color = (0, 0, 0)
+        hosting_button.text = "Host Checkers Game"
+        hosting_button.location = [x // 2 for x in SCREEN_SIZE]
+        hosting_button.handle_click = self.change_state("play_hosting")
+        self.group_add(hosting_button)
+
+        join_button = Button("join_button", font)
+        join_button.visible = True
+        join_button.color = (0, 0, 0)
+        join_button.text = "Join Checkers Game"
+        join_button.location = (
+            *hosting_button.location,
+            0,
+            hosting_button.rect.h + 10,
+        )
+        join_button.handle_click = self.change_state("play_joining")
+        self.group_add(join_button)
 
         await self.machine.raise_event(Event("init", None))
 
-    async def check_conditions(self) -> str:
-        return "play"  # "play_hosting" # "play_joining"
+
+##    async def check_conditions(self) -> str:
+##        return "play_hosting"  # "play_hosting" # "play_joining"
 
 
 class PlayHostingState(AsyncState["CheckersClient"]):
@@ -1543,25 +1831,23 @@ class PlayJoiningState(AsyncState["CheckersClient"]):
 
 class PlayState(GameState):
     "Game Play State"
-    __slots__ = ("winner",)
+    __slots__ = ()
 
     def __init__(self) -> None:
         super().__init__("play")
 
-        self.winner: int | None = None
+    ##        self.winner: int | None = None
 
     def add_actions(self) -> None:
         super().add_actions()
         self.manager.register_handlers(
             {
-                "game_over": self.handle_game_over,
-                # "game_ready_for_next": self.handle_ready_for_next,
-                # "game_preform_turn": self.hande_preform_turn,
+                "game_winner": self.handle_game_over,
             }
         )
 
     async def entry_actions(self) -> None:
-        self.winner = None
+        ##        self.winner = None
 
         assert self.machine is not None
         self.id = self.machine.new_group("play")
@@ -1570,9 +1856,6 @@ class PlayState(GameState):
         gameboard = GameBoard(
             (8, 8),
             45,
-            randint(  # noqa: S311  # Not important to be cryptographically safe
-                0, 1
-            ),
         )
         gameboard.location = [x // 2 for x in SCREEN_SIZE]
         self.group_add(gameboard)
@@ -1585,26 +1868,40 @@ class PlayState(GameState):
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
 
-    async def check_conditions(self) -> str | None:
-        if self.winner is None:
-            return None
-        return "title"
+    ##    async def check_conditions(self) -> str | None:
+    ##        if self.winner is None:
+    ##            return None
+    ##        return "title"
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
-        self.winner = event.data
-        print(f"Player {self.winner} Won")
+        winner = event.data
+        ##        print(f"Player {winner} Won")
 
-    async def handle_preform_turn(self, event: Event[tuple[str, str]]) -> None:
-        "Handle preform turn action"
-        assert self.machine is not None
-        data = event.data
-        if len(data) != 2:
-            return
-        for item in data:
-            if not isinstance(item, str):
-                return
-        await self.machine.raise_event(Event("gameboard_preform_turn", data))
+        font = pygame.font.Font("data/VeraSerif.ttf", 28)
+
+        continue_button = Button("continue_button", font)
+        continue_button.visible = True
+        continue_button.color = (0, 0, 0)
+        continue_button.text = f"{PLAYERS[winner]} Won - Return to Title"
+        continue_button.location = [x // 2 for x in SCREEN_SIZE]
+        continue_button.handle_click = self.change_state("title")
+        self.group_add(continue_button)
+
+        # Fire server stop event so server shuts down if it exists
+        await self.machine.raise_event(Event("network_stop", None))
+
+
+##    async def handle_preform_turn(self, event: Event[tuple[str, str]]) -> None:
+##        "Handle preform turn action"
+##        assert self.machine is not None
+##        data = event.data
+##        if len(data) != 2:
+##            return
+##        for item in data:
+##            if not isinstance(item, str):
+##                return
+##        await self.machine.raise_event(Event("gameboard_preform_turn", data))
 
 
 class CheckersClient(sprite.GroupProcessor):
@@ -1759,10 +2056,10 @@ async def async_run() -> None:
             await client.raise_event(
                 Event(
                     "tick",
-                    {
-                        "time_passed": clock.get_time() / 1000,
-                        "fps": clock.get_fps(),
-                    },
+                    sprite.TickEventData(
+                        time_passed=clock.get_time() / 1000,
+                        fps=clock.get_fps(),
+                    ),
                 )
             )
 

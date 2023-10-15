@@ -14,6 +14,7 @@ from collections.abc import Callable, Iterable
 from typing import (
     Any,
     AnyStr,
+    Literal,
     NoReturn,
     Self,
     SupportsIndex,
@@ -27,29 +28,51 @@ from component import Component, ComponentManager, Event
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
 
-class Timeout(Exception):
+class TimeoutException(Exception):
     __slots__ = ()
 
 
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     """Network Component (client)"""
 
-    __slots__ = ("stream", "timeout")
+    __slots__ = ("_stream", "timeout")
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
-        self.stream: trio.SocketStream
+
         self.timeout: int | float = 3
+        self._stream: trio.SocketStream | None = None
+
+    @property
+    def not_connected(self) -> bool:
+        """Is stream None?"""
+        return self._stream is None
+
+    @property
+    def stream(self) -> trio.SocketStream:
+        if self._stream is None:
+            raise RuntimeError("Stream not connected!")
+        return self._stream
 
     @classmethod
-    def from_stream(cls, name: str, stream: trio.SocketStream) -> Self:
-        self = cls(name)
-        self.stream = stream
+    def from_stream(
+        cls,
+        *args: object,
+        kwargs: dict[str, object] | None = None,
+        stream: trio.SocketStream,
+    ) -> Self:
+        """Initialize from stream"""
+        if kwargs is None:
+            kwargs = {}
+        self = cls(*args, **kwargs)  # type: ignore[arg-type]
+        self._stream = stream
         return self
 
     async def connect(self, host: str, port: int) -> None:
         """Connect to host:port on TCP"""
-        self.stream = await trio.open_tcp_stream(host, port)
+        if not self.not_connected:
+            await self.close()
+        self._stream = await trio.open_tcp_stream(host, port)
 
     async def read(self, length: int) -> bytearray:
         """Read length bytes from stream"""
@@ -62,7 +85,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             if len(recieved) == 0:
                 # No information at all
                 if len(content) == 0:
-                    raise Timeout(
+                    raise TimeoutException(
                         "Server did not respond with any information. "
                         "This may be from a connection timeout."
                     )
@@ -80,11 +103,23 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     async def close(self) -> None:
         """Close the stream"""
+        if self.not_connected:
+            return
         await self.stream.aclose()
 
-    async def close_sending(self) -> None:
-        """Close the sending half of the stream (send EOF)"""
+    async def send_eof(self) -> None:
+        """Close the sending half of the stream"""
         await self.stream.send_eof()
+
+    async def wait_write_might_not_block(self) -> None:
+        """stream.wait_send_all_might_not_block"""
+        return await self.stream.wait_send_all_might_not_block()
+
+
+##    async def send_eof_and_close(self) -> None:
+##        """Send EOF and close."""
+##        await self.send_eof()
+##        await self.close()
 
 
 class NetworkEventComponent(NetworkComponent):
@@ -93,12 +128,18 @@ class NetworkEventComponent(NetworkComponent):
     __slots__ = (
         "_read_packet_id_to_event_name",
         "_write_event_name_to_packet_id",
+        "read_lock",
+        "write_lock",
     )
+
+    packet_id_format: Literal[StructFormat.USHORT] = StructFormat.USHORT
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
         self._read_packet_id_to_event_name: dict[int, str] = {}
         self._write_event_name_to_packet_id: dict[str, int] = {}
+        self.read_lock = trio.Lock()
+        self.write_lock = trio.Lock()
 
     def bind_handlers(self) -> None:
         """Register serverbound event handlers"""
@@ -132,26 +173,33 @@ class NetworkEventComponent(NetworkComponent):
 
     async def write_event(self, event: Event[bytearray]) -> None:
         """Send event to network"""
-        await self.write_value(
-            StructFormat.UINT, self._write_event_name_to_packet_id[event.name]
-        )
-        await self.write_bytearray(event.data)
+        packet_id = self._write_event_name_to_packet_id.get(event.name)
+        if packet_id is None:
+            raise RuntimeError(f"Unhandled network event name {event.name!r}")
+        async with self.write_lock:
+            await self.write_value(self.packet_id_format, packet_id)
+            await self.write_bytearray(event.data)
 
     async def read_event(self) -> Event[bytearray]:
         """Recieve event from network"""
-        packet_id = await self.read_value(StructFormat.UINT)
-        event_name = self._read_packet_id_to_event_name[packet_id]
-        print(f"{self.__class__.__name__}: read_event {event_name = }")
-        event_data = await self.read_bytearray()
+        async with self.read_lock:
+            packet_id = await self.read_value(self.packet_id_format)
+            event_data = await self.read_bytearray()
+        event_name = self._read_packet_id_to_event_name.get(packet_id)
+        if event_name is None:
+            raise RuntimeError(f"Unhandled packet ID {packet_id!r}")
         return Event(event_name, event_data)
 
-    async def raise_event_from_read_network(self) -> None:
-        """Raise event recieved from server"""
+    async def raise_event_from_read_network(
+        self,
+    ) -> tuple[bool, TimeoutException | trio.ClosedResourceError | None]:
+        """Raise event recieved from server, return if successful"""
         try:
             event = await self.read_event()
-        except (Timeout, trio.ClosedResourceError):
-            return
+        except (TimeoutException, trio.ClosedResourceError) as ex:
+            return False, ex
         await self.raise_event(event)
+        return True, None
 
     async def raise_events_from_read_network(self) -> None:
         """Raise events recieved from server"""
@@ -196,7 +244,7 @@ class Server(ComponentManager):
             return
         self.cancel_scope.cancel()
 
-    async def serve(  # type: ignore[return-value]
+    async def serve(  # type: ignore[misc]  # "Implicit return in function which does not return"
         self,
         port: int,
         host: AnyStr | None = None,
@@ -253,7 +301,11 @@ def run() -> None:
         client.register_network_write_event("echo_event", 0)
         client.register_read_network_event(1, "reposted_event")
 
-        event = Event("echo_event", b"I will give my cat food to bob", 3)
+        event = Event(
+            "echo_event",
+            bytearray("I will give my cat food to bob", "utf-8"),
+            3,
+        )
 
         # await client.raise_event(event)
         await client.write_event(event)
@@ -267,7 +319,9 @@ def run() -> None:
 
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:
-                client = NetworkEventComponent.from_stream("client", stream)
+                client = NetworkEventComponent.from_stream(
+                    "client", stream=stream
+                )
 
                 client.register_read_network_event(0, "repost_event")
                 client.register_network_write_event("repost_event", 1)

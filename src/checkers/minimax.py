@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-# Minimax - Boilerplate code for Minimax AIs
-
-"Minimax AI Base"
+"""Minimax - Boilerplate code for Minimax AIs."""
 
 # Programmed by CoolCat467
 
@@ -68,7 +65,6 @@ class Minimax(ABC, Generic[State, Action]):
         """Return new game state after preforming action on given state"""
 
     @classmethod
-    @abstractmethod
     def minimax(
         cls,
         state: State,
@@ -94,6 +90,73 @@ class Minimax(ABC, Generic[State, Action]):
         best_action: Action | None = None
         for action in cls.actions(state):
             result = cls.minimax(cls.result(state, action), next_down)
+            new_value = best(value, result.value)
+            if new_value != value:
+                best_action = action
+            value = new_value
+        return MinimaxResult(value, best_action)
+
+
+class AsyncMinimax(ABC, Generic[State, Action]):
+    """Base class for Minimax AIs"""
+
+    __slots__ = ()
+
+    @classmethod
+    @abstractmethod
+    async def value(cls, state: State) -> int | float:
+        """Return the value of a given game state"""
+
+    @classmethod
+    @abstractmethod
+    async def terminal(cls, state: State) -> bool:
+        """Return if given game state is terminal"""
+
+    @classmethod
+    @abstractmethod
+    async def player(cls, state: State) -> Player:
+        """Return player status given the state of the game
+
+        Must return either Player.MIN or Player.MAX"""
+
+    @classmethod
+    @abstractmethod
+    async def actions(cls, state: State) -> Iterable[Action]:
+        """Return a collection of all possible actions in a given game state"""
+
+    @classmethod
+    @abstractmethod
+    async def result(cls, state: State, action: Action) -> State:
+        """Return new game state after preforming action on given state"""
+
+    @classmethod
+    async def minimax(
+        cls,
+        state: State,
+        depth: int | None = 5,
+    ) -> MinimaxResult[Action]:
+        if await cls.terminal(state):
+            return MinimaxResult(await cls.value(state), None)
+        if depth is not None and depth <= 0:
+            return MinimaxResult(
+                await cls.value(state), next(iter(await cls.actions(state)))
+            )
+        next_down = None if depth is None else depth - 1
+
+        current_player = await cls.player(state)
+        value: int | float
+        if current_player == Player.MAX:
+            value = -infinity
+            best = max
+        else:
+            value = infinity
+            best = min
+
+        best_action: Action | None = None
+        for action in await cls.actions(state):
+            result = await cls.minimax(
+                await cls.result(state, action), next_down
+            )
             new_value = best(value, result.value)
             if new_value != value:
                 best_action = action

@@ -6,7 +6,7 @@
 # Programmed by CoolCat467
 
 from collections.abc import Iterable, Iterator
-from typing import Any, ClassVar, cast
+from typing import Any, ClassVar, NamedTuple, cast
 
 import trio
 from component import Component, ComponentManager, Event
@@ -22,6 +22,13 @@ from vector import Vector2
 __title__ = "Client Sprite"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
+
+
+class TickEventData(NamedTuple):
+    """Tick Event Data"""
+
+    time_passed: float
+    fps: float
 
 
 class Sprite(ComponentManager, DirtySprite):
@@ -332,9 +339,9 @@ class AnimationComponent(Component):
         "Ask controller for new state"
         return next(self.controller)
 
-    async def tick(self, tick_event: Event[dict[str, float]]) -> None:
+    async def tick(self, tick_event: Event[TickEventData]) -> None:
         "Update controller if it's time to and update sprite image"
-        passed = tick_event.data["time_passed"]
+        passed = tick_event.data.time_passed
         new = None
         if self.update_every == 0:
             new = self.fetch_controller_new_state()

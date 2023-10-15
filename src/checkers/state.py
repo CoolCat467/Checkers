@@ -1,25 +1,42 @@
-#!/usr/bin/env python3
-# AI that plays checkers.
+"""Checkers State"""
 
-# IMPORTANT NOTE:
-# For the game to recognize this as an
-# AI, it's filename should have the words
-# 'AI' in it.
+# Programmed by CoolCat467
 
-__title__ = "Minimax AI"
+__title__ = "Checkers State"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
 import math
-from collections import Counter
-from collections.abc import Generator, Iterable
+from collections.abc import Generator
 from typing import Any, NamedTuple, Self, TypeVar, cast
 
-from minimax import Minimax, MinimaxResult, Player
+# Player:
+# 0 = False = Red   = MIN = 0, 2
+# 1 = True  = Black = MAX = 1, 3
+
+# Note: Tile Ids are chess board tile titles, A1 to H8
+# A8 ... H8
+# .........
+# A1 ... H1
 
 T = TypeVar("T")
 
 Pos = tuple[int, int]
+
+
+class Action(NamedTuple):
+    """Represents an action"""
+
+    from_pos: Pos
+    to_pos: Pos
+
+
+class ActionSet(NamedTuple):
+    """Represents a set of actions"""
+
+    jumps: dict[Pos, list[Pos]]
+    moves: tuple[Pos, ...]
+    ends: set[Pos]
 
 
 def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
@@ -54,26 +71,6 @@ def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
     return moves
 
 
-# Player:
-# 0 = False = Person  = MIN = 0, 2
-# 1 = True  = AI (Us) = MAX = 1, 3
-
-
-class Action(NamedTuple):
-    """Represents an action"""
-
-    from_pos: str
-    to_pos: str
-
-
-class ActionSet(NamedTuple):
-    """Represents a set of actions"""
-
-    jumps: dict[Pos, list[Pos]]
-    moves: tuple[Pos, ...]
-    ends: set[Pos]
-
-
 class State:
     """Represents state of checkers game"""
 
@@ -84,13 +81,15 @@ class State:
         size: tuple[int, int],
         turn: bool,
         pieces: dict[Pos, int],
+        /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
-        if pre_calculated_actions is None:
-            pre_calculated_actions = {}
         self.size = size
         self.turn = turn
         self.pieces = pieces
+
+        if pre_calculated_actions is None:
+            pre_calculated_actions = {}
         self.pre_calculated_actions = pre_calculated_actions
 
     def __repr__(self) -> str:
@@ -142,40 +141,41 @@ class State:
         ends.update(moves)
         return ActionSet(jumps, moves, ends)
 
-    ##    def get_actions_set(self, piece_position: Pos) -> ActionSet:
-    ##        """Calculate and return ActionSet if required"""
-    ##        if piece_position in self.pre_calculated_actions:
-    ##            new_action_set = self.pre_calculated_actions[piece_position]
-    ##        else:
-    ##            new_action_set = self.calculate_actions(piece_position)
-    ##            self.pre_calculated_actions[piece_position] = new_action_set
-    ##        return new_action_set
+    def get_actions_set(self, piece_position: Pos) -> ActionSet:
+        """Calculate and return ActionSet if required"""
+        if piece_position in self.pre_calculated_actions:
+            new_action_set = self.pre_calculated_actions[piece_position]
+        else:
+            new_action_set = self.calculate_actions(piece_position)
+            self.pre_calculated_actions[piece_position] = new_action_set
+        return new_action_set
 
-    ##    def invalidate_location(self, position: Pos) -> None:
-    ##        if position in self.pre_calculated_actions:
-    ##            del self.pre_calculated_actions[position]
-    ####            print(position)
+    def invalidate_location(self, position: Pos) -> None:
+        if position in self.pre_calculated_actions:
+            del self.pre_calculated_actions[position]
 
-    def piece_kinged(self, piece: Pos) -> None:
+    def invalidate_all_locations(self) -> None:
+        self.pre_calculated_actions.clear()
+
+    ##            print(position)
+
+    def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
         """Called when piece kinged."""
+        ##        print(f'piece_kinged {piece = }')
+        self.invalidate_location(piece_pos)
 
-    ##        print(f'piece_kinged {piece = }')
-    ##        self.invalidate_location(piece)
+    def piece_moved(self, start_pos: Pos, end_pos: Pos) -> None:
+        """Called when piece moved from start_pos to end_pos."""
+        self.invalidate_location(start_pos)
 
-    def piece_jumped(self, position: Pos) -> None:
+    def piece_jumped(self, jumped_piece_pos: Pos) -> None:
         """Called when piece jumped."""
-
-    ##        print(f'piece_jumped {position = }')
-    ##        cx, cy = position
-    ##        for side in get_sides(position):
-    ##            self.invalidate_location(side)
-    ##        self.pre_calculated_actions.clear()
+        ##        print(f'piece_jumped {position = }')
+        self.invalidate_all_locations()
 
     def preform_action(self, action: Action) -> Self:
         """Return new state after preforming action on self"""
-        from_pos_name, to_pos_name = action
-        from_pos = self.get_tile_pos(from_pos_name)
-        to_pos = self.get_tile_pos(to_pos_name)
+        from_pos, to_pos = action
 
         pieces_copy = dict(self.pieces.items())
 
@@ -191,33 +191,40 @@ class State:
                 # Remove jumped position from pieces in play
                 if jumped_pos in pieces_copy:
                     pieces_copy.pop(jumped_pos)
-                    self.piece_jumped(jumped_pos)
+                self.piece_jumped(jumped_pos)
                 # See if piece kinged
                 jumped_x, jumped_y = jumped_pos
                 # Rightshift 1 is more efficiant way to multiply by 2
                 cur_x += (jumped_x - cur_x) << 1
                 cur_y += (jumped_y - cur_y) << 1
 
+                self.piece_moved(from_pos, (cur_x, cur_y))
+                from_pos = (cur_x, cur_y)
+
                 # Now that we know the current position, see if kinged
                 if self.does_piece_king(piece_type, (cur_x, cur_y)):
                     piece_type += 2
-                    self.piece_kinged(from_pos)
+                    self.piece_kinged(from_pos, piece_type)
+        else:
+            self.piece_moved(from_pos, to_pos)
 
         # See if it kings and king it if so
         if self.does_piece_king(piece_type, to_pos):
             piece_type += 2
-            self.piece_kinged(from_pos)
+            self.piece_kinged(from_pos, piece_type)
 
         # Move piece to it's end position
         pieces_copy[to_pos] = piece_type
-        ##        self.invalidate_location(from_pos)
+        self.invalidate_location(from_pos)
+
+        self.invalidate_all_locations()
 
         # Swap turn
         return self.__class__(
             self.size,
             not self.turn,
             pieces_copy,
-            ##            self.pre_calculated_actions
+            pre_calculated_actions=self.pre_calculated_actions,
         )
 
     def get_tile_name(self, x: int, y: int) -> str:
@@ -232,7 +239,8 @@ class State:
 
     def action_from_points(self, start: Pos, end: Pos) -> Action:
         """Return action from given start and end coordinates"""
-        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
+        ##        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
+        return Action(start, end)
 
     def get_turn(self) -> bool:
         """Return whose turn it is. True = AI (us)"""
@@ -350,9 +358,9 @@ class State:
 
     def get_actions(self, position: Pos) -> list[Action]:
         """Return list of all moves and jumps the piece at position can make"""
-        ends = set(self.get_jumps(position))
-        ends.update(self.get_moves(position))
-        ##        ends = self.get_actions_set(position).ends
+        ##        ends = set(self.get_jumps(position))
+        ##        ends.update(self.get_moves(position))
+        ends = self.get_actions_set(position).ends
         return [self.action_from_points(position, end) for end in ends]
 
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:
@@ -382,101 +390,13 @@ class State:
                 return (player + 1) % 2
         return None
 
+    def can_player_select_piece(self, player: int, tile_pos: Pos) -> bool:
+        """Return True if player can select piece on given tile position."""
+        piece_at_pos = self.pieces.get(tile_pos)
+        if piece_at_pos is None:
+            return False
+        return (piece_at_pos % 2) == player
 
-CURRENT_STATE: State
-
-
-def update(board_data: dict[str, Any]) -> None:
-    "This function is called by the game to inform the ai of any changes that have occored on the game board"
-    global CURRENT_STATE
-    CURRENT_STATE = State.from_game_board(board_data)
-
-
-class CheckersMinimax(Minimax[State, Action]):
-    """Minimax Algorithm for Checkers"""
-
-    __slots__ = ()
-
-    @staticmethod
-    def value(state: State) -> int | float:
-        # Return winner if possible
-        win = state.check_for_win()
-        # If no winner, we have to predict the value
-        if win is None:
-            # We'll estimate the value by the pieces in play
-            counts = Counter(state.pieces.values())
-            # Score is pawns plus 3 times kings
-            min_ = counts[0] + 3 * counts[2]
-            max_ = counts[1] + 3 * counts[3]
-            # More max will make score higher,
-            # more min will make score lower
-            # Plus one in divisor makes so never / 0
-            return (max_ - min_) / (max_ + min_ + 1)
-        return win * 2 - 1
-
-    @staticmethod
-    def terminal(state: State) -> bool:
-        return state.check_for_win() is not None
-
-    @staticmethod
-    def player(state: State) -> Player:
-        return Player.MAX if state.get_turn() else Player.MIN
-
-    @staticmethod
-    def actions(state: State) -> Iterable[Action]:
-        return state.get_all_actions(int(state.get_turn()))
-
-    @staticmethod
-    def result(state: State, action: Action) -> State:
-        return state.preform_action(action)
-
-    @classmethod
-    def adaptive_depth_minimax(
-        cls, state: State, minimum: int, maximum: int
-    ) -> MinimaxResult[Action]:
-        ##        types = state.pieces.values()
-        ##        current = len(types)
-        ##        w, h = state.size
-        ##        max_count = w * h // 6 << 1
-        ##        old_depth = (1 - (current / max_count)) * math.floor(
-        ##            math.sqrt(w**2 + h**2)
-        ##        )
-
-        depth = cls.value(state) * maximum + minimum
-        final_depth = min(maximum, max(minimum, round(depth)))
-        print(f"{depth = } {final_depth = }")
-        return cls.minimax(state, final_depth)
-
-
-def turn() -> tuple[str, str] | None:
-    "This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."
-    print("\nAI brain data:")
-    value, action = CheckersMinimax.adaptive_depth_minimax(CURRENT_STATE, 4, 5)
-    print(f"Current State: {CURRENT_STATE!r}")
-    assert isinstance(action, tuple)
-    from_, to_ = action
-    assert isinstance(from_, str)
-    assert isinstance(to_, str)
-    print(f"Next Move: {action}\nValue of move: {value}")
-    return from_, to_
-
-
-def turn_success(tf: bool) -> None:
-    "This function is called immidiately after the ai's play is made, telling it if it was successfull or not"
-    if not tf:
-        print("AI: Something went wrong playing move...")
-
-
-def stop() -> None:
-    "This function is called immediately after the game's window is closed"
-    pass
-
-
-def init() -> dict[str, object]:
-    "This function is called immidiately after the game imports the AI"
-    return {
-        "player_names": ("Player", "Minimax"),
-    }
-
-
-print(f"AI: AI Module {__title__} Created by {__author__}")
+    def get_pieces(self) -> tuple[tuple[Pos, int], ...]:
+        """Get all pieces"""
+        return tuple((pos, type_) for pos, type_ in self.pieces.items())
