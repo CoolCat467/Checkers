@@ -27,9 +27,7 @@ def generate_pieces(board_size: tuple[int, int]) -> dict[tuple[int, int], int]:
 def test_run() -> None:
     minimax = ai.CheckersMinimax()
     board_size = (8, 8)
-    state = ai.State(
-        size=board_size, turn=True, pieces=generate_pieces(board_size)
-    )
+    state = ai.State(board_size, True, generate_pieces(board_size))
     print(state)
     turns = 0
 

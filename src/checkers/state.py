@@ -358,9 +358,9 @@ class State:
 
     def get_actions(self, position: Pos) -> list[Action]:
         """Return list of all moves and jumps the piece at position can make"""
-        ##        ends = set(self.get_jumps(position))
-        ##        ends.update(self.get_moves(position))
-        ends = self.get_actions_set(position).ends
+        ends = set(self.get_jumps(position))
+        ends.update(self.get_moves(position))
+        ##        ends = self.get_actions_set(position).ends
         return [self.action_from_points(position, end) for end in ends]
 
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:

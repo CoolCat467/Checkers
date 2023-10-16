@@ -160,7 +160,6 @@ class Piece(sprite.Sprite):
             Event(
                 "gameboard_piece_clicked",
                 (
-                    self.position_name,
                     self.board_position,
                     self.piece_type,
                 ),
@@ -284,10 +283,7 @@ class Tile(sprite.Sprite):
         await self.raise_event(
             Event(
                 "gameboard_tile_clicked",
-                (
-                    self.position_name,
-                    self.board_position,
-                ),
+                self.board_position,
                 3,
             )
         )
@@ -545,7 +541,7 @@ class GameBoard(sprite.Sprite):
         self, event: Event[tuple[Pos, int]]
     ) -> None:
         """Handle update_piece event"""
-        print(f"handle_update_piece_event {event = }")
+        ##        print(f"handle_update_piece_event {event = }")
         piece_pos, piece_type = event.data
         self.pieces[piece_pos] = piece_type
         piece_name = self.get_tile_name(*piece_pos)
@@ -976,6 +972,8 @@ class GameClient(NetworkEventComponent):
                 7: "server->move_piece",
                 8: "server->animation_state",
                 9: "server->game_over",
+                10: "server->action_complete",
+                11: "server->initial_config",
             }
         )
 
@@ -994,6 +992,8 @@ class GameClient(NetworkEventComponent):
                 "server->update_piece": self.read_update_piece,
                 "server->move_piece": self.read_move_piece,
                 "server->game_over": self.read_game_over,
+                "server->action_complete": self.read_action_complete,
+                "server->initial_config": self.read_initial_config,
                 ##                "select_piece_clientbound": self.read_piece_select,
                 ##                "select_tile_clientbound": self.read_tile_select,
                 "network_stop": self.handle_network_stop,
@@ -1073,31 +1073,27 @@ class GameClient(NetworkEventComponent):
 
         await self.raise_event(Event("gameboard_delete_tile", tile_pos))
 
-    async def write_piece_click(
-        self, event: Event[tuple[str, Pos, int]]
-    ) -> None:
+    async def write_piece_click(self, event: Event[tuple[Pos, int]]) -> None:
         """Write piece click event"""
         if self.not_connected:
             return
-        piece_name, piece_position, piece_type = event.data
+        piece_position, piece_type = event.data
 
         buffer = Buffer()
         write_position(buffer, piece_position)
-        ##        buffer.write_utf(piece_name)
         buffer.write_value(StructFormat.UINT, piece_type)
 
         ##        print(f"{self.__class__.__name__}: writing select_piece->server")
 
         await self.write_event(Event("select_piece->server", buffer))
 
-    async def write_tile_click(self, event: Event[tuple[str, Pos]]) -> None:
+    async def write_tile_click(self, event: Event[Pos]) -> None:
         """Write tile click event"""
-        tile_name, tile_position = event.data
-        pos_x, pos_y = tile_position
+        ##        print(f'write_tile_click {event = }')
+        tile_position = event.data
 
         buffer = Buffer()
         write_position(buffer, tile_position)
-        ##        buffer.write_utf(tile_name)
 
         ##        print(f"{self.__class__.__name__}: writing select_tile->server")
 
@@ -1145,6 +1141,31 @@ class GameClient(NetworkEventComponent):
 
         await self.raise_event(Event("game_winner", winner))
 
+    async def read_action_complete(self, event: Event[bytearray]) -> None:
+        """Read action_complete event"""
+        ##        print(f'{self.__class__.__name__}: read_action_complete {event = }')
+        buffer = Buffer(event.data)
+
+        from_pos = read_position(buffer)
+        to_pos = read_position(buffer)
+        current_turn = buffer.read_value(StructFormat.UBYTE)
+
+        await self.raise_event(
+            Event("game_action_complete", (from_pos, to_pos, current_turn))
+        )
+
+    async def read_initial_config(self, event: Event[bytearray]) -> None:
+        """Read initial_config event"""
+        ##        print(f'{self.__class__.__name__}: read_initial_config {event = }')
+        buffer = Buffer(event.data)
+
+        board_size = read_position(buffer)
+        current_turn = buffer.read_value(StructFormat.UBYTE)
+
+        await self.raise_event(
+            Event("game_initial_config", (board_size, current_turn))
+        )
+
     async def handle_network_stop(self, event: Event[None]) -> None:
         """Send EOF if connected and close socket."""
         if self.not_connected:
@@ -1178,6 +1199,8 @@ class ServerClient(NetworkEventComponent):
                 "server[write]->move_piece": 7,
                 "server[write]->animation_state": 8,
                 "server[write]->game_over": 9,
+                "server[write]->action_complete": 10,
+                "server[write]->initial_config": 11,
             }
         )
         self.register_read_network_events(
@@ -1203,6 +1226,8 @@ class ServerClient(NetworkEventComponent):
                 "move_piece->network": self.handle_move_piece,
                 "animation_state->network": self.handle_animation_state,
                 "game_over->network": self.handle_game_over,
+                "action_complete->network": self.handle_action_complete,
+                "initial_config->network": self.handle_initial_config,
             }
         )
 
@@ -1324,6 +1349,31 @@ class ServerClient(NetworkEventComponent):
 
         await self.write_event(Event("server[write]->game_over", buffer))
 
+    async def handle_action_complete(
+        self, event: Event[tuple[Pos, Pos, int]]
+    ) -> None:
+        from_pos, to_pos, player_turn = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, from_pos)
+        write_position(buffer, to_pos)
+        buffer.write_value(StructFormat.UBYTE, player_turn)
+
+        await self.write_event(Event("server[write]->action_complete", buffer))
+
+    async def handle_initial_config(
+        self, event: Event[tuple[Pos, Pos, int]]
+    ) -> None:
+        board_size, player_turn = event.data
+
+        buffer = Buffer()
+
+        write_position(buffer, board_size)
+        buffer.write_value(StructFormat.UBYTE, player_turn)
+
+        await self.write_event(Event("server[write]->initial_config", buffer))
+
 
 class CheckersState(State):
     __slots__ = ("action_queue",)
@@ -1439,14 +1489,22 @@ class GameServer(Server):
                     self.raise_event,
                     Event("delete_piece->network", piece_pos),
                 )
+
         # Using non-cryptographically secure random because it doesn't matter
         self.new_game_init(bool(random.randint(0, 1)))  # noqa: S311
+
         async with trio.open_nursery() as nursery:
             for piece_pos, piece_type in self.state.get_pieces():
                 nursery.start_soon(
                     self.raise_event,
                     Event("create_piece->network", (piece_pos, piece_type)),
                 )
+
+        await self.raise_event(
+            Event(
+                "initial_config->network", (self.board_size, self.state.turn)
+            )
+        )
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
@@ -1646,6 +1704,12 @@ class GameServer(Server):
         await self.handle_action_animations(action_queue)
 
         ##        print(f'{self.state.turn = }')
+        await self.raise_event(
+            Event(
+                "action_complete->network",
+                (piece_pos, tile_pos, self.state.turn),
+            )
+        )
 
         win_value = self.state.check_for_win()
         if win_value is not None:
@@ -1764,8 +1828,7 @@ class TitleState(GameState):
         join_button.visible = True
         join_button.color = (0, 0, 0)
         join_button.text = "Join Checkers Game"
-        join_button.location = (
-            *hosting_button.location,
+        join_button.location = hosting_button.location + (  # noqa: RUF005
             0,
             hosting_button.rect.h + 10,
         )

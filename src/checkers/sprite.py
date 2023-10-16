@@ -468,6 +468,8 @@ class DragClickEventComponent(Component):
         self, event: Event[dict[str, tuple[int, int] | int]]
     ) -> None:
         "Set pressed for event button if selected. Also raise Click events"
+        if not self.manager_exists:
+            return
         sprite = cast(Sprite, self.get_component("sprite"))
 
         pos = event.data["pos"]
@@ -492,6 +494,8 @@ class DragClickEventComponent(Component):
         self, event: Event[dict[str, tuple[int, int] | int]]
     ) -> None:
         "PygameMouseMotion event -> drag"
+        if not self.manager_exists:
+            return
         async with trio.open_nursery() as nursery:
             for button, pressed in self.pressed.items():
                 if not pressed:
