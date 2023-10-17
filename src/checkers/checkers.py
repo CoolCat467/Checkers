@@ -1537,6 +1537,10 @@ class GameServer(Server):
         """Return if game can start."""
         return self.client_count >= 2
 
+    def game_active(self) -> bool:
+        """Return if game is active."""
+        return self.state.check_for_win() is None
+
     async def handler(self, stream: trio.SocketStream) -> None:
         """Accept clients"""
         print(f"{self.__class__.__name__}: client connected")
@@ -1559,6 +1563,7 @@ class GameServer(Server):
             await client.close()
             self.remove_component(client.name)
             print(f"{self.__class__.__name__}: client disconnected")
+            self.client_count -= 1
 
     async def handle_network_select_piece(
         self, event: Event[tuple[int, Pos]]
@@ -1923,6 +1928,8 @@ class PlayJoiningState(AsyncState["CheckersClient"]):
         await self.machine.raise_event(
             Event("client_connect", ("127.0.0.1", PORT))
         )
+        # print("Failed to connect to server.")
+        # await self.machine.set_state("title")
 
     async def check_conditions(self) -> str:
         return "play"
@@ -1963,6 +1970,9 @@ class PlayState(GameState):
         await self.machine.raise_event(Event("network_stop", None))
         # Unbind components and remove group
         await super().exit_actions()
+
+        if self.machine.manager.component_exists("gameserver"):
+            self.machine.manager.remove_component("gameserver")
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
@@ -2015,10 +2025,8 @@ class CheckersClient(sprite.GroupProcessor):
 
 async def async_run() -> None:
     "Main loop of everything"
-    ##    computer = play_ai()
     # Set up globals
     global SCREEN_SIZE
-    ##    global IMAGES, PLAYERS, aiData, RUNNING
 
     # Set up the screen
     screen = pygame.display.set_mode(SCREEN_SIZE, 0, 16, vsync=VSYNC)
@@ -2044,74 +2052,6 @@ async def async_run() -> None:
         # clock = pygame.time.Clock()
         clock = Clock()
 
-        ##
-        ##    # Set up players
-        ##    if computer:
-        ##        PLAYERS = ["Player", "Computer"]
-        ##        if aiData and hasattr(aiData, "keys"):
-        ##            keys = aiData.keys()
-        ##            if "player_names" in keys:
-        ##                if len(aiData["player_names"]) == 2:
-        ##                    PLAYERS = base2d.to_str(list(aiData["player_names"]))
-        ##    else:
-        ##        PLAYERS = ["Red Player", "Black Player"]
-        ##
-        ##    # Get the screen width and height for a lot of things
-        ##    w, h = SCREEN_SIZE
-        ##
-        ##
-        ##    if computer and isinstance(aiData, dict):
-        ##        keys = aiData.keys()
-        ##        if "starting_turn" in keys:
-        ##            world.get_type("board")[0].playing = int(aiData["starting_turn"])
-        ##        if "must_quit" in keys:
-        ##            world.get_type("button")[0].do_reset = not bool(
-        ##                aiData["must_quit"]
-        ##            )
-        ##
-        ##    ai_has_been_told_game_is_won = False
-        ##
-        ##    # If we are playing against a computer,
-        ##    if computer:
-        ##        # If it's the AI's turn,
-        ##        if board.playing == 0:
-        ##            # Reset game is won tracker since presumabley a new game has started
-        ##            if ai_has_been_told_game_is_won:
-        ##                ai_has_been_told_game_is_won = False
-        ##            try:
-        ##                # Send board data to the AI
-        ##                AI.update(board.get_data())
-        ##                # Get the target piece id and destination piece id from the AI
-        ##                rec_data = AI.turn()
-        ##                if rec_data != "QUIT":
-        ##                    if rec_data is not None:
-        ##                        target, dest = rec_data
-        ##                        # Play play the target piece id to the destination tile id
-        ##                        # on the game board
-        ##                        success = ai_play(
-        ##                            str(target), str(dest), board
-        ##                        )
-        ##                        if hasattr(AI, "turn_success"):
-        ##                            AI.turn_success(bool(success))
-        ##                    # else:
-        ##                    #     print('AI Played None. Still AI\'s Turn.')
-        ##                else:
-        ##                    # Don't use this as an excuse if your AI can't win
-        ##                    print(
-        ##                        "AI wishes to hault execution. Exiting game."
-        ##                    )
-        ##                    RUNNING = False
-        ##            except Exception as ex:
-        ##                traceback.print_exception(ex)
-        ##                RUNNING = False
-        ##        elif board.playing == 2 and not ai_has_been_told_game_is_won:
-        ##            # If the game has been won, tell the AI about it
-        ##            AI.update(board.get_data())
-        ##            ai_has_been_told_game_is_won = True
-        ##    # If we have an AI going and it has the stop function,
-        ##    if computer and hasattr(AI, "stop"):
-        ##        # Tell the AI to stop
-        ##        AI.stop()
         while client.running:
             resized_window = False
 
