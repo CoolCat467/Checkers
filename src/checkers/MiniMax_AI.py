@@ -10,6 +10,7 @@ __title__ = "Minimax AI"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import math
 from collections import Counter
 from collections.abc import Iterable
 from typing import TypeVar
@@ -81,7 +82,7 @@ class CheckersMinimax(Minimax[State, Action]):
         ##        )
 
         depth = cls.value(state) * maximum + minimum
-        final_depth = min(maximum, max(minimum, round(depth)))
+        final_depth = min(maximum, max(minimum, math.floor(depth)))
         print(f"{depth = } {final_depth = }")
         return cls.minimax(state, final_depth)
 
@@ -117,6 +118,7 @@ class RemoteState(Component):
         value, action = CheckersMinimax.adaptive_depth_minimax(
             self.state, 4, 5
         )
+        print(f"{value = }")
         await self.raise_event(
             Event(
                 "gameboard_piece_clicked",

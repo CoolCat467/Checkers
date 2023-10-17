@@ -6,6 +6,7 @@ __title__ = "Checkers State"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import copy
 import math
 from collections.abc import Generator
 from typing import Any, NamedTuple, Self, TypeVar, cast
@@ -188,6 +189,8 @@ class State:
             # to know what pieces got jumped over
             cur_x, cur_y = from_pos
             for jumped_pos in self.get_jumps(from_pos)[to_pos]:
+                from_pos = (cur_x, cur_y)
+
                 # Remove jumped position from pieces in play
                 if jumped_pos in pieces_copy:
                     pieces_copy.pop(jumped_pos)
@@ -199,19 +202,18 @@ class State:
                 cur_y += (jumped_y - cur_y) << 1
 
                 self.piece_moved(from_pos, (cur_x, cur_y))
-                from_pos = (cur_x, cur_y)
 
                 # Now that we know the current position, see if kinged
                 if self.does_piece_king(piece_type, (cur_x, cur_y)):
                     piece_type += 2
-                    self.piece_kinged(from_pos, piece_type)
+                    self.piece_kinged((cur_x, cur_y), piece_type)
         else:
             self.piece_moved(from_pos, to_pos)
 
         # See if it kings and king it if so
         if self.does_piece_king(piece_type, to_pos):
             piece_type += 2
-            self.piece_kinged(from_pos, piece_type)
+            self.piece_kinged(to_pos, piece_type)
 
         # Move piece to it's end position
         pieces_copy[to_pos] = piece_type
@@ -262,6 +264,7 @@ class State:
         self,
         position: Pos,
         piece_type: int | None = None,
+        _pieces: dict[Pos, int] | None = None,
         _recursion: int = 0,
     ) -> dict[Pos, list[Pos]]:
         """Gets valid jumps a piece can make
@@ -275,6 +278,9 @@ class State:
         jumped pieces to get there"""
         if piece_type is None:
             piece_type = self.pieces[position]
+        if _pieces is None:
+            _pieces = self.pieces
+        _pieces = copy.deepcopy(_pieces)
 
         # If we are kinged, get a pawn version of ourselves.
         # Take that plus one mod 2 to get the pawn of the enemy
@@ -297,7 +303,10 @@ class State:
         for direction, side in pawn_modify(
             tuple(enumerate(sides)), piece_type
         ):
-            side_piece = self.pieces.get(side)
+            # Make sure side exists
+            if not self.valid_location(side):
+                continue
+            side_piece = _pieces.get(side)
             # Side piece must be one of our enemy's pieces
             if side_piece not in enemy_pieces:
                 continue
@@ -305,12 +314,18 @@ class State:
             # Get the coordiates of the tile on the side of the main tile's
             # side in the same direction as the main tile's side
             side_side = get_sides(side)[direction]
-            side_side_piece = self.pieces.get(side_side)
-            # If the side exists and it's open,
-            if side_side_piece is None and self.valid_location(side_side):
+            # Make sure side exists
+            if not self.valid_location(side_side):
+                continue
+            side_side_piece = _pieces.get(side_side)
+            # If the side is open,
+            if side_side_piece is None:
                 # Add it the valid jumps dictionary and add the tile
                 # to the list of end tiles.
                 valid[side_side] = [side]
+
+                # Remove jumped piece from future calculations
+                _pieces.pop(side)
 
         # For each end point tile in the list of end point tiles,
         for end_tile in tuple(valid):
@@ -326,7 +341,10 @@ class State:
                 piece_type_copy += 2
                 _recursion = -1
             add_valid = self.get_jumps(
-                end_tile, piece_type_copy, _recursion=_recursion + 1
+                end_tile,
+                piece_type_copy,
+                _pieces=_pieces,
+                _recursion=_recursion + 1,
             )
             # For each key in the new dictionary of valid tile's keys,
             for end_pos, jumped_pieces in add_valid.items():

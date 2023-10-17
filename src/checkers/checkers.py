@@ -229,6 +229,8 @@ class Piece(sprite.Sprite):
         """Update self during movement animation"""
         self.piece_type = event.data
         self.set_outlined(False)
+        # Inform board that animation is complete
+        await self.raise_event(Event("fire_next_animation", None, 1))
 
 
 class Tile(sprite.Sprite):
@@ -320,6 +322,8 @@ class GameBoard(sprite.Sprite):
         "tile_size",
         "tile_surfs",
         "pieces",
+        "animation_queue",
+        "processing_animations",
     )
 
     # Define Tile Color Map and Piece Map
@@ -353,17 +357,14 @@ class GameBoard(sprite.Sprite):
 
         self.update_location_on_resize = True
 
-        self.pieces: dict[tuple[int, int], int] = {}
+        self.pieces: dict[Pos, int] = {}
+
+        self.animation_queue: deque[Event] = deque()
+        self.processing_animations = False
 
     def get_tile_name(self, x: int, y: int) -> str:
         """Get name of a given tile"""
         return chr(65 + x) + str(self.board_size[1] - y)
-
-    def get_tile_pos(self, name: str) -> Pos:
-        """Get tile position from it's name"""
-        x = ord(name[0]) - 65
-        y = self.board_size[1] - int(name[1:])
-        return (x, y)
 
     def bind_handlers(self) -> None:
         "Register handlers"
@@ -374,15 +375,15 @@ class GameBoard(sprite.Sprite):
                 "gameboard_select_piece": self.handle_select_piece_event,
                 "gameboard_create_tile": self.handle_create_tile_event,
                 "gameboard_delete_tile": self.handle_delete_tile_event,
+                "gameboard_delete_piece_animation": self.handle_delete_piece_animation_event,
+                "gameboard_update_piece_animation": self.handle_update_piece_animation_event,
+                "gameboard_move_piece_animation": self.handle_move_piece_animation_event,
                 "gameboard_delete_piece": self.handle_delete_piece_event,
                 "gameboard_update_piece": self.handle_update_piece_event,
                 "gameboard_move_piece": self.handle_move_piece_event,
-                # "gameboard_piece_clicked": self.handle_piece_clicked_event,
-                # "gameboard_tile_clicked": self.handle_tile_clicked_event,
-                # "gameboard_select_tile": self.handle_select_tile_event,
-                ##                "gameboard_piece_moved": self.handle_piece_moved_event,
-                ##                "gameboard_restart": self.handle_restart_event,
-                ##                "gameboard_preform_turn": self.handle_preform_turn_event,
+                "gameboard_animation_state": self.handle_animation_state,
+                "fire_next_animation": self.handle_fire_next_animation,
+                "gameboard_piece_moved": self.handle_piece_moved_event,
             }
         )
 
@@ -392,27 +393,6 @@ class GameBoard(sprite.Sprite):
         self.generate_tile_images()
         self.image = self.generate_board_image()
         self.visible = True
-
-    ##        await self.handle_restart_event(event)
-
-    ##    async def handle_restart_event(self, event: Event[None]) -> None:
-    ##        """Reset board"""
-    ##        ##        async with trio.open_nursery() as nursery:
-    ##        ##            for piece_position in self.pieces:
-    ##        ##                if piece_position in self.actions:
-    ##        ##                    tiles = self.actions[piece_position].ends
-    ##        ##                    for tile_position in tiles:
-    ##        ##                        tile_name = self.get_tile_name(*tile_position)
-    ##        ##                        event = Event(f"self_destruct_tile_{tile_name}", None)
-    ##        ##                        nursery.start_soon(self.raise_event, event)
-    ##        ##                piece_name = self.get_tile_name(*piece_position)
-    ##        ##                event = Event(f"destroy_piece_{piece_name}", None)
-    ##        ##                nursery.start_soon(self.raise_event, event)
-    ##        ##
-    ##        ##        self.actions.clear()
-    ##        self.pieces.clear()
-    ##
-    ##    ##        self.game_won = None
 
     async def handle_select_piece_event(
         self, event: Event[tuple[Pos, bool]]
@@ -424,92 +404,11 @@ class GameBoard(sprite.Sprite):
             Event(f"piece_outline_{piece_name}", outline_value)
         )
 
-    ##    async def handle_tile_clicked_event(self, event: Event[str]) -> None:
-    ##        """Preform move if it's not the AI player's turn"""
-    ####        if self.turn == self.ai_player:
-    ####            return
-    ##
-    ##        await self.raise_event(Event("gameboard_select_tile", event.data))
-
-    ##    async def handle_select_tile_event(self, event: Event[str]) -> None:
-    ##        """Start preforming move"""
-    ##        # No one allowed to move during animation
-    ##
-    ##        tile_name = event.data
-    ##        piece_name = self.selected_piece
-    ##
-    ##        assert piece_name is not None
-    ##
-    ##        tile_position = self.get_tile_pos(tile_name)
-    ##        piece_position = self.get_tile_pos(piece_name)
-    ##
-    ##        assert tile_position in self.actions[piece_position].ends
-    ##
-    ##        await self.raise_event(Event(f"piece_outline_{piece_name}", False))
-    ##
-    ##        if tile_position in self.actions[piece_position].moves:
-    ##            tile_location = self.get_tile_location(tile_position)
-    ##
-    ##            await self.raise_event(
-    ##                Event(
-    ##                    f"piece_move_{piece_name}",
-    ##                    [(tile_location, piece_position, tile_position)],
-    ##                )
-    ##            )
-    ##
-    ##        if tile_position in self.actions[piece_position].jumps:
-    ##            jumped = self.actions[piece_position].jumps[tile_position]
-    ##            positions: list[tuple[Vector2, Pos, Pos]] = []
-    ##
-    ##            cur_x, cur_y = piece_position
-    ##            for jumped_pos in jumped:
-    ##                start_pos = (cur_x, cur_y)
-    ##
-    ##                jumped_x, jumped_y = jumped_pos
-    ##                # Rightshift 1 is more efficiant way to multiply by 2
-    ##                cur_x += (jumped_x - cur_x) << 1
-    ##                cur_y += (jumped_y - cur_y) << 1
-    ##
-    ##                tile_location = self.get_tile_location((cur_x, cur_y))
-    ##                positions.append((tile_location, start_pos, (cur_x, cur_y)))
-    ##            await self.raise_event(
-    ##                Event(f"piece_move_{piece_name}", positions)
-    ##            )
-
-    ##    async def handle_piece_moved_event(
-    ##        self, event: Event[tuple[str, Pos, Pos, bool]]
-    ##    ) -> None:
-    ##        """Handle piece finishing one part of it's movement animation"""
-    ##        piece_name, start_pos, end_pos, done = event.data
-
-    ##        piece_type = self.pieces.pop(start_pos)
-    ##
-    ##        if self.does_piece_king(piece_type, end_pos):
-    ##            # types: ^^^^^^^^^^
-    ##            piece_type += 2
-    ##            await self.raise_event(Event(f"piece_king_{piece_name}", None))
-
-    ##        self.pieces[end_pos] = piece_type
-
-    ##        start_x, start_y = start_pos
-    ##        end_x, end_y = end_pos
-    ##
-    ##        delta_x = end_x - start_x
-    ##        delta_y = end_y - start_y
-    ##        if abs(delta_x) > 1 and abs(delta_y) > 1:
-    ##            # Leftshift 1 is more efficiant way to divide by 2
-    ##            jumped_x = start_x + (delta_x >> 1)
-    ##            jumped_y = start_y + (delta_y >> 1)
-    ##
-    ##            if self.pieces.pop((jumped_x, jumped_y), None) is not None:
-    ##                jumped_name = self.get_tile_name(jumped_x, jumped_y)
-    ##                await self.raise_event(
-    ##                    Event(f"destroy_piece_{jumped_name}", None)
-    ##                )
-
-    ##        if done:
-    ##        await self.raise_event(Event(f"destroy_piece_{piece_name}", None))
-    ##        self.add_piece(piece_type, end_pos)
+    async def handle_piece_moved_event(
+        self, event: Event[tuple[str, Pos, Pos, bool]]
+    ) -> None:
+        """Handle piece finishing one part of it's movement animation"""
+        await self.raise_event(Event("fire_next_animation", None))
 
     async def handle_create_piece_event(
         self, event: Event[tuple[Pos, int]]
@@ -529,45 +428,63 @@ class GameBoard(sprite.Sprite):
         tile_name = self.get_tile_name(*tile_pos)
         await self.raise_event(Event(f"self_destruct_tile_{tile_name}", None))
 
+    async def handle_delete_piece_animation_event(
+        self, event: Event[Pos]
+    ) -> None:
+        """Handle delete_animation_piece event"""
+        self.animation_queue.append(
+            Event(event.name.removesuffix("_animation"), event.data)
+        )
+
     async def handle_delete_piece_event(self, event: Event[Pos]) -> None:
         """Handle delete_piece event"""
-        ##        print(f'handle_delete_piece_event {event = }')
         piece_pos = event.data
         piece_name = self.get_tile_name(*piece_pos)
         await self.raise_event(Event(f"destroy_piece_{piece_name}", None))
         self.pieces.pop(piece_pos)
+        await self.raise_event(Event("fire_next_animation", None))
+
+    async def handle_update_piece_animation_event(
+        self, event: Event[tuple[Pos, int]]
+    ) -> None:
+        """Handle update_piece_animation event"""
+        self.animation_queue.append(
+            Event(event.name.removesuffix("_animation"), event.data)
+        )
 
     async def handle_update_piece_event(
         self, event: Event[tuple[Pos, int]]
     ) -> None:
         """Handle update_piece event"""
-        ##        print(f"handle_update_piece_event {event = }")
         piece_pos, piece_type = event.data
         self.pieces[piece_pos] = piece_type
         piece_name = self.get_tile_name(*piece_pos)
         await self.raise_event(Event(f"piece_update_{piece_name}", piece_type))
+
+    async def handle_move_piece_animation_event(
+        self, event: Event[tuple[Pos, Pos]]
+    ) -> None:
+        """Handle move_piece_animation event"""
+        self.animation_queue.append(
+            Event(event.name.removesuffix("_animation"), event.data)
+        )
 
     async def handle_move_piece_event(
         self, event: Event[tuple[Pos, Pos]]
     ) -> None:
         """Handle move_piece event"""
         from_pos, to_pos = event.data
-        ##        print(f'handle_move_piece_event {event = }')
-        ##        positions: list[tuple[Vector2, Pos, Pos]] = []
-        ##        await self.raise_event(
-        ##            Event(f"piece_move_{piece_name}", positions)
-        ##        )
+
         from_name = self.get_tile_name(*from_pos)
         to_location = self.get_tile_location(to_pos)
 
         self.add_piece(
-            self.pieces.pop(from_pos),
+            self.pieces.pop(from_pos),  # Same type as parent
             to_pos,
             self.get_tile_location(from_pos),
         )
 
         await self.raise_event(Event(f"destroy_piece_{from_name}", None))
-        ##        self.pieces.pop(from_pos)
 
         to_name = self.get_tile_name(*to_pos)
 
@@ -577,6 +494,68 @@ class GameBoard(sprite.Sprite):
                 [(to_location, from_pos, to_pos)],
             )
         )
+
+    async def handle_animation_state(self, event: Event[bool]) -> None:
+        """Handle animation_state event."""
+        new_animating_state = event.data
+
+        # Add important start/end block information as an event to the queue
+        self.animation_queue.append(
+            Event("animation_state", new_animating_state)
+        )
+
+        if new_animating_state:
+            return
+
+        # Stopping, end of animation block
+        if not self.processing_animations:
+            self.processing_animations = True
+            await self.raise_event(Event("fire_next_animation", None))
+
+    async def handle_fire_next_animation(self, _: Event[None] = None) -> None:
+        """Start next animation."""
+        assert self.processing_animations
+
+        if not self.animation_queue:
+            self.processing_animations = False
+            return
+
+        queue_event = self.animation_queue.popleft()
+
+        # If we find animation_state block
+        if queue_event.name == "animation_state":
+            # If start block or no more animations
+            if queue_event.data or not self.animation_queue:
+                # Handle one more tick to trigger stop
+                await self.handle_fire_next_animation()
+                return
+            # Otherwise, state event is False, meaning just popped end of block.
+            # This means next event should always be new block start event
+            if self.animation_queue[0].name != "animation_state":
+                raise RuntimeError("Expected animation_state block!")
+            assert self.animation_queue[0].data, "expected start block"
+            # Since we have a start block, make sure we have all the data
+            # before we play the animation; Otherwise we can end up in a state
+            # where we are still reading animations while they are playing,
+            # which is a race condition waiting to happen.
+
+            # Search queue for end block
+            has_end = False
+            for event in self.animation_queue:
+                if event.name == "animation_state" and not event.data:
+                    has_end = True
+                    break
+            if has_end:
+                # Found end, keep ticking animations, we have all the data
+                await self.handle_fire_next_animation()
+                return
+            # if ran through queue, still reading animations from
+            # server.
+            self.animation_queue.appendleft(queue_event)
+            await trio.sleep(0)
+            await self.handle_fire_next_animation()
+            return
+        await self.raise_event(queue_event)
 
     def generate_tile_images(self) -> None:
         """Load all the images"""
@@ -640,7 +619,6 @@ class GameBoard(sprite.Sprite):
         piece_type: int,
         position: Pos,
         location: Pos | None = None,
-        visible: bool = True,
     ) -> str:
         """Add piece given type and position"""
         group = self.groups()[-1]
@@ -656,7 +634,6 @@ class GameBoard(sprite.Sprite):
             position_name=name,
             location=location,
         )
-        piece.visible = visible
         self.add_component(piece)
         group.add(piece)  # type: ignore[arg-type]
 
@@ -674,6 +651,7 @@ class GameBoard(sprite.Sprite):
         tile = Tile(color, position, name, self.get_tile_location(position))
         self.add_component(tile)
         group.add(tile)  # type: ignore[arg-type]
+
         return tile.name
 
     def generate_board_image(self) -> Surface:
@@ -710,30 +688,6 @@ class GameBoard(sprite.Sprite):
             # Increment the y counter by tile_size
             loc_y += self.tile_size
         return surf
-
-    async def turn_over(self) -> None:
-        """Continue to next player's turn"""
-        await self.raise_event(Event("game_ready_for_next", None, 1))
-
-    async def handle_preform_turn_event(
-        self, event: Event[tuple[str, str]]
-    ) -> None:
-        """Preform a turn"""
-        piece_name, tile_name = event.data
-        await self.raise_event(Event("gameboard_select_tile", tile_name))
-
-
-def find_ais() -> list[str]:
-    "Returns the filename without the '.py' extention of any python files with 'AI' in their filename"
-    ais = []
-    # For each filename in the current directory,
-    for filename in os.listdir(os.getcwd()):
-        # If it's a python file and the word 'AI' is in it's filename,
-        if filename.endswith(".py") and "AI" in filename:
-            # Add the filename without the exention to the list of ais
-            ais.append(filename.split(".py", 1)[0])
-    # Return all the AI filenames we found
-    return ais
 
 
 class ClickDestinationComponent(Component):
@@ -947,11 +901,18 @@ def write_position(buffer: Buffer, pos: Pos) -> None:
 
 
 class GameClient(NetworkEventComponent):
+    """Game Client Network Event Component.
+
+    This class handles connecting to the game server, transmitting events
+    to the server, and reading and raising incoming events from the server."""
+
     __slots__ = ()
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
 
+        # Five seconds until timeout is generous, but it gives server end wiggle
+        # room.
         self.timeout = 5
 
         self.register_network_write_events(
@@ -967,9 +928,9 @@ class GameClient(NetworkEventComponent):
                 2: "server->select_piece",
                 3: "server->create_tile",
                 4: "server->delete_tile",
-                5: "server->delete_piece",
-                6: "server->update_piece",
-                7: "server->move_piece",
+                5: "server->delete_piece_animation",
+                6: "server->update_piece_animation",
+                7: "server->move_piece_animation",
                 8: "server->animation_state",
                 9: "server->game_over",
                 10: "server->action_complete",
@@ -981,21 +942,20 @@ class GameClient(NetworkEventComponent):
         super().bind_handlers()
         self.register_handlers(
             {
-                ##                "no_actions->client": self.print_no_actions,
+                # "no_actions->client": self.print_no_actions,
                 "gameboard_piece_clicked": self.write_piece_click,
                 "gameboard_tile_clicked": self.write_tile_click,
                 "server->create_piece": self.read_create_piece,
                 "server->select_piece": self.read_select_piece,
                 "server->create_tile": self.read_create_tile,
                 "server->delete_tile": self.read_delete_tile,
-                "server->delete_piece": self.read_delete_piece,
-                "server->update_piece": self.read_update_piece,
-                "server->move_piece": self.read_move_piece,
+                "server->delete_piece_animation": self.read_delete_piece_animation,
+                "server->update_piece_animation": self.read_update_piece_animation,
+                "server->move_piece_animation": self.read_move_piece_animation,
+                "server->animation_state": self.read_animation_state,
                 "server->game_over": self.read_game_over,
                 "server->action_complete": self.read_action_complete,
                 "server->initial_config": self.read_initial_config,
-                ##                "select_piece_clientbound": self.read_piece_select,
-                ##                "select_tile_clientbound": self.read_tile_select,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
                 "tick": self.handle_tick,
@@ -1003,6 +963,10 @@ class GameClient(NetworkEventComponent):
         )
 
     async def print_no_actions(self, event: Event[bytearray]) -> None:
+        """Print recieved `no_actions` event from server.
+
+        This event is used as a sort of keepalive heartbeat, because
+        it stops the connection from timing out."""
         print(f"print_no_actions {event = }")
 
     async def handle_tick(self, event: Event[dict[str, float]]) -> None:
@@ -1026,14 +990,13 @@ class GameClient(NetworkEventComponent):
     async def handle_client_connect(
         self, event: Event[tuple[str, int]]
     ) -> None:
-        "Have client connect to address"
+        """Have client connect to address specified in event"""
         if not self.not_connected:
             return
         await self.connect(*event.data)
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_create_piece {event = }')
+        """Read create_piece event from server"""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
@@ -1044,8 +1007,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_select_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_select_piece {event = }')
+        """Read create_piece event from server"""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
@@ -1056,8 +1018,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_create_tile(self, event: Event[bytearray]) -> None:
-        """Read create_tile event"""
-        ##        print(f'{self.__class__.__name__}: read_create_piece {event = }')
+        """Read create_tile event from server"""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
@@ -1065,8 +1026,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event("gameboard_create_tile", tile_pos))
 
     async def read_delete_tile(self, event: Event[bytearray]) -> None:
-        """Read delete_tile event"""
-        ##        print(f'{self.__class__.__name__}: read_delete_piece {event = }')
+        """Read delete_tile event from server"""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
@@ -1074,7 +1034,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event("gameboard_delete_tile", tile_pos))
 
     async def write_piece_click(self, event: Event[tuple[Pos, int]]) -> None:
-        """Write piece click event"""
+        """Write piece click event to server"""
         if self.not_connected:
             return
         piece_position, piece_type = event.data
@@ -1083,58 +1043,68 @@ class GameClient(NetworkEventComponent):
         write_position(buffer, piece_position)
         buffer.write_value(StructFormat.UINT, piece_type)
 
-        ##        print(f"{self.__class__.__name__}: writing select_piece->server")
-
         await self.write_event(Event("select_piece->server", buffer))
 
     async def write_tile_click(self, event: Event[Pos]) -> None:
-        """Write tile click event"""
-        ##        print(f'write_tile_click {event = }')
+        """Write tile click event to server"""
         tile_position = event.data
 
         buffer = Buffer()
         write_position(buffer, tile_position)
 
-        ##        print(f"{self.__class__.__name__}: writing select_tile->server")
-
         await self.write_event(Event("select_tile->server", buffer))
 
-    async def read_delete_piece(self, event: Event[bytearray]) -> None:
-        """Read delete_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_delete_piece {event = }')
+    async def read_delete_piece_animation(
+        self, event: Event[bytearray]
+    ) -> None:
+        """Read delete_piece_animation event from server"""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
 
-        await self.raise_event(Event("gameboard_delete_piece", tile_pos))
+        await self.raise_event(
+            Event("gameboard_delete_piece_animation", tile_pos)
+        )
 
-    async def read_update_piece(self, event: Event[bytearray]) -> None:
-        """Read update_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_update_piece {event = }')
+    async def read_update_piece_animation(
+        self, event: Event[bytearray]
+    ) -> None:
+        """Read update_piece_animation event from server"""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
         piece_type = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
-            Event("gameboard_update_piece", (piece_pos, piece_type))
+            Event("gameboard_update_piece_animation", (piece_pos, piece_type))
         )
 
-    async def read_move_piece(self, event: Event[bytearray]) -> None:
-        """Read move_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_move_piece {event = }')
+    async def read_move_piece_animation(self, event: Event[bytearray]) -> None:
+        """Read move_piece_animation event from server"""
         buffer = Buffer(event.data)
 
         piece_current_pos = read_position(buffer)
         piece_new_pos = read_position(buffer)
 
         await self.raise_event(
-            Event("gameboard_move_piece", (piece_current_pos, piece_new_pos))
+            Event(
+                "gameboard_move_piece_animation",
+                (piece_current_pos, piece_new_pos),
+            )
+        )
+
+    async def read_animation_state(self, event: Event[bytearray]) -> None:
+        """Read animation_state event from server"""
+        buffer = Buffer(event.data)
+
+        animation_state = buffer.read_value(StructFormat.BOOL)
+
+        await self.raise_event(
+            Event("gameboard_animation_state", animation_state)
         )
 
     async def read_game_over(self, event: Event[bytearray]) -> None:
-        """Read update_piece event"""
-        ##        print(f'{self.__class__.__name__}: read_game_over {event = }')
+        """Read update_piece event from server"""
         buffer = Buffer(event.data)
 
         winner = buffer.read_value(StructFormat.UBYTE)
@@ -1142,8 +1112,10 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event("game_winner", winner))
 
     async def read_action_complete(self, event: Event[bytearray]) -> None:
-        """Read action_complete event"""
-        ##        print(f'{self.__class__.__name__}: read_action_complete {event = }')
+        """Read action_complete event from server.
+
+        Sent when last action from client is done, great for AIs.
+        As of writing, not used for main client."""
         buffer = Buffer(event.data)
 
         from_pos = read_position(buffer)
@@ -1155,8 +1127,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_initial_config(self, event: Event[bytearray]) -> None:
-        """Read initial_config event"""
-        ##        print(f'{self.__class__.__name__}: read_initial_config {event = }')
+        """Read initial_config event from server"""
         buffer = Buffer(event.data)
 
         board_size = read_position(buffer)
@@ -1174,11 +1145,14 @@ class GameClient(NetworkEventComponent):
             await self.send_eof()
         await self.close()
 
-    def __del__(self) -> None:
-        print(f"del {self.__class__.__name__}")
-
 
 class ServerClient(NetworkEventComponent):
+    """Server Client Network Event Component.
+
+    When clients connect to server, this class handles the incoming
+    connections to the server in the way of reading and raising events
+    that are transfered over the network."""
+
     __slots__ = ("client_id",)
 
     def __init__(self, client_id: int) -> None:
@@ -1194,9 +1168,9 @@ class ServerClient(NetworkEventComponent):
                 "server[write]->select_piece": 2,
                 "server[write]->create_tile": 3,
                 "server[write]->delete_tile": 4,
-                "server[write]->delete_piece": 5,
-                "server[write]->update_piece": 6,
-                "server[write]->move_piece": 7,
+                "server[write]->delete_piece_animation": 5,
+                "server[write]->update_piece_animation": 6,
+                "server[write]->move_piece_animation": 7,
                 "server[write]->animation_state": 8,
                 "server[write]->game_over": 9,
                 "server[write]->action_complete": 10,
@@ -1205,7 +1179,6 @@ class ServerClient(NetworkEventComponent):
         )
         self.register_read_network_events(
             {
-                ##                0: "client->no_actions",
                 0: f"client[{self.client_id}]->select_piece",
                 1: f"client[{self.client_id}]->select_tile",
             }
@@ -1221,9 +1194,9 @@ class ServerClient(NetworkEventComponent):
                 "select_piece->network": self.handle_piece_select,
                 "create_tile->network": self.handle_create_tile,
                 "delete_tile->network": self.handle_delete_tile,
-                "delete_piece->network": self.handle_delete_piece,
-                "update_piece->network": self.handle_update_piece,
-                "move_piece->network": self.handle_move_piece,
+                "delete_piece_animation->network": self.handle_delete_piece_animation,
+                "update_piece_animation->network": self.handle_update_piece_animation,
+                "move_piece_animation->network": self.handle_move_piece_animation,
                 "animation_state->network": self.handle_animation_state,
                 "game_over->network": self.handle_game_over,
                 "action_complete->network": self.handle_action_complete,
@@ -1232,11 +1205,9 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_raw_select_piece(self, event: Event[bytearray]) -> None:
-        ##        print(f"{self.__class__.__name__}: reading client[raw]->select_piece")
-
+        """Read raw select piece event and reraise as network->select_piece"""
         buffer = Buffer(event.data)
 
-        ##        piece_name = buffer.read_utf()
         pos_x, pos_y = read_position(buffer)
 
         await self.raise_event(
@@ -1244,10 +1215,9 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_raw_select_tile(self, event: Event[bytearray]) -> None:
-        ##        print(f"{self.__class__.__name__}: reading network->select_tile")
+        """Read raw select tile event and reraise as network->select_tile"""
         buffer = Buffer(event.data)
 
-        ##        tile_name = buffer.read_utf()
         pos_x, pos_y = read_position(buffer)
 
         await self.raise_event(
@@ -1255,7 +1225,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_create_piece {event = }')
+        """Read create piece event and reraise as server[write]->create_piece"""
         piece_pos, piece_type = event.data
 
         buffer = Buffer()
@@ -1268,6 +1238,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_piece_select(
         self, event: Event[tuple[Pos, bool]]
     ) -> None:
+        """Read piece select event and reraise as server[write]->select_piece"""
         piece_pos, outline_value = event.data
 
         buffer = Buffer()
@@ -1278,7 +1249,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->select_piece", buffer))
 
     async def handle_create_tile(self, event: Event[Pos]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_create_piece {event = }')
+        """Read create tile event and reraise as server[write]->create_tile"""
         tile_pos = event.data
 
         buffer = Buffer()
@@ -1288,7 +1259,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->create_tile", buffer))
 
     async def handle_delete_tile(self, event: Event[Pos]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_delete_tile {event = }')
+        """Read delete tile event and reraise as server[write]->delete_tile"""
         tile_pos = event.data
 
         buffer = Buffer()
@@ -1297,18 +1268,22 @@ class ServerClient(NetworkEventComponent):
 
         await self.write_event(Event("server[write]->delete_tile", buffer))
 
-    async def handle_delete_piece(self, event: Event[Pos]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_delete_piece {event = }')
+    async def handle_delete_piece_animation(self, event: Event[Pos]) -> None:
+        """Read delete piece animation event and reraise as server[write]->delete_piece_animation"""
         piece_pos = event.data
 
         buffer = Buffer()
 
         write_position(buffer, piece_pos)
 
-        await self.write_event(Event("server[write]->delete_piece", buffer))
+        await self.write_event(
+            Event("server[write]->delete_piece_animation", buffer)
+        )
 
-    async def handle_update_piece(self, event: Event[tuple[Pos, int]]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_update_piece {event = }')
+    async def handle_update_piece_animation(
+        self, event: Event[tuple[Pos, int]]
+    ) -> None:
+        """Read update piece animation event and reraise as server[write]->update_piece_animation"""
         piece_pos, piece_type = event.data
 
         buffer = Buffer()
@@ -1316,10 +1291,14 @@ class ServerClient(NetworkEventComponent):
         write_position(buffer, piece_pos)
         buffer.write_value(StructFormat.UBYTE, piece_type)
 
-        await self.write_event(Event("server[write]->update_piece", buffer))
+        await self.write_event(
+            Event("server[write]->update_piece_animation", buffer)
+        )
 
-    async def handle_move_piece(self, event: Event[tuple[Pos, Pos]]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_move_piece {event = }')
+    async def handle_move_piece_animation(
+        self, event: Event[tuple[Pos, Pos]]
+    ) -> None:
+        """Read move piece animation event and reraise as server[write]->move_piece_animation"""
         piece_current_pos, piece_new_pos = event.data
 
         buffer = Buffer()
@@ -1327,10 +1306,12 @@ class ServerClient(NetworkEventComponent):
         write_position(buffer, piece_current_pos)
         write_position(buffer, piece_new_pos)
 
-        await self.write_event(Event("server[write]->move_piece", buffer))
+        await self.write_event(
+            Event("server[write]->move_piece_animation", buffer)
+        )
 
     async def handle_animation_state(self, event: Event[bool]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_animation_state {event = }')
+        """Read animation state change event and reraise as server[write]->animation_state"""
         state = event.data
 
         buffer = Buffer()
@@ -1340,7 +1321,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->animation_state", buffer))
 
     async def handle_game_over(self, event: Event[int]) -> None:
-        ##        print(f'{self.__class__.__name__}: handle_game_over {event = }')
+        """Read game over event and reraise as server[write]->game_over"""
         winner = event.data
 
         buffer = Buffer()
@@ -1352,6 +1333,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_action_complete(
         self, event: Event[tuple[Pos, Pos, int]]
     ) -> None:
+        """Read action complete event and reraise as server[write]->action_complete"""
         from_pos, to_pos, player_turn = event.data
 
         buffer = Buffer()
@@ -1365,6 +1347,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_initial_config(
         self, event: Event[tuple[Pos, Pos, int]]
     ) -> None:
+        """Read initial config event and reraise as server[write]->initial_config"""
         board_size, player_turn = event.data
 
         buffer = Buffer()
@@ -1376,6 +1359,8 @@ class ServerClient(NetworkEventComponent):
 
 
 class CheckersState(State):
+    """Subclass of State that keeps track of actions in `action_queue`"""
+
     __slots__ = ("action_queue",)
 
     def __init__(
@@ -1415,7 +1400,10 @@ class CheckersState(State):
 
 
 class GameServer(Server):
-    """Checkers server"""
+    """Checkers server
+
+    Handles accepting incoming connections from clients and handles
+    main game logic via State subclass above."""
 
     __slots__ = (
         "client_count",
@@ -1453,24 +1441,41 @@ class GameServer(Server):
     async def stop_server(self, event: Event[None] | None = None) -> None:
         """Stop serving and disconnect all NetworkEventComponents"""
         self.stop_serving()
-        component_names = []
         async with trio.open_nursery() as nursery:
             for component in self.get_all_components():
                 if isinstance(component, NetworkEventComponent):
                     nursery.start_soon(component.close)
-                    component_names.append(component.name)
-        for component_name in component_names:
-            self.remove_component(component_name)
+        for component in self.get_all_components():
+            if isinstance(component, NetworkEventComponent):
+                self.remove_component(component.name)
+
+    def setup_teams(self, client_ids: list[int]) -> dict[int, int]:
+        """Setup teams from sorted client ids."""
+        players: dict[int, int] = {}
+        for idx, client_id in enumerate(client_ids):
+            if idx < 2:
+                players[client_id] = idx % 2
+            else:
+                players[client_id] = -1
+        return players
 
     def new_game_init(self, turn: bool) -> None:
+        """Start new game."""
         self.client_players.clear()
         self.player_selections.clear()
 
         pieces = generate_pieces(*self.board_size)
         self.state = CheckersState(self.board_size, turn, pieces)
-        self.client_players = {
-            client_id: client_id % 2 for client_id in range(self.client_count)
-        }
+
+        # Why keep track of another object just to know client ID numbers
+        # if we already have that with the components? No need!
+        client_ids: set[int] = set()
+        for component in self.get_all_components():
+            if isinstance(component, ServerClient):
+                client_ids.add(component.client_id)
+
+        self.client_players = self.setup_teams(sorted(client_ids))
+
         self.players_can_interact = True
 
     async def start_server(self, event: Event[None] | None = None) -> None:
@@ -1482,7 +1487,7 @@ class GameServer(Server):
 
     async def handle_server_start_new_game(self, event: Event[None]) -> None:
         """Handle game start."""
-        ##        print(f"{self.__class__.__name__}: handle_server_start_new_game")
+        # Delete all pieces from last state (shouldn't be needed but still.)
         async with trio.open_nursery() as nursery:
             for piece_pos, _piece_type in self.state.get_pieces():
                 nursery.start_soon(
@@ -1490,9 +1495,11 @@ class GameServer(Server):
                     Event("delete_piece->network", piece_pos),
                 )
 
+        # Choose which team plays first
         # Using non-cryptographically secure random because it doesn't matter
         self.new_game_init(bool(random.randint(0, 1)))  # noqa: S311
 
+        # Send create_piece events for all pieces
         async with trio.open_nursery() as nursery:
             for piece_pos, piece_type in self.state.get_pieces():
                 nursery.start_soon(
@@ -1500,6 +1507,7 @@ class GameServer(Server):
                     Event("create_piece->network", (piece_pos, piece_type)),
                 )
 
+        # Raise initial config event with board size and initial turn.
         await self.raise_event(
             Event(
                 "initial_config->network", (self.board_size, self.state.turn)
@@ -1510,7 +1518,7 @@ class GameServer(Server):
         """Network loop for given ServerClient."""
         while True:
             try:
-                ##                print(f"{client.name} client_network_loop tick")
+                # print(f"{client.name} client_network_loop tick")
                 await client.write_event(
                     Event("server[write]->no_actions", bytearray())
                 )
@@ -1525,6 +1533,10 @@ class GameServer(Server):
             except (trio.ClosedResourceError, trio.BrokenResourceError):
                 break
 
+    def can_start(self) -> bool:
+        """Return if game can start."""
+        return self.client_count >= 2
+
     async def handler(self, stream: trio.SocketStream) -> None:
         """Accept clients"""
         print(f"{self.__class__.__name__}: client connected")
@@ -1538,38 +1550,44 @@ class GameServer(Server):
         client = ServerClient.from_stream(new_client_id, stream=stream)
         self.add_component(client)
 
-        if self.client_count >= 2:
+        if self.can_start():
             await self.raise_event(Event("server_send_game_start", None))
 
         try:
             await self.client_network_loop(client)
         finally:
             await client.close()
+            self.remove_component(client.name)
+            print(f"{self.__class__.__name__}: client disconnected")
 
     async def handle_network_select_piece(
         self, event: Event[tuple[int, Pos]]
     ) -> None:
-        """Handle piece event from client"""
-        ##        print(f'{self.__class__.__name__}: handle_network_select_piece {event = }')
+        """Handle piece event from client."""
         client_id, tile_pos = event.data
 
         player = self.client_players[client_id]
 
         if player != self.state.turn:
-            ##            print(f"{player = } cannot select piece {tile_pos = } because it is not that player's turn")
+            print(
+                f"{player = } cannot select piece {tile_pos = } because it is not that player's turn"
+            )
             return
 
         if not self.players_can_interact:
-            ##            print(f"{player = } cannot select piece {tile_pos = } because players_can_interact is False")
+            print(
+                f"{player = } cannot select piece {tile_pos = } because players_can_interact is False"
+            )
             return
         if not self.state.can_player_select_piece(player, tile_pos):
-            ##            print(f"{player = } cannot select piece {tile_pos = }")
+            print(f"{player = } cannot select piece {tile_pos = }")
             await self.player_select_piece(player, None)
             return
         if tile_pos == self.player_selections.get(player):
-            ##            print(f"{player = } toggle select -> No select")
+            # print(f"{player = } toggle select -> No select")
             await self.player_select_piece(player, None)
             return
+
         await self.player_select_piece(player, tile_pos)
 
     async def player_select_piece(
@@ -1618,6 +1636,7 @@ class GameServer(Server):
                     self.raise_event,
                     Event("create_tile->network", tile_position),
                 )
+            # Sent select piece as well
             nursery.start_soon(
                 self.raise_event,
                 Event(
@@ -1629,19 +1648,21 @@ class GameServer(Server):
     async def handle_move_animation(self, from_pos: Pos, to_pos: Pos) -> None:
         """Handle move animation."""
         await self.raise_event(
-            Event("move_piece->network", (from_pos, to_pos))
+            Event("move_piece_animation->network", (from_pos, to_pos))
         )
 
     async def handle_jump_animation(self, jumped_pos: Pos) -> None:
         """Handle jump animation."""
-        await self.raise_event(Event("delete_piece->network", jumped_pos))
+        await self.raise_event(
+            Event("delete_piece_animation->network", jumped_pos)
+        )
 
     async def handle_king_animation(
         self, kinged_pos: Pos, piece_type: int
     ) -> None:
         """Handle jump animation."""
         await self.raise_event(
-            Event("update_piece->network", (kinged_pos, piece_type))
+            Event("update_piece_animation->network", (kinged_pos, piece_type))
         )
 
     async def handle_action_animations(
@@ -1663,9 +1684,6 @@ class GameServer(Server):
         self, event: Event[tuple[int, Pos]]
     ) -> None:
         """Handle select tile event from network."""
-        ##        print(
-        ##            f"{self.__class__.__name__}: handle_network_select_tile {event = }"
-        ##        )
         client_id, tile_pos = event.data
 
         player = self.client_players[client_id]
@@ -1675,35 +1693,48 @@ class GameServer(Server):
                 f"{player = } cannot select tile {tile_pos = } because players_can_interact is False"
             )
             return
+
         if player != self.state.turn:
+            print(
+                f"{player = } cannot select tile {tile_pos = } because it is not their turn."
+            )
             return
+
         piece_pos = self.player_selections.get(player)
         if piece_pos is None:
             print(
                 f"{player = } cannot select tile {tile_pos = } because has no selection"
             )
             return
-        ##        print(f"{piece_pos = }")
+
         if tile_pos not in self.state.get_actions_set(piece_pos).ends:
-            print(f"{player = } cannot select tile because not valid move")
+            print(
+                f"{player = } cannot select tile {piece_pos!r} because not valid move"
+            )
             return
 
         self.players_can_interact = False  # No one moves during animation
+
+        # Send animation state start event
+        await self.raise_event(Event("animation_state->network", True))
+
+        # Remove tile sprites and glowing effect
         await self.player_select_piece(player, None)
 
         action = self.state.action_from_points(piece_pos, tile_pos)
-        ##        print(f"{action = }")
+        # print(f"{action = }")
+        # print(f'{self.state.turn = }')
 
-        ##        print(f'{self.state.turn = }')
-
+        # Get new state after preforming valid action
         new_state = self.state.preform_action(action)
+        # Get action queue from old state
         action_queue = self.state.get_action_queue()
         self.state = new_state
 
-        ##        print(f'{action_queue = }')
+        # Send action animations
         await self.handle_action_animations(action_queue)
 
-        ##        print(f'{self.state.turn = }')
+        # Send action complete event
         await self.raise_event(
             Event(
                 "action_complete->network",
@@ -1711,15 +1742,16 @@ class GameServer(Server):
             )
         )
 
+        await self.raise_event(Event("animation_state->network", False))
+
         win_value = self.state.check_for_win()
         if win_value is not None:
+            # If we have a winner, send game over event.
             await self.raise_event(Event("game_over->network", win_value))
             return
 
+        # If not game over, allow interactions so next player can take turn
         self.players_can_interact = True
-
-    def __del__(self) -> None:
-        print(f"del {self.__class__.__name__}")
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -1746,10 +1778,12 @@ class GameState(AsyncState["CheckersClient"]):
         self.manager = ComponentManager(self.name)
 
     def add_actions(self) -> None:
+        """Add internal component manager to statemachine's component manager."""
         assert self.machine is not None
         self.machine.manager.add_component(self.manager)
 
     def group_add(self, new_sprite: sprite.Sprite) -> None:
+        """Add new sprite to statemachine's group."""
         assert self.machine is not None
         group = self.machine.get_group(self.id)
         assert group is not None, "Expected group from new group id"
@@ -1757,6 +1791,7 @@ class GameState(AsyncState["CheckersClient"]):
         self.manager.add_component(new_sprite)
 
     async def exit_actions(self) -> None:
+        """Remove group and unbind all components."""
         assert self.machine is not None
         self.machine.remove_group(self.id)
         self.manager.unbind_components()
@@ -1811,6 +1846,7 @@ class TitleState(GameState):
         super().__init__("title")
 
     async def entry_actions(self) -> None:
+        """Add buttons."""
         assert self.machine is not None
         self.id = self.machine.new_group("title")
 
@@ -1899,8 +1935,6 @@ class PlayState(GameState):
     def __init__(self) -> None:
         super().__init__("play")
 
-    ##        self.winner: int | None = None
-
     def add_actions(self) -> None:
         super().add_actions()
         self.manager.register_handlers(
@@ -1910,8 +1944,6 @@ class PlayState(GameState):
         )
 
     async def entry_actions(self) -> None:
-        ##        self.winner = None
-
         assert self.machine is not None
         self.id = self.machine.new_group("play")
 
@@ -1927,19 +1959,15 @@ class PlayState(GameState):
 
     async def exit_actions(self) -> None:
         assert self.machine is not None
-        await super().exit_actions()
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
-
-    ##    async def check_conditions(self) -> str | None:
-    ##        if self.winner is None:
-    ##            return None
-    ##        return "title"
+        # Unbind components and remove group
+        await super().exit_actions()
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
         winner = event.data
-        ##        print(f"Player {winner} Won")
+        # print(f"Player {PLAYERS[winner]} ({winner}) Won")
 
         font = pygame.font.Font("data/VeraSerif.ttf", 28)
 
@@ -1953,18 +1981,6 @@ class PlayState(GameState):
 
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
-
-
-##    async def handle_preform_turn(self, event: Event[tuple[str, str]]) -> None:
-##        "Handle preform turn action"
-##        assert self.machine is not None
-##        data = event.data
-##        if len(data) != 2:
-##            return
-##        for item in data:
-##            if not isinstance(item, str):
-##                return
-##        await self.machine.raise_event(Event("gameboard_preform_turn", data))
 
 
 class CheckersClient(sprite.GroupProcessor):
