@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-# Async Clock - Asyncronous version of pygame.time.Clock
+# Async Clock - Asynchronous version of pygame.time.Clock
 
-"Asyncronous FPS clock"
+"Asynchronous FPS clock"
 
 # Programmed by CoolCat467
 
@@ -14,7 +14,7 @@ import trio
 
 
 class Clock:
-    "pygame.time.Clock but with asyncronous tick"
+    "pygame.time.Clock but with asynchronous tick"
     __slots__ = (
         "fps_tick",
         "timepassed",

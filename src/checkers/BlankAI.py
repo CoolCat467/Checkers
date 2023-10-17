@@ -22,15 +22,15 @@ def turn() -> tuple[str, str] | None:
 
 
 def turnSuccess(tf: bool) -> None:
-    """This function is called immidiately after the ai's play is made, telling it if it was successfull or not"""
+    """This function is called immediately after the ai's play is made, telling it if it was successful or not"""
 
 
 def stop() -> None:
-    """This function is called immidiately after the game's window is closed"""
+    """This function is called immediately after the game's window is closed"""
 
 
 def init() -> dict[str, object] | None:
-    """This function is called immidiately after the game imports the AI"""
+    """This function is called immediately after the game imports the AI"""
 
 
 ##    send = {}

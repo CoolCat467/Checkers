@@ -69,7 +69,7 @@ class Sprite(ComponentManager, DirtySprite):
             self.location = pre_loc
 
     image_dims = property(
-        _get_image_dims, _set_image_dims, doc="Image dimentions"
+        _get_image_dims, _set_image_dims, doc="Image dimensions"
     )
 
     def __get_image(self) -> Surface | None:
@@ -86,7 +86,7 @@ class Sprite(ComponentManager, DirtySprite):
     image = property(
         __get_image,
         __set_image,
-        doc="Image property auto-updating dimentions",
+        doc="Image property auto-updating dimensions",
     )
 
     # Extra
@@ -171,7 +171,7 @@ class ImageComponent(ComponentManager):
             self.add_image(ident, surf)
 
     def list_images(self) -> tuple[int | str, ...]:
-        "Return a tuple of saved image identifers"
+        "Return a tuple of saved image identifiers"
         return tuple(self.__surfaces)
 
     def image_exists(self, identifier: int | str) -> bool:
@@ -254,7 +254,7 @@ class OutlineComponent(Component):
         self.manager.set_image(self.manager.set_surface)
 
     def get_outline_discriptor(self, identifier: str | int) -> str:
-        "Return outlined identifer for given original identifier"
+        "Return outlined identifier for given original identifier"
         color = "_".join(map(str, self.__color))
         return f"{identifier}{self.mod}{color}_{self.size}"
 

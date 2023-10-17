@@ -22,7 +22,7 @@ def amol(
     lst: Iterable[int | float], **kwargs: int | float
 ) -> tuple[int | float, ...]:
     "All Math On List; a=Add, s=Subtract, m=Multiply, d=Divide, p=To the power of"
-    # Math Operator acting appon All values of a List
+    # Math Operator acting upon All values of a List
     data = list(lst)
     rng = range(len(data))
     for op, operand in kwargs.items():
@@ -380,7 +380,7 @@ class WorldBase:
 
     def render(self, surface: pygame.surface.Surface) -> None:
         "Draw the background and render all entities"
-        # draw the background and all it's entites
+        # draw the background and all it's entities
         surface.unlock()
         if self.background is not None:
             surface.blit(self.background, (0, 0))

@@ -175,7 +175,7 @@ class State:
         self.invalidate_all_locations()
 
     def preform_action(self, action: Action) -> Self:
-        """Return new state after preforming action on self"""
+        """Return new state after performing action on self"""
         from_pos, to_pos = action
 
         pieces_copy = dict(self.pieces.items())
@@ -311,7 +311,7 @@ class State:
             if side_piece not in enemy_pieces:
                 continue
             # Get the direction from the dictionary we made earlier
-            # Get the coordiates of the tile on the side of the main tile's
+            # Get the coordinates of the tile on the side of the main tile's
             # side in the same direction as the main tile's side
             side_side = get_sides(side)[direction]
             # Make sure side exists
@@ -348,7 +348,7 @@ class State:
             )
             # For each key in the new dictionary of valid tile's keys,
             for end_pos, jumped_pieces in add_valid.items():
-                # If the key is not already existant in the list of
+                # If the key is not already existent in the list of
                 # valid destinations,
                 if end_pos not in valid:
                     # Add that destination to the dictionary and every

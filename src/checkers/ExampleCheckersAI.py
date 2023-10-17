@@ -63,7 +63,7 @@ def turn():
                 moves = tileData["moves"]
                 # If our piece can move,
                 if len(moves):
-                    # Add it's moves to the dictonary of movable pieces at key of target tile id
+                    # Add it's moves to the dictionary of movable pieces at key of target tile id
                     selectTiles[tileId] = moves
         # If there are no jumps we can make,
         if not jumpTiles:
@@ -98,18 +98,18 @@ def turn():
 
 
 def turn_success(tf):
-    """This function is called immidiately after the ai's play is made, telling it if it was successfull or not"""
+    """This function is called immediately after the ai's play is made, telling it if it was successful or not"""
     if not tf:
         print("AI: Something went wrong playing move...")
 
 
 def stop():
-    """This function is called immidiately after the game's window is closed"""
+    """This function is called immediately after the game's window is closed"""
     pass
 
 
 def init():
-    """This function is called immidiately after the game imports the AI"""
+    """This function is called immediately after the game imports the AI"""
     # We dunno what the board looks like, so set it to blank.
     global BOARD
     BOARD = {}

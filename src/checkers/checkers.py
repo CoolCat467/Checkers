@@ -3,12 +3,12 @@
 # Programmed by CoolCat467
 
 # For AI Support, the python file has to have the text
-# 'AI' in it somewhere, and has to have the '.py' extention.
+# 'AI' in it somewhere, and has to have the '.py' extension.
 # The game calls update(boardData) and tells the AI about
 # the current state of the game board from gameboard.get_data(),
 # turn() to get the target piece tile id and target destination
 # tile id from the AI to make a move, and calls init() after the
-# AI is imported for it to initalize anything.
+# AI is imported for it to initialize anything.
 
 # IMPORTANT NOTE:
 # The updating and turn calls halt execution, including display
@@ -583,7 +583,7 @@ class GameBoard(sprite.Sprite):
             outline_ident = outline.precalculate_outline(name, outline_color)
             image.add_image(f"{name}_outlined", outline_ident)
 
-        # Generate a Pice Surface for each piece using a base image and a color
+        # Generate a Piece Surface for each piece using a base image and a color
         for piece_type, piece_data in enumerate(self.piece_map):
             color, filename = piece_data
             real_path = os.path.join(base_folder, *filename.split("/"))
@@ -963,7 +963,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def print_no_actions(self, event: Event[bytearray]) -> None:
-        """Print recieved `no_actions` event from server.
+        """Print received `no_actions` event from server.
 
         This event is used as a sort of keepalive heartbeat, because
         it stops the connection from timing out."""
@@ -1151,7 +1151,7 @@ class ServerClient(NetworkEventComponent):
 
     When clients connect to server, this class handles the incoming
     connections to the server in the way of reading and raising events
-    that are transfered over the network."""
+    that are transferred over the network."""
 
     __slots__ = ("client_id",)
 
@@ -1561,7 +1561,8 @@ class GameServer(Server):
             await self.client_network_loop(client)
         finally:
             await client.close()
-            self.remove_component(client.name)
+            if self.component_exists(client.name):
+                self.remove_component(client.name)
             print(f"{self.__class__.__name__}: client disconnected")
             self.client_count -= 1
 
@@ -1730,7 +1731,7 @@ class GameServer(Server):
         # print(f"{action = }")
         # print(f'{self.state.turn = }')
 
-        # Get new state after preforming valid action
+        # Get new state after performing valid action
         new_state = self.state.preform_action(action)
         # Get action queue from old state
         action_queue = self.state.get_action_queue()

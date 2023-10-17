@@ -35,7 +35,7 @@ class Buffer(BaseSyncWriter, BaseSyncReader, bytearray):
             Amount of bytes to be read.
 
             If the requested amount can't be read (buffer doesn't contain that much data/buffer
-            doesn't contain any data), an :exc:`IOError` will be reaised.
+            doesn't contain any data), an :exc:`IOError` will be re-raised.
 
             If there were some data in the buffer, but it was less than requested, this remaining
             data will still be depleted and the partial data that was read will be a part of the

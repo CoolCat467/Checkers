@@ -63,7 +63,7 @@ class Client(Thread):
         self.active = True
         # While we remain active,
         while self.active:
-            # Try to recive data from our socket
+            # Try to receive data from our socket
             try:
                 self.recvData = self.sock.recv(BUFSIZE)
             except OSError:
@@ -85,12 +85,12 @@ class Client(Thread):
                     self.active = False
                 else:
                     # If everything went as planned,
-                    # split the recieved message decoded by it's semicolons,
-                    # which are used to seperate messages, and add the messages
+                    # split the received message decoded by it's semicolons,
+                    # which are used to separate messages, and add the messages
                     # to the list we were told when we were initialised.
                     for i in self.recvData.decode("utf-8").split(";"):
                         self.data.append([self.name, i])
-            # Update the last time we recieved a message (used by clientTimer threads)
+            # Update the last time we received a message (used by clientTimer threads)
             self.lastMsg = float(time.time())
         # If we are inactive, close our socket.
         self.sock.close()
@@ -146,7 +146,7 @@ class ClientTimer(Thread):
                         )
                         client.send_all(self.msg)
                     except OSError:
-                        # If anything goes wrong, try again in half a seccond
+                        # If anything goes wrong, try again in half a second
                         print(
                             'Server: ClientTimer: Error Occored when sending "%i" wakeup message'
                             % self.cid,
@@ -164,7 +164,7 @@ class ClientTimer(Thread):
                     )
                     client.sock.close()
             else:
-                # If the timer has not been tripped, sleep for one seccond.
+                # If the timer has not been tripped, sleep for one second.
                 time.sleep(1)
         # Once our client is inactive, we can rest forever.
         print("Server: ClientTimer: Client is Inactive, exiting")
@@ -194,7 +194,7 @@ def run():
     global clients, closeWaitEvent, serversocket, chatData
     # We have no clients currently
     clients = {}
-    # Initalize close event
+    # Initialize close event
     closeWaitEvent = Event()
     # Set up a list to hold chat data
     chatData = []
@@ -223,7 +223,7 @@ def run():
     print("Server: All connections established.")
     print("Server: Sending confermation message to clients...")
     # Tell all connected clients all connected users
-    # Get the client names and seperate them by slashes
+    # Get the client names and separate them by slashes
     clientNames = "/".join([str(i) for i in clients.keys()])
     # For each connected client,
     for client in clients.values():
@@ -243,7 +243,7 @@ def run():
                     'From: "' + str(i[0]) + '" : ' + i[1] for i in chatData
                 ]:
                     print("Server:", i)
-                # Seperate message data from client id data
+                # Separate message data from client id data
                 messages = [i[1] + ";" for i in chatData]
                 # Get the "To" address lines from each message
                 to_ids = [m.split(" ")[0][1:-1] for m in messages]
@@ -332,7 +332,7 @@ def run():
     # Tell all client threads that may still be active to close
     closeWaitEvent.set()
     print(
-        "Server: Server shutting down... Waiting five secconds for all threads to stop."
+        "Server: Server shutting down... Waiting five seconds for all threads to stop."
     )
     time.sleep(5)
     # Find any clients that didn't listen

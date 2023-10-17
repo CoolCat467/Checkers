@@ -55,11 +55,11 @@ class Vector2(NamedTuple):
         return self / self.magnitude()
 
     def heading_radians(self) -> float:
-        "Returns the arc tangent (mesured in radians) of self.y/self.x."
+        "Returns the arc tangent (measured in radians) of self.y/self.x."
         return math.atan2(self.y, self.x)
 
     def heading(self) -> float:
-        """Returns the arc tangent (mesured in degrees) of self.y/self.x.
+        """Returns the arc tangent (measured in degrees) of self.y/self.x.
 
         Angle is measured from the positive X axis counterclockwise"""
         return math.degrees(self.heading_radians())

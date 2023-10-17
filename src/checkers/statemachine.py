@@ -45,7 +45,7 @@ class BaseState(Generic[Machine]):
         return self.machine_ref()
 
     def add_actions(self) -> None:
-        "Preform actions when this state added to a State Machine"
+        "Perform actions when this state added to a State Machine"
         return None
 
 
@@ -57,11 +57,11 @@ class State(BaseState[SyncMachine]):
     __slots__ = ()
 
     def entry_actions(self) -> None:
-        "Preform entry actions for this State."
+        "Perform entry actions for this State."
         return None
 
     def do_actions(self) -> None:
-        "Preform actions for this State."
+        "Perform actions for this State."
         return None
 
     def check_conditions(self) -> str | None:
@@ -69,7 +69,7 @@ class State(BaseState[SyncMachine]):
         return None
 
     def exit_actions(self) -> None:
-        "Preform exit actions for this State."
+        "Perform exit actions for this State."
         return None
 
 
@@ -83,11 +83,11 @@ class AsyncState(BaseState[AsyncMachine]):
     __slots__ = ()
 
     async def entry_actions(self) -> None:
-        "Preform entry actions for this State."
+        "Perform entry actions for this State."
         return None
 
     async def do_actions(self) -> None:
-        "Preform actions for this State."
+        "Perform actions for this State."
         return None
 
     async def check_conditions(self) -> str | None:
@@ -95,7 +95,7 @@ class AsyncState(BaseState[AsyncMachine]):
         return None
 
     async def exit_actions(self) -> None:
-        "Preform exit actions for this State."
+        "Perform exit actions for this State."
         return None
 
 
@@ -143,7 +143,7 @@ class StateMachine(BaseStateMachine):
         del self.states[state_name]
 
     def set_state(self, new_state_name: str | None) -> None:
-        "Change states and preform any exit / entry actions."
+        "Change states and perform any exit / entry actions."
         if new_state_name not in self.states and new_state_name is not None:
             raise KeyError(
                 f'"{new_state_name}" not found in internal states dictionary!'
@@ -159,11 +159,11 @@ class StateMachine(BaseStateMachine):
             self.active_state.entry_actions()
 
     def think(self) -> None:
-        "Preform actions check conditions and potentially change states"
+        "Perform actions check conditions and potentially change states"
         # Only continue if there is an active state
         if self.active_state is None:
             return None
-        # Preform the actions of the active state
+        # Perform the actions of the active state
         self.active_state.do_actions()
         # Check conditions and potentially change states.
         new_state_name = self.active_state.check_conditions()
@@ -202,7 +202,7 @@ class AsyncStateMachine(BaseStateMachine):
         del self.states[state_name]
 
     async def set_state(self, new_state_name: str | None) -> None:
-        "Change states and preform any exit / entry actions."
+        "Change states and perform any exit / entry actions."
         if new_state_name not in self.states and new_state_name is not None:
             raise KeyError(
                 f'"{new_state_name}" not found in internal states dictionary!'
@@ -218,11 +218,11 @@ class AsyncStateMachine(BaseStateMachine):
             await self.active_state.entry_actions()
 
     async def think(self) -> None:
-        "Preform actions check conditions and potentially change states"
+        "Perform actions check conditions and potentially change states"
         # Only continue if there is an active state
         if self.active_state is None:
             return None
-        # Preform the actions of the active state
+        # Perform the actions of the active state
         await self.active_state.do_actions()
         # Check conditions and potentially change states.
         new_state_name = await self.active_state.check_conditions()

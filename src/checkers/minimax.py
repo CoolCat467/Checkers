@@ -62,7 +62,7 @@ class Minimax(ABC, Generic[State, Action]):
     @classmethod
     @abstractmethod
     def result(cls, state: State, action: Action) -> State:
-        """Return new game state after preforming action on given state"""
+        """Return new game state after performing action on given state"""
 
     @classmethod
     def minimax(
@@ -127,7 +127,7 @@ class AsyncMinimax(ABC, Generic[State, Action]):
     @classmethod
     @abstractmethod
     async def result(cls, state: State, action: Action) -> State:
-        """Return new game state after preforming action on given state"""
+        """Return new game state after performing action on given state"""
 
     @classmethod
     async def minimax(

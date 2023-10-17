@@ -110,10 +110,10 @@ class RemoteState(Component):
         )
 
     async def preform_turn(self) -> None:
-        """Preform turn"""
+        """Perform turn"""
         print("preform_turn")
         if CheckersMinimax.terminal(self.state):
-            print("Terminal state, not preforming turn")
+            print("Terminal state, not performing turn")
             return
         value, action = CheckersMinimax.adaptive_depth_minimax(
             self.state, 4, 5
@@ -133,7 +133,7 @@ class RemoteState(Component):
     async def handle_action_complete(
         self, event: Event[tuple[Pos, Pos, int]]
     ) -> None:
-        """Preform action on internal state and preform our turn if possible."""
+        """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
         action = self.state.action_from_points(from_pos, to_pos)
         self.state = self.state.preform_action(action)
@@ -142,7 +142,7 @@ class RemoteState(Component):
             await self.preform_turn()
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
-        """Update interal pieces if we haven't had the initial setup event."""
+        """Update internal pieces if we haven't had the initial setup event."""
         if self.has_initial:
             return
         pos, type_ = event.data
@@ -151,7 +151,7 @@ class RemoteState(Component):
     async def handle_initial_config(
         self, event: Event[tuple[Pos, int]]
     ) -> None:
-        """Set up initial state and preform our turn if possible."""
+        """Set up initial state and perform our turn if possible."""
         board_size, turn = event.data
         self.state = State(board_size, turn, self.pieces)
         self.has_initial = True

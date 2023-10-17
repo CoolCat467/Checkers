@@ -78,11 +78,11 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """Read length bytes from stream"""
         content = bytearray()
         while max_read_count := length - len(content):
-            recieved = b""
+            received = b""
             with trio.move_on_after(self.timeout):
-                recieved = await self.stream.receive_some(max_read_count)
-                content.extend(recieved)
-            if len(recieved) == 0:
+                received = await self.stream.receive_some(max_read_count)
+                content.extend(received)
+            if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
                     raise TimeoutException(
@@ -158,7 +158,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(f"{event_name!r} event already registered!")
         if self._read_packet_id_to_event_name.get(packet_id) == event_name:
             raise ValueError(
-                f"{event_name!r} events are also being recieved"
+                f"{event_name!r} events are also being received"
                 f"from server with packet id {packet_id!r}, "
                 "which will would lead to infinite looping over network"
             )
@@ -181,7 +181,7 @@ class NetworkEventComponent(NetworkComponent):
             await self.write_bytearray(event.data)
 
     async def read_event(self) -> Event[bytearray]:
-        """Recieve event from network"""
+        """Receive event from network"""
         async with self.read_lock:
             packet_id = await self.read_value(self.packet_id_format)
             event_data = await self.read_bytearray()
@@ -193,7 +193,7 @@ class NetworkEventComponent(NetworkComponent):
     async def raise_event_from_read_network(
         self,
     ) -> tuple[bool, TimeoutException | trio.ClosedResourceError | None]:
-        """Raise event recieved from server, return if successful"""
+        """Raise event received from server, return if successful"""
         try:
             event = await self.read_event()
         except (TimeoutException, trio.ClosedResourceError) as ex:
@@ -202,7 +202,7 @@ class NetworkEventComponent(NetworkComponent):
         return True, None
 
     async def raise_events_from_read_network(self) -> None:
-        """Raise events recieved from server"""
+        """Raise events received from server"""
         while True:
             await self.raise_event_from_read_network()
 
@@ -214,7 +214,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(f"Packet ID {packet_id!r} already registered!")
         if self._write_event_name_to_packet_id.get(event_name) == packet_id:
             raise ValueError(
-                f"Packet id {packet_id!r} packets are also being recieved"
+                f"Packet id {packet_id!r} packets are also being received"
                 f"from server with as {event_name!r} events, "
                 "which will would lead to infinite looping over network"
             )
