@@ -677,7 +677,7 @@ class GameBoard(sprite.Sprite):
                 ### Blit the id of the tile at the tile's location
                 ##surf.blit(
                 ##    render_text(
-                ##        "VeraSerif.ttf",
+                ##        trio.Path("data", "VeraSerif.ttf"),
                 ##        20,
                 ##        "".join(map(str, (x, y))),
                 ##        GREEN
@@ -844,7 +844,7 @@ class FPSCounter(objects.Text):
     __slots__ = ()
 
     def __init__(self) -> None:
-        font = pygame.font.Font("data/VeraSerif.ttf", 28)
+        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
         super().__init__("fps", font)
 
         self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
@@ -1980,7 +1980,7 @@ class PlayState(GameState):
         winner = event.data
         # print(f"Player {PLAYERS[winner]} ({winner}) Won")
 
-        font = pygame.font.Font("data/VeraSerif.ttf", 28)
+        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
 
         continue_button = Button("continue_button", font)
         continue_button.visible = True
