@@ -41,7 +41,7 @@ from base_io import StructFormat
 from buffer import Buffer
 from component import Component, ComponentManager, Event, ExternalRaiseManager
 from network import NetworkEventComponent, Server, TimeoutException
-from objects import Button
+from objects import Button, OutlinedText
 from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
@@ -1412,12 +1412,14 @@ class GameServer(Server):
         "player_selections",
         "actions_queue",
         "players_can_interact",
+        "internal_singleplayer_mode",
     )
 
     board_size = (8, 8)
+    max_clients = 4
 
-    def __init__(self) -> None:
-        super().__init__("gameserver")
+    def __init__(self, internal_singleplayer_mode: bool = False) -> None:
+        super().__init__("GameServer")
 
         self.client_count: int
         self.state: CheckersState = CheckersState(self.board_size, False, {})
@@ -1425,6 +1427,8 @@ class GameServer(Server):
         self.client_players: dict[int, int] = {}
         self.player_selections: dict[int, Pos] = {}
         self.players_can_interact: bool = False
+
+        self.internal_singleplayer_mode = internal_singleplayer_mode
 
     def bind_handlers(self) -> None:
         """Register start_server and stop_server"""
@@ -1448,6 +1452,16 @@ class GameServer(Server):
         for component in self.get_all_components():
             if isinstance(component, NetworkEventComponent):
                 self.remove_component(component.name)
+
+    def setup_teams_internal(self, client_ids: list[int]) -> dict[int, int]:
+        """Setup teams for internal server mode from sorted client ids."""
+        players: dict[int, int] = {}
+        for idx, client_id in enumerate(client_ids):
+            if idx == 0:
+                players[client_id] = 2
+            else:
+                players[client_id] = -1
+        return players
 
     def setup_teams(self, client_ids: list[int]) -> dict[int, int]:
         """Setup teams from sorted client ids."""
@@ -1474,7 +1488,11 @@ class GameServer(Server):
             if isinstance(component, ServerClient):
                 client_ids.add(component.client_id)
 
-        self.client_players = self.setup_teams(sorted(client_ids))
+        sorted_client_ids = sorted(client_ids)
+        if self.internal_singleplayer_mode:
+            self.client_players = self.setup_teams_internal(sorted_client_ids)
+        else:
+            self.client_players = self.setup_teams(sorted_client_ids)
 
         self.players_can_interact = True
 
@@ -1535,6 +1553,8 @@ class GameServer(Server):
 
     def can_start(self) -> bool:
         """Return if game can start."""
+        if self.internal_singleplayer_mode:
+            return self.client_count >= 1
         return self.client_count >= 2
 
     def game_active(self) -> bool:
@@ -1546,15 +1566,17 @@ class GameServer(Server):
         print(f"{self.__class__.__name__}: client connected")
         new_client_id = self.client_count
         self.client_count += 1
-        if self.client_count >= 2:
+
+        can_start = self.can_start()
+        if can_start:
             self.stop_serving()
-        if self.client_count > 2:
+        if self.client_count > self.max_clients:
             await stream.aclose()
 
         client = ServerClient.from_stream(new_client_id, stream=stream)
         self.add_component(client)
 
-        if self.can_start():
+        if can_start:
             await self.raise_event(Event("server_send_game_start", None))
 
         try:
@@ -1572,7 +1594,9 @@ class GameServer(Server):
         """Handle piece event from client."""
         client_id, tile_pos = event.data
 
-        player = self.client_players[client_id]
+        player = self.client_players.get(client_id, -1)
+        if player == 2:
+            player = int(self.state.turn)
 
         if player != self.state.turn:
             print(
@@ -1692,7 +1716,9 @@ class GameServer(Server):
         """Handle select tile event from network."""
         client_id, tile_pos = event.data
 
-        player = self.client_players[client_id]
+        player = self.client_players.get(client_id, -1)
+        if player == 2:
+            player = int(self.state.turn)
 
         if not self.players_can_interact:
             print(
@@ -1856,26 +1882,49 @@ class TitleState(GameState):
         assert self.machine is not None
         self.id = self.machine.new_group("title")
 
-        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+        button_font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+        title_font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 56)
 
-        hosting_button = Button("hosting_button", font)
+        title_text = OutlinedText("title_text", title_font)
+        title_text.visible = True
+        title_text.color = (0, 0, 0)
+        title_text.outline = (255, 0, 0)
+        title_text.border_width = 4
+        title_text.text = "CHECKERS"
+        title_text.location = (SCREEN_SIZE[0] // 2, title_text.rect.h)
+        self.group_add(title_text)
+
+        hosting_button = Button("hosting_button", button_font)
         hosting_button.visible = True
         hosting_button.color = (0, 0, 0)
-        hosting_button.text = "Host Checkers Game"
+        hosting_button.text = "Host Networked Game"
         hosting_button.location = [x // 2 for x in SCREEN_SIZE]
         hosting_button.handle_click = self.change_state("play_hosting")
         self.group_add(hosting_button)
 
-        join_button = Button("join_button", font)
+        join_button = Button("join_button", button_font)
         join_button.visible = True
         join_button.color = (0, 0, 0)
-        join_button.text = "Join Checkers Game"
+        join_button.text = "Join Networked Game"
         join_button.location = hosting_button.location + (  # noqa: RUF005
             0,
             hosting_button.rect.h + 10,
         )
         join_button.handle_click = self.change_state("play_joining")
         self.group_add(join_button)
+
+        internal_button = Button("internal_hosting", button_font)
+        internal_button.visible = True
+        internal_button.color = (0, 0, 0)
+        internal_button.text = "Singleplayer Game"
+        internal_button.location = hosting_button.location - (
+            0,
+            hosting_button.rect.h + 10,
+        )
+        internal_button.handle_click = self.change_state(
+            "play_internal_hosting"
+        )
+        self.group_add(internal_button)
 
         await self.machine.raise_event(Event("init", None))
 
@@ -1888,25 +1937,29 @@ class PlayHostingState(AsyncState["CheckersClient"]):
     "Start running server"
     __slots__ = ()
 
-    def __init__(self) -> None:
-        super().__init__("play_hosting")
+    internal_server = False
 
-    def add_actions(self) -> None:
-        "Add server component"
-        assert self.machine is not None
-        self.machine.manager.add_component(GameServer())
+    def __init__(self) -> None:
+        extra = "_internal" if self.internal_server else ""
+        super().__init__(f"play{extra}_hosting")
 
     async def entry_actions(self) -> None:
         "Start hosting server"
         assert self.machine is not None
+        self.machine.manager.add_component(GameServer(self.internal_server))
+
         await self.machine.raise_event(Event("server_start", None))
         await trio.sleep(0.1)  # Wait for server to start
-        await self.machine.raise_event(
-            Event("client_connect", ("127.0.0.1", PORT))
-        )
 
     async def check_conditions(self) -> str:
-        return "play"
+        return "play_joining"
+
+
+class PlayInternalHostingState(PlayHostingState):
+    "Host server with internal server mode"
+    __slots__ = ()
+
+    internal_server = True
 
 
 class PlayJoiningState(AsyncState["CheckersClient"]):
@@ -1972,8 +2025,8 @@ class PlayState(GameState):
         # Unbind components and remove group
         await super().exit_actions()
 
-        if self.machine.manager.component_exists("gameserver"):
-            self.machine.manager.remove_component("gameserver")
+        if self.machine.manager.component_exists("GameServer"):
+            self.machine.manager.remove_component("GameServer")
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
@@ -2009,6 +2062,7 @@ class CheckersClient(sprite.GroupProcessor):
                 InitializeState(),
                 TitleState(),
                 PlayHostingState(),
+                PlayInternalHostingState(),
                 PlayJoiningState(),
                 PlayState(),
             )
