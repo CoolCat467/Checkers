@@ -28,6 +28,7 @@ import random
 import traceback
 from collections import deque
 from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
+from functools import partial
 from os import path
 from typing import Any, TypeVar
 
@@ -1413,6 +1414,7 @@ class GameServer(Server):
         "actions_queue",
         "players_can_interact",
         "internal_singleplayer_mode",
+        "advertisement_scope",
     )
 
     board_size = (8, 8)
@@ -1429,6 +1431,7 @@ class GameServer(Server):
         self.players_can_interact: bool = False
 
         self.internal_singleplayer_mode = internal_singleplayer_mode
+        self.advertisement_scope: trio.CancelScope | None = None
 
     def bind_handlers(self) -> None:
         """Register start_server and stop_server"""
@@ -1445,6 +1448,7 @@ class GameServer(Server):
     async def stop_server(self, event: Event[None] | None = None) -> None:
         """Stop serving and disconnect all NetworkEventComponents"""
         self.stop_serving()
+        self.stop_advertising()
         async with trio.open_nursery() as nursery:
             for component in self.get_all_components():
                 if isinstance(component, NetworkEventComponent):
@@ -1452,6 +1456,32 @@ class GameServer(Server):
         for component in self.get_all_components():
             if isinstance(component, NetworkEventComponent):
                 self.remove_component(component.name)
+
+    async def post_advertisement(
+        self, udp_socket: trio.socket.socket, hosting_port: int
+    ) -> None:
+        """Post server advertisement packet."""
+        advertisement = (f"[AD]{hosting_port}[/AD]").encode()
+        await udp_socket.sendto(advertisement, ("224.0.2.60", 4445))
+
+    def stop_advertising(self) -> None:
+        """Cancel self.advertisement_scope"""
+        if self.advertisement_scope is None:
+            return
+        self.advertisement_scope.cancel()
+
+    async def post_advertisements(self, hosting_port: int) -> None:
+        """Post lan UDP packets so server can be found."""
+        udp_socket = trio.socket.socket(
+            family=trio.socket.AF_INET,  # IPv4
+            type=trio.socket.SOCK_DGRAM,  # UDP
+        )
+
+        self.advertisement_scope = trio.CancelScope()
+        with self.advertisement_scope:
+            while not self.can_start():
+                await self.post_advertisement(udp_socket, hosting_port)
+                await trio.sleep(1.5)
 
     def setup_teams_internal(self, client_ids: list[int]) -> dict[int, int]:
         """Setup teams for internal server mode from sorted client ids."""
@@ -1501,7 +1531,12 @@ class GameServer(Server):
         print(f"{self.__class__.__name__}: starting server")
         await self.stop_server()
         self.client_count = 0
-        await self.serve(PORT, backlog=0)
+        port = PORT
+        async with trio.open_nursery() as nursery:
+            nursery.start_soon(partial(self.serve, port, backlog=0))
+            # Do not post advertisements when using internal singleplayer mode
+            if not self.internal_singleplayer_mode:
+                nursery.start_soon(self.post_advertisements, port)
 
     async def handle_server_start_new_game(self, event: Event[None]) -> None:
         """Handle game start."""
@@ -1784,6 +1819,9 @@ class GameServer(Server):
 
         # If not game over, allow interactions so next player can take turn
         self.players_can_interact = True
+
+    def __del__(self) -> None:
+        print(f"del {self.__class__.__name__}")
 
 
 class HaltState(AsyncState["CheckersClient"]):
