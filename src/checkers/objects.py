@@ -80,13 +80,14 @@ class OutlinedText(Text):
             image.get_rect(),
             border_radius=self.border_radius,
         )
-        rect(
-            image,
-            self.outline,
-            image.get_rect(),
-            width=self.border_width,
-            border_radius=self.border_radius,
-        )
+        if self.border_width > 0:
+            rect(
+                image,
+                self.outline,
+                image.get_rect(),
+                width=self.border_width,
+                border_radius=self.border_radius,
+            )
         image.blit(text_surf, (self.border_width, self.border_width))
         return image
 

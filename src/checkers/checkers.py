@@ -982,11 +982,10 @@ class GameClient(NetworkEventComponent):
             return
 
         traceback.print_exception(exception)
-        print(
-            f"{self.__class__.__name__}: Failed to read event from network, stopping"
-        )
-
-        await self.raise_event(Event("network_stop", None))
+        message = "Failed to read event from server."
+        print(f"{self.__class__.__name__}: {message}")
+        await self.close()
+        await self.raise_event(Event("client_disconnected", message))
 
     async def handle_client_connect(
         self, event: Event[tuple[str, int]]
@@ -994,7 +993,16 @@ class GameClient(NetworkEventComponent):
         """Have client connect to address specified in event"""
         if not self.not_connected:
             return
-        await self.connect(*event.data)
+        try:
+            await self.connect(*event.data)
+            return
+        except OSError as ex:
+            traceback.print_exception(ex)
+        message = "Error connecting to server."
+        print(f"{self.__class__.__name__}: {message}")
+        await self.close()
+        await self.raise_event(Event("client_disconnected", message))
+        print("post raise")
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server"""
@@ -1145,6 +1153,9 @@ class GameClient(NetworkEventComponent):
         else:
             await self.send_eof()
         await self.close()
+
+    def __del__(self) -> None:
+        print(f"del {self.__class__.__name__}")
 
 
 class ServerClient(NetworkEventComponent):
@@ -1461,7 +1472,9 @@ class GameServer(Server):
         self, udp_socket: trio.socket.socket, hosting_port: int
     ) -> None:
         """Post server advertisement packet."""
-        advertisement = (f"[AD]{hosting_port}[/AD]").encode()
+        advertisement = (
+            f"[CHECKERS][/CHECKERS][AD]{hosting_port}[/AD]"
+        ).encode()
         await udp_socket.sendto(advertisement, ("224.0.2.60", 4445))
 
     def stop_advertising(self) -> None:
@@ -1477,6 +1490,7 @@ class GameServer(Server):
             type=trio.socket.SOCK_DGRAM,  # UDP
         )
 
+        self.stop_advertising()
         self.advertisement_scope = trio.CancelScope()
         with self.advertisement_scope:
             while not self.can_start():
@@ -1822,6 +1836,7 @@ class GameServer(Server):
 
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")
+        super().__del__()
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -2014,14 +2029,13 @@ class PlayJoiningState(AsyncState["CheckersClient"]):
 
         self.machine.manager.add_component(client)
 
-    async def entry_actions(self) -> None:
-        "Start hosting server"
+    async def exit_actions(self) -> None:
+        "Have client connect"
         assert self.machine is not None
         await self.machine.raise_event(
             Event("client_connect", ("127.0.0.1", PORT))
         )
-        # print("Failed to connect to server.")
-        # await self.machine.set_state("title")
+        await super().exit_actions()
 
     async def check_conditions(self) -> str:
         return "play"
@@ -2038,6 +2052,7 @@ class PlayState(GameState):
         super().add_actions()
         self.manager.register_handlers(
             {
+                "client_disconnected": self.handle_client_disconnected,
                 "game_winner": self.handle_game_over,
             }
         )
@@ -2060,11 +2075,14 @@ class PlayState(GameState):
         assert self.machine is not None
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
-        # Unbind components and remove group
-        await super().exit_actions()
 
+        if self.machine.manager.component_exists("network"):
+            self.machine.manager.remove_component("network")
         if self.machine.manager.component_exists("GameServer"):
             self.machine.manager.remove_component("GameServer")
+
+        # Unbind components and remove group
+        await super().exit_actions()
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
@@ -2080,6 +2098,36 @@ class PlayState(GameState):
         continue_button.location = [x // 2 for x in SCREEN_SIZE]
         continue_button.handle_click = self.change_state("title")
         self.group_add(continue_button)
+
+        # Fire server stop event so server shuts down if it exists
+        await self.machine.raise_event(Event("network_stop", None))
+
+    async def handle_client_disconnected(self, event: Event[str]) -> None:
+        """Handle client disconnected error."""
+        print("handle_client_disconnected")
+        error = event.data
+
+        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+
+        title_button = Button("title_button", font)
+        title_button.visible = True
+        title_button.color = (0, 0, 0)
+        title_button.text = "Client Disconnected - Return to Title"
+        title_button.location = [x // 2 for x in SCREEN_SIZE]
+        title_button.handle_click = self.change_state("title")
+        self.group_add(title_button)
+
+        error_text = OutlinedText("error_text", font)
+        error_text.visible = True
+        error_text.color = (255, 0, 0)
+        error_text.border_width = 1
+        error_text.text = error
+        error_text.location = title_button.location + (  # noqa: RUF005
+            0,
+            title_button.rect.h + 10,
+        )
+
+        self.group_add(error_text)
 
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
@@ -2129,7 +2177,8 @@ async def async_run() -> None:
 
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
-            "checkers", main_nursery, "client"
+            "checkers",
+            main_nursery,  # "client"
         )
         client = CheckersClient(event_manager)
 

@@ -188,8 +188,8 @@ class ComponentManager(Component):
             await super().raise_event(event)
             return
 
-        ##        if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
-        ##            print(f'''{self.__class__.__name__}:\n{event = }''')
+        # if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
+        #     print(f'''{self.__class__.__name__}:\n{event = }''')
 
         # Call all registered handlers for this event
         if event.name in self.__event_handlers:
@@ -211,7 +211,7 @@ class ComponentManager(Component):
 
     def add_component(self, component: Component) -> None:
         "Add component to this manager"
-        assert isinstance(component, Component), "Must be component"
+        assert isinstance(component, Component), "Must be component instance"
         if self.component_exists(component.name):
             raise ValueError(
                 f'Component named "{component.name}" already exists!'
@@ -228,8 +228,13 @@ class ComponentManager(Component):
         "Remove a component"
         if not self.component_exists(component_name):
             raise ValueError(f"Component {component_name!r} does not exist!")
+        # Remove component from registered components
         component = self.__components.pop(component_name)
+        # Tell component they need to unbind
         component._unbind()
+
+        # Unregister component's event handlers
+        # List of events that will have no handlers once we are done
         empty = []
         for event_name, handlers in self.__event_handlers.items():
             for item in tuple(handlers):
@@ -238,6 +243,7 @@ class ComponentManager(Component):
                     self.__event_handlers[event_name].remove(item)
                     if not self.__event_handlers[event_name]:
                         empty.append(event_name)
+        # Remove event handler table keys that have no items anymore
         for name in empty:
             self.__event_handlers.pop(name)
 
@@ -247,7 +253,10 @@ class ComponentManager(Component):
 
     def components_exist(self, component_names: Iterable[str]) -> bool:
         "Return if all component names given exist in this manager"
-        return all(self.component_exists(name) for name in component_names)
+        for name in component_names:
+            if not self.component_exists(name):
+                return False
+        return True
 
     def get_component(self, component_name: str) -> Any:
         "Return Component or raise ValueError"
@@ -255,9 +264,7 @@ class ComponentManager(Component):
             raise ValueError(f'"{component_name}" component does not exist')
         return self.__components[component_name]
 
-    def get_components(
-        self, component_names: Iterable[str]
-    ) -> list[Component]:
+    def get_components(self, component_names: Iterable[str]) -> list[Any]:
         "Return iterable of components asked for or raise ValueError"
         return [self.get_component(name) for name in component_names]
 
@@ -273,6 +280,11 @@ class ComponentManager(Component):
         "Unbind all components, allows things to get garbage collected."
         self.__event_handlers.clear()
         for component in iter(self.__components.values()):
+            if (
+                isinstance(component, ComponentManager)
+                and component is not self
+            ):
+                component.unbind_components()
             component._unbind()
         self.__components.clear()
 
