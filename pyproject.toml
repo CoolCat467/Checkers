@@ -101,7 +101,7 @@ extend-ignore = [
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py311, mypy
+    envlist = py311, pytest, mypy
     isolated_build = false
 
     [gh-actions]
