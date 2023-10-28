@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
-# Objects - Common objects that are useful
+"Objects - Common objects that are useful"
 
-"Objects"
+from __future__ import annotations
 
 # Programmed by CoolCat467
 
@@ -9,13 +8,18 @@ __title__ = "Objects"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+from typing import TYPE_CHECKING
+
 from pygame.color import Color
 from pygame.draw import rect
-from pygame.font import Font
 from pygame.surface import Surface
 
-from checkers import sprite
-from checkers.component import Event
+from . import sprite
+
+if TYPE_CHECKING:
+    from pygame.font import Font
+
+    from .component import Event
 
 
 class Text(sprite.Sprite):

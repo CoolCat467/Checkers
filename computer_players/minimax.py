@@ -164,10 +164,5 @@ class AsyncMinimax(ABC, Generic[State, Action]):
         return MinimaxResult(value, best_action)
 
 
-def run() -> None:
-    "Run test of module"
-
-
 if __name__ == "__main__":
     print(f"{__title__}\nProgrammed by {__author__}.\n")
-    run()

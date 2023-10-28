@@ -8,7 +8,7 @@ __license__ = "LGPL-3.0-only"
 
 from typing import Any
 
-from checkers.base_io import BaseSyncReader, BaseSyncWriter
+from .base_io import BaseSyncReader, BaseSyncWriter
 
 __all__ = ["Buffer"]
 

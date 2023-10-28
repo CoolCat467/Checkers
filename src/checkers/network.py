@@ -23,8 +23,8 @@ from typing import (
 
 import trio
 
-from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
-from checkers.component import Component, ComponentManager, Event
+from .base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
+from .component import Component, ComponentManager, Event
 
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
@@ -73,16 +73,24 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """Connect to host:port on TCP"""
         if not self.not_connected:
             await self.close()
-        self._stream = await trio.open_tcp_stream(host, port)
+        try:
+            self._stream = await trio.open_tcp_stream(host, port)
+        except OSError:
+            await self.close()
+            raise
 
     async def read(self, length: int) -> bytearray:
-        """Read length bytes from stream"""
+        """Read `length` bytes from stream."""
         content = bytearray()
         while max_read_count := length - len(content):
             received = b""
-            with trio.move_on_after(self.timeout):
-                received = await self.stream.receive_some(max_read_count)
-                content.extend(received)
+            try:
+                with trio.move_on_after(self.timeout):
+                    received = await self.stream.receive_some(max_read_count)
+            except (trio.BrokenResourceError, trio.ClosedResourceError):
+                await self.close()
+                raise
+            content.extend(received)
             if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
@@ -100,13 +108,18 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     async def write(self, data: bytes) -> None:
         """Write data to stream"""
-        await self.stream.send_all(data)
+        try:
+            await self.stream.send_all(data)
+        except (trio.BrokenResourceError, trio.ClosedResourceError):
+            await self.close()
+            raise
 
     async def close(self) -> None:
         """Close the stream"""
         if self.not_connected:
             return
         await self.stream.aclose()
+        self._stream = None
 
     async def send_eof(self) -> None:
         """Close the sending half of the stream"""

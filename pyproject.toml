@@ -24,6 +24,7 @@ classifiers = [
 keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "ai-support", "networked-game"]
 dependencies = [
     "pygame~=2.5.2",
+    "typing_extensions",
 ]
 
 [project.urls]
@@ -32,7 +33,10 @@ dependencies = [
 "Bug Tracker" = "https://github.com/CoolCat467/Checkers/issues"
 
 [tool.setuptools.package-data]
-checkers = ["py.typed", "pic/*.png", "*.ttf"]
+checkers = ["py.typed", "data/*"]
+
+[project.scripts]
+checkers_game = "checkers.game:cli_run"
 
 [tool.pytest.ini_options]
 addopts = "--cov-report term-missing --cov=checkers"
@@ -97,6 +101,9 @@ extend-ignore = [
     "S101",  # use of assert for tests and type narrowing
     'PYI041',  # redundant-numeric-union
 ]
+
+[tool.ruff.per-file-ignores]
+"src/checkers/__init__.py" = ['F401', 'E402']
 
 [tool.tox]
 legacy_tox_ini = """

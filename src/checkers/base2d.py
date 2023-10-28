@@ -13,9 +13,9 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import pygame
 
-from checkers import sprite
-from checkers.statemachine import StateMachine
-from checkers.vector import Vector2
+from . import sprite
+from .statemachine import StateMachine
+from .vector import Vector2
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Sequence
@@ -243,7 +243,7 @@ class GameEntity(sprite.Sprite):
         if self.visible:
             surface.blit(self.image, (x - w // 2, y - h // 2))
         if self.show_hitbox:
-            pygame.draw.rect(surface, (0, 0, 0), self.get_col_rect(), 1)
+            pygame.draw.rect(surface, (0, 0, 0), self.rect, 1)
             if self.scan:
                 pygame.draw.circle(
                     surface, (0, 0, 60), to_int([x, y]), self.scan, 1

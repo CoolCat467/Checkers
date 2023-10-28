@@ -1,25 +1,17 @@
 #!/usr/bin/env python3
-# Graphical Checkers Game with AI support
+# Graphical Checkers Game
+
+"Graphical Checkers Game"
+
 # Programmed by CoolCat467
-
-# For AI Support, the python file has to have the text
-# 'AI' in it somewhere, and has to have the '.py' extension.
-# The game calls update(boardData) and tells the AI about
-# the current state of the game board from gameboard.get_data(),
-# turn() to get the target piece tile id and target destination
-# tile id from the AI to make a move, and calls init() after the
-# AI is imported for it to initialize anything.
-
-# IMPORTANT NOTE:
-# The updating and turn calls halt execution, including display
-# updates. This would be fixed with multiprocessing, but I am not
-# very familiar with it and it also might cause some dy-syncronization
-# problems.
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
 # .........
 # A1 ... H1
+
+# 0 = False = Red   = 0, 2
+# 1 = True  = Black = 1, 3
 
 from __future__ import annotations
 
@@ -31,28 +23,31 @@ import traceback
 from collections import deque
 from functools import partial
 from os import path
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar, cast
 
 import pygame
 import trio
+from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 
-from checkers import base2d, objects, sprite
-from checkers.async_clock import Clock
-from checkers.base_io import StructFormat
-from checkers.buffer import Buffer
-from checkers.component import (
+from . import base2d, objects, sprite
+from .async_clock import Clock
+from .base_io import StructFormat
+from .buffer import Buffer
+from .client import GameClient
+from .component import (
     Component,
     ComponentManager,
     Event,
     ExternalRaiseManager,
 )
-from checkers.network import NetworkEventComponent, Server, TimeoutException
-from checkers.objects import Button, OutlinedText
-from checkers.state import ActionSet, State
-from checkers.statemachine import AsyncState
-from checkers.vector import Vector2
+from .network import NetworkEventComponent, Server, TimeoutException
+from .network_shared import read_position, write_position
+from .objects import Button, OutlinedText
+from .state import ActionSet, State
+from .statemachine import AsyncState
+from .vector import Vector2
 
 if TYPE_CHECKING:
     from collections.abc import (
@@ -63,7 +58,6 @@ if TYPE_CHECKING:
         Sequence,
     )
 
-    from pygame.color import Color
     from pygame.surface import Surface
 
 __title__ = "Checkers"
@@ -93,7 +87,7 @@ T = TypeVar("T")
 
 IS_WINDOWS = platform.system() == "Windows"
 
-Pos = tuple[int, int]
+Pos: TypeAlias = tuple[int, int]
 
 
 def render_text(
@@ -329,10 +323,6 @@ def generate_tile_image(
     return surf
 
 
-# 0 = False = Red   = 0, 2
-# 1 = True  = Black = 1, 3
-
-
 class GameBoard(sprite.Sprite):
     "Entity that stores data about the game board and renders it"
     __slots__ = (
@@ -400,6 +390,7 @@ class GameBoard(sprite.Sprite):
                 "gameboard_update_piece": self.handle_update_piece_event,
                 "gameboard_move_piece": self.handle_move_piece_event,
                 "gameboard_animation_state": self.handle_animation_state,
+                "game_winner": self.handle_game_winner,
                 "fire_next_animation": self.handle_fire_next_animation,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
             }
@@ -499,9 +490,7 @@ class GameBoard(sprite.Sprite):
         self.add_piece(
             self.pieces.pop(from_pos),  # Same type as parent
             to_pos,
-            # types: arg-type error: Argument 3 to "add_piece" of "GameBoard" has incompatible type "Vector2"; expected "tuple[int, int] | None"
             self.get_tile_location(from_pos),
-            # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^
         )
 
         await self.raise_event(Event(f"destroy_piece_{from_name}", None))
@@ -515,16 +504,12 @@ class GameBoard(sprite.Sprite):
             )
         )
 
-    async def handle_animation_state(self, event: Event[bool]) -> None:
-        """Handle animation_state event."""
-        new_animating_state = event.data
-
+    async def new_animating_state(self, new_state: bool) -> None:
+        """Process animation start or end."""
         # Add important start/end block information as an event to the queue
-        self.animation_queue.append(
-            Event("animation_state", new_animating_state)
-        )
+        self.animation_queue.append(Event("animation_state", new_state))
 
-        if new_animating_state:
+        if new_state:
             return
 
         # Stopping, end of animation block
@@ -532,11 +517,20 @@ class GameBoard(sprite.Sprite):
             self.processing_animations = True
             await self.raise_event(Event("fire_next_animation", None))
 
-    # types: assignment error: Incompatible default for argument "_" (default has type "None", argument has type "Event[None]")
-    # types: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
-    # types: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
-    async def handle_fire_next_animation(self, _: Event[None] = None) -> None:
-        # types:                                                ^^^^
+    async def handle_animation_state(self, event: Event[bool]) -> None:
+        """Handle animation_state event."""
+        new_animating_state = event.data
+
+        await self.new_animating_state(new_animating_state)
+
+    async def handle_game_winner(self, _: Event[int] | None) -> None:
+        """Handle game_winner event."""
+        # Process end of final animation
+        await self.new_animating_state(False)
+
+    async def handle_fire_next_animation(
+        self, _: Event[None] | None = None
+    ) -> None:
         """Start next animation."""
         assert self.processing_animations
 
@@ -642,7 +636,7 @@ class GameBoard(sprite.Sprite):
         self,
         piece_type: int,
         position: Pos,
-        location: Pos | None = None,
+        location: Pos | Vector2 | None = None,
     ) -> str:
         """Add piece given type and position"""
         group = self.groups()[-1]
@@ -650,17 +644,13 @@ class GameBoard(sprite.Sprite):
         name = self.get_tile_name(*position)
 
         if location is None:
-            # types: assignment error: Incompatible types in assignment (expression has type "Vector2", variable has type "tuple[int, int] | None")
             location = self.get_tile_location(position)
-        # types:               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
         piece = Piece(
             piece_type=piece_type,
             position=position,
             position_name=name,
-            # types: arg-type error: Argument "location" to "Piece" has incompatible type "tuple[int, int] | None"; expected "tuple[int, int] | Vector2"
             location=location,
-            # types:     ^^^^^^^^
         )
         self.add_component(piece)
         group.add(piece)  # type: ignore[arg-type]
@@ -705,7 +695,7 @@ class GameBoard(sprite.Sprite):
                 ### Blit the id of the tile at the tile's location
                 ##surf.blit(
                 ##    render_text(
-                ##        trio.Path("data", "VeraSerif.ttf"),
+                ##        trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
                 ##        20,
                 ##        "".join(map(str, (x, y))),
                 ##        GREEN
@@ -818,7 +808,7 @@ class MrFloppy(sprite.Sprite):
         movement.speed = 200
 
         floppy: pygame.surface.Surface = pygame.image.load(
-            path.join("data", "mr_floppy.png")
+            path.join(path.dirname(__file__), "data", "mr_floppy.png")
         )
 
         image.add_images(
@@ -872,7 +862,9 @@ class FPSCounter(objects.Text):
     __slots__ = ()
 
     def __init__(self) -> None:
-        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+        font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+        )
         super().__init__("fps", font)
 
         self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
@@ -911,277 +903,6 @@ def generate_pieces(
                 piece_type = int(y <= z_to_1)
                 pieces[(x, y)] = piece_type
     return pieces
-
-
-def read_position(buffer: Buffer) -> Pos:
-    """Read a position tuple from buffer."""
-    pos_x = buffer.read_value(StructFormat.UBYTE)
-    pos_y = buffer.read_value(StructFormat.UBYTE)
-
-    return pos_x, pos_y
-
-
-def write_position(buffer: Buffer, pos: Pos) -> None:
-    """Write a position tuple to buffer."""
-    pos_x, pos_y = pos
-    buffer.write_value(StructFormat.UBYTE, pos_x)
-    buffer.write_value(StructFormat.UBYTE, pos_y)
-
-
-class GameClient(NetworkEventComponent):
-    """Game Client Network Event Component.
-
-    This class handles connecting to the game server, transmitting events
-    to the server, and reading and raising incoming events from the server."""
-
-    __slots__ = ()
-
-    def __init__(self, name: str) -> None:
-        super().__init__(name)
-
-        # Five seconds until timeout is generous, but it gives server end wiggle
-        # room.
-        self.timeout = 5
-
-        self.register_network_write_events(
-            {
-                "select_piece->server": 0,
-                "select_tile->server": 1,
-            }
-        )
-        self.register_read_network_events(
-            {
-                0: "no_actions->client",
-                1: "server->create_piece",
-                2: "server->select_piece",
-                3: "server->create_tile",
-                4: "server->delete_tile",
-                5: "server->delete_piece_animation",
-                6: "server->update_piece_animation",
-                7: "server->move_piece_animation",
-                8: "server->animation_state",
-                9: "server->game_over",
-                10: "server->action_complete",
-                11: "server->initial_config",
-            }
-        )
-
-    def bind_handlers(self) -> None:
-        super().bind_handlers()
-        self.register_handlers(
-            {
-                # "no_actions->client": self.print_no_actions,
-                "gameboard_piece_clicked": self.write_piece_click,
-                "gameboard_tile_clicked": self.write_tile_click,
-                "server->create_piece": self.read_create_piece,
-                "server->select_piece": self.read_select_piece,
-                "server->create_tile": self.read_create_tile,
-                "server->delete_tile": self.read_delete_tile,
-                "server->delete_piece_animation": self.read_delete_piece_animation,
-                "server->update_piece_animation": self.read_update_piece_animation,
-                "server->move_piece_animation": self.read_move_piece_animation,
-                "server->animation_state": self.read_animation_state,
-                "server->game_over": self.read_game_over,
-                "server->action_complete": self.read_action_complete,
-                "server->initial_config": self.read_initial_config,
-                "network_stop": self.handle_network_stop,
-                "client_connect": self.handle_client_connect,
-                "tick": self.handle_tick,
-            }
-        )
-
-    async def print_no_actions(self, event: Event[bytearray]) -> None:
-        """Print received `no_actions` event from server.
-
-        This event is used as a sort of keepalive heartbeat, because
-        it stops the connection from timing out."""
-        print(f"print_no_actions {event = }")
-
-    async def handle_tick(self, event: Event[dict[str, float]]) -> None:
-        """Raise events from server"""
-        if self.not_connected:
-            return
-        success, exception = await self.raise_event_from_read_network()
-        if success:
-            return
-
-        if isinstance(exception, trio.ClosedResourceError):
-            return
-
-        traceback.print_exception(exception)
-        message = "Failed to read event from server."
-        print(f"{self.__class__.__name__}: {message}")
-        await self.close()
-        await self.raise_event(Event("client_disconnected", message))
-
-    async def handle_client_connect(
-        self, event: Event[tuple[str, int]]
-    ) -> None:
-        """Have client connect to address specified in event"""
-        if not self.not_connected:
-            return
-        try:
-            await self.connect(*event.data)
-            return
-        except OSError as ex:
-            traceback.print_exception(ex)
-        message = "Error connecting to server."
-        print(f"{self.__class__.__name__}: {message}")
-        await self.close()
-        await self.raise_event(Event("client_disconnected", message))
-
-    async def read_create_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event from server"""
-        buffer = Buffer(event.data)
-
-        piece_pos = read_position(buffer)
-        piece_type = buffer.read_value(StructFormat.UBYTE)
-
-        await self.raise_event(
-            Event("gameboard_create_piece", (piece_pos, piece_type))
-        )
-
-    async def read_select_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event from server"""
-        buffer = Buffer(event.data)
-
-        piece_pos = read_position(buffer)
-        outline_value = buffer.read_value(StructFormat.BOOL)
-
-        await self.raise_event(
-            Event("gameboard_select_piece", (piece_pos, outline_value))
-        )
-
-    async def read_create_tile(self, event: Event[bytearray]) -> None:
-        """Read create_tile event from server"""
-        buffer = Buffer(event.data)
-
-        tile_pos = read_position(buffer)
-
-        await self.raise_event(Event("gameboard_create_tile", tile_pos))
-
-    async def read_delete_tile(self, event: Event[bytearray]) -> None:
-        """Read delete_tile event from server"""
-        buffer = Buffer(event.data)
-
-        tile_pos = read_position(buffer)
-
-        await self.raise_event(Event("gameboard_delete_tile", tile_pos))
-
-    async def write_piece_click(self, event: Event[tuple[Pos, int]]) -> None:
-        """Write piece click event to server"""
-        if self.not_connected:
-            return
-        piece_position, piece_type = event.data
-
-        buffer = Buffer()
-        write_position(buffer, piece_position)
-        buffer.write_value(StructFormat.UINT, piece_type)
-
-        await self.write_event(Event("select_piece->server", buffer))
-
-    async def write_tile_click(self, event: Event[Pos]) -> None:
-        """Write tile click event to server"""
-        tile_position = event.data
-
-        buffer = Buffer()
-        write_position(buffer, tile_position)
-
-        await self.write_event(Event("select_tile->server", buffer))
-
-    async def read_delete_piece_animation(
-        self, event: Event[bytearray]
-    ) -> None:
-        """Read delete_piece_animation event from server"""
-        buffer = Buffer(event.data)
-
-        tile_pos = read_position(buffer)
-
-        await self.raise_event(
-            Event("gameboard_delete_piece_animation", tile_pos)
-        )
-
-    async def read_update_piece_animation(
-        self, event: Event[bytearray]
-    ) -> None:
-        """Read update_piece_animation event from server"""
-        buffer = Buffer(event.data)
-
-        piece_pos = read_position(buffer)
-        piece_type = buffer.read_value(StructFormat.UBYTE)
-
-        await self.raise_event(
-            Event("gameboard_update_piece_animation", (piece_pos, piece_type))
-        )
-
-    async def read_move_piece_animation(self, event: Event[bytearray]) -> None:
-        """Read move_piece_animation event from server"""
-        buffer = Buffer(event.data)
-
-        piece_current_pos = read_position(buffer)
-        piece_new_pos = read_position(buffer)
-
-        await self.raise_event(
-            Event(
-                "gameboard_move_piece_animation",
-                (piece_current_pos, piece_new_pos),
-            )
-        )
-
-    async def read_animation_state(self, event: Event[bytearray]) -> None:
-        """Read animation_state event from server"""
-        buffer = Buffer(event.data)
-
-        animation_state = buffer.read_value(StructFormat.BOOL)
-
-        await self.raise_event(
-            Event("gameboard_animation_state", animation_state)
-        )
-
-    async def read_game_over(self, event: Event[bytearray]) -> None:
-        """Read update_piece event from server"""
-        buffer = Buffer(event.data)
-
-        winner = buffer.read_value(StructFormat.UBYTE)
-
-        await self.raise_event(Event("game_winner", winner))
-
-    async def read_action_complete(self, event: Event[bytearray]) -> None:
-        """Read action_complete event from server.
-
-        Sent when last action from client is done, great for AIs.
-        As of writing, not used for main client."""
-        buffer = Buffer(event.data)
-
-        from_pos = read_position(buffer)
-        to_pos = read_position(buffer)
-        current_turn = buffer.read_value(StructFormat.UBYTE)
-
-        await self.raise_event(
-            Event("game_action_complete", (from_pos, to_pos, current_turn))
-        )
-
-    async def read_initial_config(self, event: Event[bytearray]) -> None:
-        """Read initial_config event from server"""
-        buffer = Buffer(event.data)
-
-        board_size = read_position(buffer)
-        current_turn = buffer.read_value(StructFormat.UBYTE)
-
-        await self.raise_event(
-            Event("game_initial_config", (board_size, current_turn))
-        )
-
-    async def handle_network_stop(self, event: Event[None]) -> None:
-        """Send EOF if connected and close socket."""
-        if self.not_connected:
-            return
-        else:
-            await self.send_eof()
-        await self.close()
-
-    def __del__(self) -> None:
-        print(f"del {self.__class__.__name__}")
 
 
 class ServerClient(NetworkEventComponent):
@@ -1383,27 +1104,15 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->action_complete", buffer))
 
     async def handle_initial_config(
-        self, event: Event[tuple[Pos, Pos, int]]
+        self, event: Event[tuple[Pos, int]]
     ) -> None:
         """Read initial config event and reraise as server[write]->initial_config"""
-        # types: misc error: Too many values to unpack (2 expected, 3 provided)
         board_size, player_turn = event.data
-        # types:                          ^^^^^^^^^^
 
         buffer = Buffer()
 
-        # types: has-type error: Cannot determine type of "board_size"
         write_position(buffer, board_size)
-        # types:               ^^^^^^^^^^
-        # types: call-overload error: No overload variant of "write_value" of "BaseSyncWriter" matches argument types "StructFormat", "Any"
-        # types: note: Possible overload variants:
-        # types: note:     def write_value(self, Literal[StructFormat.BYTE, StructFormat.UBYTE, StructFormat.SHORT, StructFormat.USHORT, StructFormat.INT, StructFormat.UINT, StructFormat.LONG, StructFormat.ULONG, StructFormat.LONGLONG, StructFormat.ULONGLONG], int, /) -> None
-        # types: note:     def write_value(self, Literal[StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT], float, /) -> None
-        # types: note:     def write_value(self, Literal[StructFormat.BOOL], bool, /) -> None
-        # types: note:     def write_value(self, Literal[StructFormat.CHAR], str, /) -> None
-        # types: has-type error: Cannot determine type of "player_turn"
         buffer.write_value(StructFormat.UBYTE, player_turn)
-        # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
         await self.write_event(Event("server[write]->initial_config", buffer))
 
@@ -1498,28 +1207,26 @@ class GameServer(Server):
         """Stop serving and disconnect all NetworkEventComponents"""
         self.stop_serving()
         self.stop_advertising()
-        async with trio.open_nursery() as nursery:
-            for component in self.get_all_components():
-                if isinstance(component, NetworkEventComponent):
-                    nursery.start_soon(component.close)
+
+        close_methods: deque[Callable[[], Awaitable[Any]]] = deque()
         for component in self.get_all_components():
             if isinstance(component, NetworkEventComponent):
+                close_methods.append(component.close)
                 self.remove_component(component.name)
+        async with trio.open_nursery() as nursery:
+            while close_methods:
+                nursery.start_soon(close_methods.popleft())
 
     async def post_advertisement(
-        # types: valid-type error: Function "trio.socket.socket" is not valid as a type
-        # types: note: Perhaps you need "Callable[...]" or a callback protocol?
         self,
-        udp_socket: trio.socket.socket,
+        udp_socket: trio._socket._SocketType,
         hosting_port: int,
     ) -> None:
         """Post server advertisement packet."""
         advertisement = (
             f"[AD]{hosting_port}[/AD][CHECKERS][/CHECKERS]"
         ).encode()
-        # types: attr-defined error: trio.socket.socket? has no attribute "sendto"
         await udp_socket.sendto(advertisement, ("224.0.2.60", 4445))
-        # types: ^^^^^^^^^^^^^^
         ##        await udp_socket.sendto(advertisement, ("255.255.255.255", 4445))
         print("click")
 
@@ -1606,8 +1313,9 @@ class GameServer(Server):
 
     async def start_server(self, event: Event[None] | None = None) -> None:
         """Serve clients"""
-        print(f"{self.__class__.__name__}: starting server")
+        print(f"{self.__class__.__name__}: Closing old server clients")
         await self.stop_server()
+        print(f"{self.__class__.__name__}: Starting Server")
         self.client_count = 0
         port = PORT
         async with trio.open_nursery() as nursery:
@@ -1650,18 +1358,26 @@ class GameServer(Server):
         while True:
             try:
                 # print(f"{client.name} client_network_loop tick")
-                await client.write_event(
-                    Event("server[write]->no_actions", bytearray())
-                )
-                (
-                    success,
-                    exception,
-                ) = await client.raise_event_from_read_network()
-                if isinstance(exception, TimeoutException):
-                    continue
-                # traceback.print_exception(exception)
-                if not success:
+                try:
+                    await client.write_event(
+                        Event("server[write]->no_actions", bytearray())
+                    )
+                except (
+                    trio.BrokenResourceError,
+                    trio.ClosedResourceError,
+                    RuntimeError,
+                ):
                     break
+                except Exception as exc:
+                    traceback.print_exception(exc)
+                    break
+                try:
+                    event = await client.read_event()
+                except TimeoutException:
+                    continue
+                else:
+                    await client.raise_event(event)
+                # traceback.print_exception(exception)
             except (trio.ClosedResourceError, trio.BrokenResourceError):
                 break
 
@@ -1810,19 +1526,23 @@ class GameServer(Server):
         )
 
     async def handle_action_animations(
-        self, actions: deque[tuple[str, Iterable[Pos]]]
+        self, actions: deque[tuple[str, Iterable[Pos | int]]]
     ) -> None:
         """Handle action animations"""
         while actions:
             name, params = actions.popleft()
             if name == "move":
-                await self.handle_move_animation(*params)
+                await self.handle_move_animation(
+                    *cast("Iterable[Pos]", params)
+                )
             elif name == "jump":
-                await self.handle_jump_animation(*params)
+                await self.handle_jump_animation(
+                    *cast("Iterable[Pos]", params)
+                )
             elif name == "king":
-                # types: arg-type error: Argument 1 to "handle_king_animation" of "GameServer" has incompatible type "*Iterable[tuple[int, int]]"; expected "int"
-                await self.handle_king_animation(*params)
-            # types:                              ^^^^^^
+                await self.handle_king_animation(
+                    *cast("tuple[Pos, int]", params)
+                )
             else:
                 raise NotImplementedError(f"Animation for action {name}")
 
@@ -1862,7 +1582,6 @@ class GameServer(Server):
             return
 
         self.players_can_interact = False  # No one moves during animation
-
         # Send animation state start event
         await self.raise_event(Event("animation_state->network", True))
 
@@ -1880,9 +1599,7 @@ class GameServer(Server):
         self.state = new_state
 
         # Send action animations
-        # types: arg-type error: Argument 1 to "handle_action_animations" of "GameServer" has incompatible type "deque[tuple[str, Iterable[tuple[int, int] | int]]]"; expected "deque[tuple[str, Iterable[tuple[int, int]]]]"
         await self.handle_action_animations(action_queue)
-        # types:                                    ^^^^^^^^^^^^
 
         # Send action complete event
         await self.raise_event(
@@ -1892,8 +1609,6 @@ class GameServer(Server):
             )
         )
 
-        await self.raise_event(Event("animation_state->network", False))
-
         win_value = self.state.check_for_win()
         if win_value is not None:
             # If we have a winner, send game over event.
@@ -1902,6 +1617,7 @@ class GameServer(Server):
 
         # If not game over, allow interactions so next player can take turn
         self.players_can_interact = True
+        await self.raise_event(Event("animation_state->network", False))
 
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")
@@ -1938,10 +1654,9 @@ async def find_ip() -> str:
     return candidates[0]
 
 
-# types: return error: Missing return statement
 async def read_advertisements(
     network_adapter: str | None = None, timeout: int = 3
-) -> list[tuple[str, int]]:
+) -> list[tuple[str, str, int]]:
     """Read server advertisements from network."""
     if network_adapter is None:
         network_adapter = await find_ip()
@@ -1988,37 +1703,38 @@ async def read_advertisements(
         )
 
         buffer = b""
+        address = ""
         with trio.move_on_after(timeout):
             buffer, address = await udp_socket.recvfrom(32)
             print(f"{buffer = }")
             print(f"{address = }")
-    print("post close")
 
+        response: list[tuple[str, str, int]] = []
 
-##        response: list[tuple[str, int]] = []
-##
-##        start = 0
-##        while True:
-##            start_block = buffer.find(b'[CHECKERS]', start)
-##            if start_block == -1:
-##                break
-##            start_end = buffer.find(b'[/CHECKERS]', start_block)
-##            if start_end == -1:
-##                break
-##            ad_start = buffer.find(b'[AD]', start_end)
-##            if ad_start == -1:
-##                break
-##            ad_end = buffer.find(b'[AD]', ad_start)
-##            if ad_end == -1:
-##                break
-##
-##            start = ad_end
-##            response.append((
-##                buffer[start_block+10:start_end],
-##                address,
-##                buffer[ad_start+4:ad_end]
-##            ))
-##        return response
+        start = 0
+        while True:
+            ad_start = buffer.find(b"[AD]", start)
+            if ad_start == -1:
+                break
+            ad_end = buffer.find(b"[AD]", ad_start)
+            if ad_end == -1:
+                break
+            start_block = buffer.find(b"[CHECKERS]", ad_end)
+            if start_block == -1:
+                break
+            start_end = buffer.find(b"[/CHECKERS]", start_block)
+            if start_end == -1:
+                break
+
+            start = ad_end
+            response.append(
+                (
+                    buffer[start_block + 10 : start_end].decode("utf-8"),
+                    address,
+                    buffer[ad_start + 4 : ad_end].decode("utf-8"),
+                )
+            )
+        return response
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -2065,7 +1781,7 @@ class GameState(AsyncState["CheckersClient"]):
 
     def change_state(
         self, new_state: str | None
-    ) -> Callable[[], Awaitable[None]]:
+    ) -> Callable[[Event[Any]], Awaitable[None]]:
         """Return an async function that will change state to `new_state`"""
 
         async def set_state(*args: object, **kwargs: object) -> None:
@@ -2117,14 +1833,16 @@ class TitleState(GameState):
         assert self.machine is not None
         self.id = self.machine.new_group("title")
 
-        button_font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
-        title_font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 56)
+        button_font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+        )
+        title_font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 56
+        )
 
         title_text = OutlinedText("title_text", title_font)
         title_text.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        title_text.color = (0, 0, 0)
-        # types:           ^^^^^^^^^
+        title_text.color = Color(0, 0, 0)
         title_text.outline = (255, 0, 0)
         title_text.border_width = 4
         title_text.text = "CHECKERS"
@@ -2133,54 +1851,32 @@ class TitleState(GameState):
 
         hosting_button = Button("hosting_button", button_font)
         hosting_button.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        hosting_button.color = (0, 0, 0)
-        # types:               ^^^^^^^^^
+        hosting_button.color = Color(0, 0, 0)
         hosting_button.text = "Host Networked Game"
         hosting_button.location = [x // 2 for x in SCREEN_SIZE]
-        # types: method-assign error: Cannot assign to a method
-        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         hosting_button.handle_click = self.change_state("play_hosting")
-        # types: ^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(hosting_button)
 
         join_button = Button("join_button", button_font)
         join_button.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        join_button.color = (0, 0, 0)
-        # types:            ^^^^^^^^^
+        join_button.color = Color(0, 0, 0)
         join_button.text = "Join Networked Game"
-        # types: operator error: No overload variant of "__add__" of "list" matches argument type "tuple[int, int]"
-        # types: note: Possible overload variants:
-        # types: note:     def __add__(self, list[Any], /) -> list[Any]
-        # types: note:     def [_S] __add__(self, list[_S], /) -> list[_S | Any]
         join_button.location = hosting_button.location + (  # noqa: RUF005
-            # types:           ^
             0,
             hosting_button.rect.h + 10,
         )
-        # types: method-assign error: Cannot assign to a method
-        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         join_button.handle_click = self.change_state("play_joining")
-        # types: ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(join_button)
 
         internal_button = Button("internal_hosting", button_font)
         internal_button.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        internal_button.color = (0, 0, 0)
-        # types:                ^^^^^^^^^
+        internal_button.color = Color(0, 0, 0)
         internal_button.text = "Singleplayer Game"
-        # types: operator error: Unsupported left operand type for - ("list[Any]")
         internal_button.location = hosting_button.location - (
-            # types:               ^
             0,
             hosting_button.rect.h + 10,
         )
-        # types: method-assign error: Cannot assign to a method
-        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         internal_button.handle_click = self.change_state(
-            # types: ^^^^^^^^^^^^^^^   ^
             "play_internal_hosting"
         )
         self.group_add(internal_button)
@@ -2295,60 +1991,45 @@ class PlayState(GameState):
         winner = event.data
         # print(f"Player {PLAYERS[winner]} ({winner}) Won")
 
-        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+        font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+        )
 
         continue_button = Button("continue_button", font)
         continue_button.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        continue_button.color = (0, 0, 0)
-        # types:                ^^^^^^^^^
+        continue_button.color = Color(0, 0, 0)
         continue_button.text = f"{PLAYERS[winner]} Won - Return to Title"
         continue_button.location = [x // 2 for x in SCREEN_SIZE]
-        # types: method-assign error: Cannot assign to a method
-        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         continue_button.handle_click = self.change_state("title")
-        # types: ^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(continue_button)
 
         # Fire server stop event so server shuts down if it exists
-        # types: union-attr error: Item "None" of "CheckersClient | None" has no attribute "raise_event"
+        assert self.machine is not None
         await self.machine.raise_event(Event("network_stop", None))
-
-    # types:      ^^^^^^^^^^^^^^^^^^^^^^^^
 
     async def handle_client_disconnected(self, event: Event[str]) -> None:
         """Handle client disconnected error."""
         print("handle_client_disconnected")
         error = event.data
 
-        font = pygame.font.Font(trio.Path("data", "VeraSerif.ttf"), 28)
+        font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+        )
 
         title_button = Button("title_button", font)
         title_button.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        title_button.color = (0, 0, 0)
-        # types:             ^^^^^^^^^
+        title_button.color = Color(0, 0, 0)
         title_button.text = "Client Disconnected - Return to Title"
         title_button.location = [x // 2 for x in SCREEN_SIZE]
-        # types: method-assign error: Cannot assign to a method
-        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         title_button.handle_click = self.change_state("title")
-        # types: ^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(title_button)
 
         error_text = OutlinedText("error_text", font)
         error_text.visible = True
-        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
-        error_text.color = (255, 0, 0)
-        # types:           ^^^^^^^^^^^
+        error_text.color = Color(255, 0, 0)
         error_text.border_width = 1
         error_text.text = error
-        # types: operator error: No overload variant of "__add__" of "list" matches argument type "tuple[int, int]"
-        # types: note: Possible overload variants:
-        # types: note:     def __add__(self, list[Any], /) -> list[Any]
-        # types: note:     def [_S] __add__(self, list[_S], /) -> list[_S | Any]
         error_text.location = title_button.location + (  # noqa: RUF005
-            # types:          ^
             0,
             title_button.rect.h + 10,
         )
@@ -2356,14 +2037,8 @@ class PlayState(GameState):
         self.group_add(error_text)
 
         # Fire server stop event so server shuts down if it exists
-        # types: union-attr error: Item "None" of "CheckersClient | None" has no attribute "raise_event"
-        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
-        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
-        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
+        assert self.machine is not None
         await self.machine.raise_event(Event("network_stop", None))
-
-
-# types:      ^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 class CheckersClient(sprite.GroupProcessor):
@@ -2416,7 +2091,7 @@ async def async_run() -> None:
         client = CheckersClient(event_manager)
 
         background = pygame.image.load(
-            path.join("data", "background.png")
+            path.join(path.dirname(__file__), "data", "background.png")
         ).convert()
         client.clear(screen, background)
 
@@ -2474,7 +2149,8 @@ def run() -> None:
     trio.run(async_run)
 
 
-if __name__ == "__main__":
+def cli_run() -> None:
+    "Start game"
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
 
     # If we're not imported as a module, run.
@@ -2494,3 +2170,7 @@ if __name__ == "__main__":
         run()
     finally:
         pygame.quit()
+
+
+if __name__ == "__main__":
+    cli_run()

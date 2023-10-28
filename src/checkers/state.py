@@ -2,23 +2,28 @@
 
 # Programmed by CoolCat467
 
+from __future__ import annotations
+
 __title__ = "Checkers State"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+
 import copy
 import math
-from collections.abc import Generator
-from typing import Any, NamedTuple, Self, TypeVar, cast
+from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar, cast
 
-# Player:
-# 0 = False = Red   = MIN = 0, 2
-# 1 = True  = Black = MAX = 1, 3
+if TYPE_CHECKING:
+    from collections.abc import Generator
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
 # .........
 # A1 ... H1
+
+# Player:
+# 0 = False = Red   = MIN = 0, 2
+# 1 = True  = Black = MAX = 1, 3
 
 T = TypeVar("T")
 
@@ -260,6 +265,17 @@ class State:
         _, h = self.size
         return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
 
+    @staticmethod
+    def get_enemy_piece_types(piece_type: int) -> tuple[int, int]:
+        """Return enemy piece types of given piece type."""
+        # If we are kinged, get a pawn version of ourselves.
+        # Take that plus one mod 2 to get the pawn of the enemy
+        enemy_pawn = (piece_type + 1) % 2
+        # Then get the pawn and the king in a list so we can see if a piece
+        # is our enemy
+        enemy_pieces = (enemy_pawn, enemy_pawn + 2)
+        return enemy_pieces
+
     def get_jumps(
         self,
         position: Pos,
@@ -282,12 +298,7 @@ class State:
             _pieces = self.pieces
         _pieces = copy.deepcopy(_pieces)
 
-        # If we are kinged, get a pawn version of ourselves.
-        # Take that plus one mod 2 to get the pawn of the enemy
-        enemy_pawn = (piece_type + 1) % 2
-        # Then get the pawn and the king in a list so we can see if a piece
-        # is our enemy
-        enemy_pieces = {enemy_pawn, enemy_pawn + 2}
+        enemy_pieces = self.get_enemy_piece_types(piece_type)
 
         # Get the side choordinates of the tile and make them tuples so
         # the scan later works properly.
@@ -405,7 +416,7 @@ class State:
             else:
                 # Continued without break, so player either has no moves
                 # or no possible moves, so their opponent wins
-                return (player + 1) % 2
+                return ((player + 1) % 2) == self.turn
         return None
 
     def can_player_select_piece(self, player: int, tile_pos: Pos) -> bool:

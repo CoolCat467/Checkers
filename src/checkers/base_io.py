@@ -12,7 +12,7 @@ from enum import Enum
 from itertools import count
 from typing import TYPE_CHECKING, Literal, TypeAlias, TypeVar, overload
 
-from checkers.utils import from_twos_complement, to_twos_complement
+from .utils import from_twos_complement, to_twos_complement
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable

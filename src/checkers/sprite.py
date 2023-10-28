@@ -5,8 +5,9 @@
 
 # Programmed by CoolCat467
 
-from collections.abc import Iterable, Iterator
-from typing import Any, ClassVar, NamedTuple, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, cast
 
 import trio
 from pygame.color import Color
@@ -16,9 +17,12 @@ from pygame.rect import Rect
 from pygame.sprite import DirtySprite, LayeredDirty, LayeredUpdates
 from pygame.surface import Surface
 
-from checkers.component import Component, ComponentManager, Event
-from checkers.statemachine import AsyncStateMachine
-from checkers.vector import Vector2
+from .component import Component, ComponentManager, Event
+from .statemachine import AsyncStateMachine
+from .vector import Vector2
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable, Iterator
 
 __title__ = "Client Sprite"
 __author__ = "CoolCat467"
@@ -238,21 +242,22 @@ class OutlineComponent(Component):
 
     def set_color(self, color: Color | None) -> None:
         "Set color. If None, disable, otherwise enable."
+        manager = cast(ImageComponent, self.manager)
         prev = self.active
         self.__active = color is not None
         if color is None:
             if prev:
-                search = str(self.manager.set_surface).split(self.mod)[0]
-                for term in self.manager.list_images():
+                search = str(manager.set_surface).split(self.mod)[0]
+                for term in manager.list_images():
                     if term == search or str(term) == search:
                         break
                 else:
                     return
-                self.manager.set_image(term)
+                manager.set_image(term)
             return
         self.__color = color
-        assert self.manager.set_surface is not None
-        self.manager.set_image(self.manager.set_surface)
+        assert manager.set_surface is not None
+        manager.set_image(manager.set_surface)
 
     def get_outline_discriptor(self, identifier: str | int) -> str:
         "Return outlined identifier for given original identifier"
@@ -261,11 +266,13 @@ class OutlineComponent(Component):
 
     def save_outline(self, identifier: str | int) -> None:
         "Save outlined version of given identifier image"
+        manager = cast(ImageComponent, self.manager)
+
         outlined = self.get_outline_discriptor(identifier)
-        if self.manager.image_exists(outlined):
+        if manager.image_exists(outlined):
             return
 
-        surface = self.manager.get_image(identifier)
+        surface = manager.get_image(identifier)
 
         w, h = surface.get_size()
 
@@ -282,14 +289,14 @@ class OutlineComponent(Component):
         surf.fill(Color(0, 0, 0, 0))
 
         surf.lock()
-        for ox, oy in self.manager.get_mask(identifier).outline():
+        for ox, oy in manager.get_mask(identifier).outline():
             for x in range(diameter + 1):
                 for y in range(diameter + 1):
                     surf.set_at((ox + x, oy + y), self.__color)
         surf.unlock()
         surf.blit(surface, (radius, radius))
 
-        self.manager.add_image(outlined, surf)
+        manager.add_image(outlined, surf)
 
     def get_outline(self, identifier: str | int) -> str:
         "Get saved outline effect identifier"
@@ -309,7 +316,9 @@ class OutlineComponent(Component):
         self, color: Color | tuple[int, int, int]
     ) -> None:
         "Precalculate all images outlined"
-        for image in self.manager.list_images():
+        manager = cast(ImageComponent, self.manager)
+
+        for image in manager.list_images():
             self.precalculate_outline(image, color)
 
 
@@ -328,8 +337,9 @@ class AnimationComponent(Component):
         super().__init__("animation")
 
         def default() -> Iterator[int | str | None]:
+            manager = cast(ImageComponent, self.manager)
             while True:
-                yield self.manager.set_surface
+                yield manager.set_surface
 
         self.controller: Iterator[int | str | None] = default()
 
@@ -353,7 +363,8 @@ class AnimationComponent(Component):
             for _ in range(int(updates)):
                 new = self.fetch_controller_new_state()
         if new is not None:
-            self.manager.set_image(new)
+            manager = cast(ImageComponent, self.manager)
+            manager.set_image(new)
 
     def bind_handlers(self) -> None:
         "Bind tick handler"

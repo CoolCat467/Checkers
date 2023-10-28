@@ -154,7 +154,7 @@ class ComponentManager(Component):
         "Add this manager as component to self without binding."
         if self.component_exists(name):
             raise ValueError(f'Component named "{name}" already exists!')
-        self.__components[name] = self  # type: ignore[assignment]
+        self.__components[name] = self
 
     def register_handler(
         self,
