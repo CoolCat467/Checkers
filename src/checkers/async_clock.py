@@ -33,7 +33,7 @@ class Clock:
         self.fps_count = 0
 
     def __repr__(self) -> str:
-        return f"<Clock({self.fps:2f})>"
+        return f"<{self.__class__.__name__}({self.fps:2f})>"
 
     def get_fps(self) -> float:
         "compute the clock framerate"
@@ -49,7 +49,10 @@ class Clock:
 
     async def tick(self, framerate: int = 0) -> int:
         "update the clock"
-        endtime = 1000 // framerate
+        if framerate > 0:
+            endtime = 1000 // framerate
+        else:
+            endtime = 0
         self.rawpassed = pygame.time.get_ticks() - self.last_tick
         delay = endtime - self.rawpassed
         if delay > 0:
@@ -63,12 +66,12 @@ class Clock:
         if not self.fps_tick:
             self.fps_count = 0
             self.fps_tick = nowtime
-        elif self.fps_count >= 10:
+        if self.fps_count >= 10:
             self.fps = self.fps_count / ((nowtime - self.fps_tick) / 1000)
             self.fps_count = 0
             self.fps_tick = nowtime
         return self.timepassed
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")

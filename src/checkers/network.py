@@ -22,8 +22,9 @@ from typing import (
 )
 
 import trio
-from base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
-from component import Component, ComponentManager, Event
+
+from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
+from checkers.component import Component, ComponentManager, Event
 
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 

@@ -8,12 +8,14 @@ __license__ = "LGPL-3.0-only"
 
 import struct
 from abc import ABC, abstractmethod
-from collections.abc import Awaitable, Callable
 from enum import Enum
 from itertools import count
-from typing import Literal, TypeAlias, TypeVar, overload
+from typing import TYPE_CHECKING, Literal, TypeAlias, TypeVar, overload
 
-from utils import from_twos_complement, to_twos_complement
+from checkers.utils import from_twos_complement, to_twos_complement
+
+if TYPE_CHECKING:
+    from collections.abc import Awaitable, Callable
 
 __all__ = [
     "BaseAsyncReader",
@@ -56,35 +58,22 @@ class StructFormat(str, Enum):
     ULONGLONG = "Q"
 
 
-INT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.BYTE] | (
-    Literal[StructFormat.UBYTE]
-    | (
-        Literal[StructFormat.SHORT]
-        | (
-            Literal[StructFormat.USHORT]
-            | (
-                Literal[StructFormat.INT]
-                | (
-                    Literal[StructFormat.UINT]
-                    | (
-                        Literal[StructFormat.LONG]
-                        | (
-                            Literal[StructFormat.ULONG]
-                            | (
-                                Literal[StructFormat.LONGLONG]
-                                | Literal[StructFormat.ULONGLONG]
-                            )
-                        )
-                    )
-                )
-            )
-        )
-    )
-)
+INT_FORMATS_TYPE: TypeAlias = Literal[
+    StructFormat.BYTE,
+    StructFormat.UBYTE,
+    StructFormat.SHORT,
+    StructFormat.USHORT,
+    StructFormat.INT,
+    StructFormat.UINT,
+    StructFormat.LONG,
+    StructFormat.ULONG,
+    StructFormat.LONGLONG,
+    StructFormat.ULONGLONG,
+]
 
-FLOAT_FORMATS_TYPE: TypeAlias = Literal[StructFormat.FLOAT] | (
-    Literal[StructFormat.DOUBLE] | Literal[StructFormat.HALFFLOAT]
-)
+FLOAT_FORMATS_TYPE: TypeAlias = Literal[
+    StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT
+]
 
 # endregion
 

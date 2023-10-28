@@ -9,13 +9,16 @@ __title__ = "2d Game Base Module"
 __version__ = "0.0.1"
 
 import math
-from collections.abc import Callable, Iterable, Sequence
-from typing import Any, TypeVar, cast
+from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import pygame
-import sprite
-from statemachine import StateMachine
-from vector import Vector2
+
+from checkers import sprite
+from checkers.statemachine import StateMachine
+from checkers.vector import Vector2
+
+if TYPE_CHECKING:
+    from collections.abc import Callable, Iterable, Sequence
 
 
 def amol(

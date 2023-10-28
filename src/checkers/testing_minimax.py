@@ -1,4 +1,4 @@
-import MiniMax_AI as ai
+import checkers.MiniMax_AI as ai
 
 
 def generate_pieces(board_size: tuple[int, int]) -> dict[tuple[int, int], int]:

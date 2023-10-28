@@ -21,35 +21,50 @@
 # .........
 # A1 ... H1
 
-# from __future__ import annotations
+from __future__ import annotations
 
 import os
+import platform
 import random
+import struct
 import traceback
 from collections import deque
-from collections.abc import Awaitable, Callable, Generator, Iterable, Sequence
 from functools import partial
 from os import path
-from typing import Any, TypeVar
+from typing import TYPE_CHECKING, Any, TypeVar
 
-import base2d
-import objects
 import pygame
-import sprite
 import trio
-from async_clock import Clock
-from base_io import StructFormat
-from buffer import Buffer
-from component import Component, ComponentManager, Event, ExternalRaiseManager
-from network import NetworkEventComponent, Server, TimeoutException
-from objects import Button, OutlinedText
-from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
-from pygame.surface import Surface
-from state import ActionSet, State
-from statemachine import AsyncState
-from vector import Vector2
+
+from checkers import base2d, objects, sprite
+from checkers.async_clock import Clock
+from checkers.base_io import StructFormat
+from checkers.buffer import Buffer
+from checkers.component import (
+    Component,
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
+)
+from checkers.network import NetworkEventComponent, Server, TimeoutException
+from checkers.objects import Button, OutlinedText
+from checkers.state import ActionSet, State
+from checkers.statemachine import AsyncState
+from checkers.vector import Vector2
+
+if TYPE_CHECKING:
+    from collections.abc import (
+        Awaitable,
+        Callable,
+        Generator,
+        Iterable,
+        Sequence,
+    )
+
+    from pygame.color import Color
+    from pygame.surface import Surface
 
 __title__ = "Checkers"
 __version__ = "0.0.5"
@@ -57,7 +72,7 @@ __author__ = "CoolCat467"
 
 SCREEN_SIZE = (640, 480)
 
-FPS = 60
+FPS = 48
 VSYNC = True
 PORT = 31613
 
@@ -75,6 +90,8 @@ WHITE = (255, 255, 255)
 
 
 T = TypeVar("T")
+
+IS_WINDOWS = platform.system() == "Windows"
 
 Pos = tuple[int, int]
 
@@ -360,7 +377,7 @@ class GameBoard(sprite.Sprite):
 
         self.pieces: dict[Pos, int] = {}
 
-        self.animation_queue: deque[Event] = deque()
+        self.animation_queue: deque[Event[object]] = deque()
         self.processing_animations = False
 
     def get_tile_name(self, x: int, y: int) -> str:
@@ -482,7 +499,9 @@ class GameBoard(sprite.Sprite):
         self.add_piece(
             self.pieces.pop(from_pos),  # Same type as parent
             to_pos,
+            # types: arg-type error: Argument 3 to "add_piece" of "GameBoard" has incompatible type "Vector2"; expected "tuple[int, int] | None"
             self.get_tile_location(from_pos),
+            # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^
         )
 
         await self.raise_event(Event(f"destroy_piece_{from_name}", None))
@@ -513,7 +532,11 @@ class GameBoard(sprite.Sprite):
             self.processing_animations = True
             await self.raise_event(Event("fire_next_animation", None))
 
+    # types: assignment error: Incompatible default for argument "_" (default has type "None", argument has type "Event[None]")
+    # types: note: PEP 484 prohibits implicit Optional. Accordingly, mypy has changed its default to no_implicit_optional=True
+    # types: note: Use https://github.com/hauntsaninja/no_implicit_optional to automatically upgrade your codebase
     async def handle_fire_next_animation(self, _: Event[None] = None) -> None:
+        # types:                                                ^^^^
         """Start next animation."""
         assert self.processing_animations
 
@@ -627,13 +650,17 @@ class GameBoard(sprite.Sprite):
         name = self.get_tile_name(*position)
 
         if location is None:
+            # types: assignment error: Incompatible types in assignment (expression has type "Vector2", variable has type "tuple[int, int] | None")
             location = self.get_tile_location(position)
+        # types:               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
         piece = Piece(
             piece_type=piece_type,
             position=position,
             position_name=name,
+            # types: arg-type error: Argument "location" to "Piece" has incompatible type "tuple[int, int] | None"; expected "tuple[int, int] | Vector2"
             location=location,
+            # types:     ^^^^^^^^
         )
         self.add_component(piece)
         group.add(piece)  # type: ignore[arg-type]
@@ -1002,7 +1029,6 @@ class GameClient(NetworkEventComponent):
         print(f"{self.__class__.__name__}: {message}")
         await self.close()
         await self.raise_event(Event("client_disconnected", message))
-        print("post raise")
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server"""
@@ -1360,12 +1386,24 @@ class ServerClient(NetworkEventComponent):
         self, event: Event[tuple[Pos, Pos, int]]
     ) -> None:
         """Read initial config event and reraise as server[write]->initial_config"""
+        # types: misc error: Too many values to unpack (2 expected, 3 provided)
         board_size, player_turn = event.data
+        # types:                          ^^^^^^^^^^
 
         buffer = Buffer()
 
+        # types: has-type error: Cannot determine type of "board_size"
         write_position(buffer, board_size)
+        # types:               ^^^^^^^^^^
+        # types: call-overload error: No overload variant of "write_value" of "BaseSyncWriter" matches argument types "StructFormat", "Any"
+        # types: note: Possible overload variants:
+        # types: note:     def write_value(self, Literal[StructFormat.BYTE, StructFormat.UBYTE, StructFormat.SHORT, StructFormat.USHORT, StructFormat.INT, StructFormat.UINT, StructFormat.LONG, StructFormat.ULONG, StructFormat.LONGLONG, StructFormat.ULONGLONG], int, /) -> None
+        # types: note:     def write_value(self, Literal[StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT], float, /) -> None
+        # types: note:     def write_value(self, Literal[StructFormat.BOOL], bool, /) -> None
+        # types: note:     def write_value(self, Literal[StructFormat.CHAR], str, /) -> None
+        # types: has-type error: Cannot determine type of "player_turn"
         buffer.write_value(StructFormat.UBYTE, player_turn)
+        # types: ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
         await self.write_event(Event("server[write]->initial_config", buffer))
 
@@ -1469,13 +1507,21 @@ class GameServer(Server):
                 self.remove_component(component.name)
 
     async def post_advertisement(
-        self, udp_socket: trio.socket.socket, hosting_port: int
+        # types: valid-type error: Function "trio.socket.socket" is not valid as a type
+        # types: note: Perhaps you need "Callable[...]" or a callback protocol?
+        self,
+        udp_socket: trio.socket.socket,
+        hosting_port: int,
     ) -> None:
         """Post server advertisement packet."""
         advertisement = (
-            f"[CHECKERS][/CHECKERS][AD]{hosting_port}[/AD]"
+            f"[AD]{hosting_port}[/AD][CHECKERS][/CHECKERS]"
         ).encode()
+        # types: attr-defined error: trio.socket.socket? has no attribute "sendto"
         await udp_socket.sendto(advertisement, ("224.0.2.60", 4445))
+        # types: ^^^^^^^^^^^^^^
+        ##        await udp_socket.sendto(advertisement, ("255.255.255.255", 4445))
+        print("click")
 
     def stop_advertising(self) -> None:
         """Cancel self.advertisement_scope"""
@@ -1485,17 +1531,35 @@ class GameServer(Server):
 
     async def post_advertisements(self, hosting_port: int) -> None:
         """Post lan UDP packets so server can be found."""
-        udp_socket = trio.socket.socket(
-            family=trio.socket.AF_INET,  # IPv4
-            type=trio.socket.SOCK_DGRAM,  # UDP
-        )
-
         self.stop_advertising()
         self.advertisement_scope = trio.CancelScope()
-        with self.advertisement_scope:
-            while not self.can_start():
-                await self.post_advertisement(udp_socket, hosting_port)
-                await trio.sleep(1.5)
+        with trio.socket.socket(
+            family=trio.socket.AF_INET,  # IPv4
+            type=trio.socket.SOCK_DGRAM,  # UDP
+            proto=trio.socket.IPPROTO_UDP,  # UDP
+        ) as udp_socket:
+            udp_socket.setsockopt(
+                trio.socket.SOL_SOCKET, trio.socket.SO_BROADCAST, 1
+            )
+            # for all packets sent, after two hops on the network the packet will not
+            # be re-sent/broadcast (see https://www.tldp.org/HOWTO/Multicast-HOWTO-6.html)
+            ##            udp_socket.setsockopt(
+            ##                trio.socket.IPPROTO_IP,
+            ##                trio.socket.IP_MULTICAST_TTL,
+            ##                2,
+            ##            )
+            with self.advertisement_scope:
+                while not self.can_start():
+                    try:
+                        await self.post_advertisement(udp_socket, hosting_port)
+                        await read_advertisements()
+                    except OSError as exc:
+                        traceback.print_exception(exc)
+                        print(
+                            f"{self.__class__.__name__}: Failed to post server advertisement"
+                        )
+                        break
+                    await trio.sleep(1.5)
 
     def setup_teams_internal(self, client_ids: list[int]) -> dict[int, int]:
         """Setup teams for internal server mode from sorted client ids."""
@@ -1595,6 +1659,7 @@ class GameServer(Server):
                 ) = await client.raise_event_from_read_network()
                 if isinstance(exception, TimeoutException):
                     continue
+                # traceback.print_exception(exception)
                 if not success:
                     break
             except (trio.ClosedResourceError, trio.BrokenResourceError):
@@ -1755,7 +1820,9 @@ class GameServer(Server):
             elif name == "jump":
                 await self.handle_jump_animation(*params)
             elif name == "king":
+                # types: arg-type error: Argument 1 to "handle_king_animation" of "GameServer" has incompatible type "*Iterable[tuple[int, int]]"; expected "int"
                 await self.handle_king_animation(*params)
+            # types:                              ^^^^^^
             else:
                 raise NotImplementedError(f"Animation for action {name}")
 
@@ -1813,7 +1880,9 @@ class GameServer(Server):
         self.state = new_state
 
         # Send action animations
+        # types: arg-type error: Argument 1 to "handle_action_animations" of "GameServer" has incompatible type "deque[tuple[str, Iterable[tuple[int, int] | int]]]"; expected "deque[tuple[str, Iterable[tuple[int, int]]]]"
         await self.handle_action_animations(action_queue)
+        # types:                                    ^^^^^^^^^^^^
 
         # Send action complete event
         await self.raise_event(
@@ -1837,6 +1906,119 @@ class GameServer(Server):
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")
         super().__del__()
+
+
+# Stolen from WOOF (Web Offer One File), Copyright (C) 2004-2009 Simon Budig,
+# available at http://www.home.unix-ag.org/simon/woof
+# with modifications
+
+# Utility function to guess the IP (as a string) where the server can be
+# reached from the outside. Quite nasty problem actually.
+
+
+async def find_ip() -> str:
+    """Guess the IP where the server can be found from the network."""
+    # we get a UDP-socket for the TEST-networks reserved by IANA.
+    # It is highly unlikely, that there is special routing used
+    # for these networks, hence the socket later should give us
+    # the IP address of the default route.
+    # We're doing multiple tests, to guard against the computer being
+    # part of a test installation.
+
+    candidates: list[str] = []
+    for test_ip in ("192.0.2.0", "198.51.100.0", "203.0.113.0"):
+        sock = trio.socket.socket(trio.socket.AF_INET, trio.socket.SOCK_DGRAM)
+        await sock.connect((test_ip, 80))
+        ip_addr: str = sock.getsockname()[0]
+        sock.close()
+        if ip_addr in candidates:
+            return ip_addr
+        candidates.append(ip_addr)
+
+    return candidates[0]
+
+
+# types: return error: Missing return statement
+async def read_advertisements(
+    network_adapter: str | None = None, timeout: int = 3
+) -> list[tuple[str, int]]:
+    """Read server advertisements from network."""
+    if network_adapter is None:
+        network_adapter = await find_ip()
+    with trio.socket.socket(
+        family=trio.socket.AF_INET,  # IPv4
+        type=trio.socket.SOCK_DGRAM,  # UDP
+        proto=trio.socket.IPPROTO_UDP,
+    ) as udp_socket:
+        # SO_REUSEADDR: allows binding to port potentially already in use
+        udp_socket.setsockopt(
+            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1
+        )
+
+        ##        udp_socket.setsockopt(
+        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 32
+        ##        )
+        ##        udp_socket.setsockopt(
+        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_LOOP,
+        ##            1
+        ##        )
+        # linux binds to multicast address, windows to interface address
+        ##        ip_bind = network_adapter if IS_WINDOWS else "224.0.2.60"
+        ip_bind = ""
+        await udp_socket.bind((ip_bind, 4445))
+
+        ##        # Tell the kernel that we are a multicast socket
+        ##        udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
+
+        # socket.IPPROTO_IP works on Linux and Windows
+        ##        # IP_MULTICAST_IF: force sending network traffic over specific network adapter
+        # IP_ADD_MEMBERSHIP: join multicast group
+        ##        udp_socket.setsockopt(
+        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
+        ##            trio.socket.inet_aton(network_adapter)
+        ##        )
+        udp_socket.setsockopt(
+            trio.socket.IPPROTO_IP,
+            trio.socket.IP_ADD_MEMBERSHIP,
+            struct.pack(
+                "4s4s",
+                trio.socket.inet_aton("224.0.2.60"),
+                trio.socket.inet_aton(network_adapter),
+            ),
+        )
+
+        buffer = b""
+        with trio.move_on_after(timeout):
+            buffer, address = await udp_socket.recvfrom(32)
+            print(f"{buffer = }")
+            print(f"{address = }")
+    print("post close")
+
+
+##        response: list[tuple[str, int]] = []
+##
+##        start = 0
+##        while True:
+##            start_block = buffer.find(b'[CHECKERS]', start)
+##            if start_block == -1:
+##                break
+##            start_end = buffer.find(b'[/CHECKERS]', start_block)
+##            if start_end == -1:
+##                break
+##            ad_start = buffer.find(b'[AD]', start_end)
+##            if ad_start == -1:
+##                break
+##            ad_end = buffer.find(b'[AD]', ad_start)
+##            if ad_end == -1:
+##                break
+##
+##            start = ad_end
+##            response.append((
+##                buffer[start_block+10:start_end],
+##                address,
+##                buffer[ad_start+4:ad_end]
+##            ))
+##        return response
 
 
 class HaltState(AsyncState["CheckersClient"]):
@@ -1940,7 +2122,9 @@ class TitleState(GameState):
 
         title_text = OutlinedText("title_text", title_font)
         title_text.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         title_text.color = (0, 0, 0)
+        # types:           ^^^^^^^^^
         title_text.outline = (255, 0, 0)
         title_text.border_width = 4
         title_text.text = "CHECKERS"
@@ -1949,32 +2133,54 @@ class TitleState(GameState):
 
         hosting_button = Button("hosting_button", button_font)
         hosting_button.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         hosting_button.color = (0, 0, 0)
+        # types:               ^^^^^^^^^
         hosting_button.text = "Host Networked Game"
         hosting_button.location = [x // 2 for x in SCREEN_SIZE]
+        # types: method-assign error: Cannot assign to a method
+        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         hosting_button.handle_click = self.change_state("play_hosting")
+        # types: ^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(hosting_button)
 
         join_button = Button("join_button", button_font)
         join_button.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         join_button.color = (0, 0, 0)
+        # types:            ^^^^^^^^^
         join_button.text = "Join Networked Game"
+        # types: operator error: No overload variant of "__add__" of "list" matches argument type "tuple[int, int]"
+        # types: note: Possible overload variants:
+        # types: note:     def __add__(self, list[Any], /) -> list[Any]
+        # types: note:     def [_S] __add__(self, list[_S], /) -> list[_S | Any]
         join_button.location = hosting_button.location + (  # noqa: RUF005
+            # types:           ^
             0,
             hosting_button.rect.h + 10,
         )
+        # types: method-assign error: Cannot assign to a method
+        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         join_button.handle_click = self.change_state("play_joining")
+        # types: ^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(join_button)
 
         internal_button = Button("internal_hosting", button_font)
         internal_button.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         internal_button.color = (0, 0, 0)
+        # types:                ^^^^^^^^^
         internal_button.text = "Singleplayer Game"
+        # types: operator error: Unsupported left operand type for - ("list[Any]")
         internal_button.location = hosting_button.location - (
+            # types:               ^
             0,
             hosting_button.rect.h + 10,
         )
+        # types: method-assign error: Cannot assign to a method
+        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         internal_button.handle_click = self.change_state(
+            # types: ^^^^^^^^^^^^^^^   ^
             "play_internal_hosting"
         )
         self.group_add(internal_button)
@@ -2093,14 +2299,22 @@ class PlayState(GameState):
 
         continue_button = Button("continue_button", font)
         continue_button.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         continue_button.color = (0, 0, 0)
+        # types:                ^^^^^^^^^
         continue_button.text = f"{PLAYERS[winner]} Won - Return to Title"
         continue_button.location = [x // 2 for x in SCREEN_SIZE]
+        # types: method-assign error: Cannot assign to a method
+        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         continue_button.handle_click = self.change_state("title")
+        # types: ^^^^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(continue_button)
 
         # Fire server stop event so server shuts down if it exists
+        # types: union-attr error: Item "None" of "CheckersClient | None" has no attribute "raise_event"
         await self.machine.raise_event(Event("network_stop", None))
+
+    # types:      ^^^^^^^^^^^^^^^^^^^^^^^^
 
     async def handle_client_disconnected(self, event: Event[str]) -> None:
         """Handle client disconnected error."""
@@ -2111,18 +2325,30 @@ class PlayState(GameState):
 
         title_button = Button("title_button", font)
         title_button.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         title_button.color = (0, 0, 0)
+        # types:             ^^^^^^^^^
         title_button.text = "Client Disconnected - Return to Title"
         title_button.location = [x // 2 for x in SCREEN_SIZE]
+        # types: method-assign error: Cannot assign to a method
+        # types: assignment error: Incompatible types in assignment (expression has type "Callable[[], Awaitable[None]]", variable has type "Callable[[Event[dict[str, tuple[int, int] | int]]], Coroutine[Any, Any, None]]")
         title_button.handle_click = self.change_state("title")
+        # types: ^^^^^^^^^^^^^^^^   ^^^^^^^^^^^^^^^^^^^^^^^^^^
         self.group_add(title_button)
 
         error_text = OutlinedText("error_text", font)
         error_text.visible = True
+        # types: assignment error: Incompatible types in assignment (expression has type "tuple[int, int, int]", variable has type "Color")
         error_text.color = (255, 0, 0)
+        # types:           ^^^^^^^^^^^
         error_text.border_width = 1
         error_text.text = error
+        # types: operator error: No overload variant of "__add__" of "list" matches argument type "tuple[int, int]"
+        # types: note: Possible overload variants:
+        # types: note:     def __add__(self, list[Any], /) -> list[Any]
+        # types: note:     def [_S] __add__(self, list[_S], /) -> list[_S | Any]
         error_text.location = title_button.location + (  # noqa: RUF005
+            # types:          ^
             0,
             title_button.rect.h + 10,
         )
@@ -2130,7 +2356,14 @@ class PlayState(GameState):
         self.group_add(error_text)
 
         # Fire server stop event so server shuts down if it exists
+        # types: union-attr error: Item "None" of "CheckersClient | None" has no attribute "raise_event"
+        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/objects.py
+        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/sprite.py
+        # types: note: Another file has errors: /home/samuel/Desktop/Python/Projects/Checkers/src/checkers/base2d.py
         await self.machine.raise_event(Event("network_stop", None))
+
+
+# types:      ^^^^^^^^^^^^^^^^^^^^^^^^
 
 
 class CheckersClient(sprite.GroupProcessor):
@@ -2246,9 +2479,8 @@ if __name__ == "__main__":
 
     # If we're not imported as a module, run.
     # Make sure the game will display correctly on high DPI monitors on Windows.
-    import platform
 
-    if platform.system() == "Windows":
+    if IS_WINDOWS:
         from ctypes import windll  # type: ignore
 
         try:
@@ -2256,7 +2488,6 @@ if __name__ == "__main__":
         except AttributeError:
             pass
         del windll
-    del platform
 
     try:
         pygame.init()

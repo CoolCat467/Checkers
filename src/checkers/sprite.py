@@ -9,15 +9,16 @@ from collections.abc import Iterable, Iterator
 from typing import Any, ClassVar, NamedTuple, cast
 
 import trio
-from component import Component, ComponentManager, Event
 from pygame.color import Color
 from pygame.event import Event as PygameEvent, event_name
 from pygame.mask import Mask, from_surface as mask_from_surface
 from pygame.rect import Rect
 from pygame.sprite import DirtySprite, LayeredDirty, LayeredUpdates
 from pygame.surface import Surface
-from statemachine import AsyncStateMachine
-from vector import Vector2
+
+from checkers.component import Component, ComponentManager, Event
+from checkers.statemachine import AsyncStateMachine
+from checkers.vector import Vector2
 
 __title__ = "Client Sprite"
 __author__ = "CoolCat467"

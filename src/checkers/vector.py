@@ -6,6 +6,8 @@
 # Original version by Will McGugan, modified extensively by CoolCat467
 # Programmed by CoolCat467
 
+from __future__ import annotations
+
 __title__ = "Vector2 Module"
 __author__ = "CoolCat467"
 __version__ = "1.0.7"
@@ -14,12 +16,14 @@ __ver_minor__ = 0
 __ver_patch__ = 7
 
 import math
-from collections.abc import Iterable
-from typing import NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class Vector2(NamedTuple):
-    "Vector2 Object. Takes an x an a y choordinate."
+    "Vector2 Object. Takes an x and a y choordinate."
     x: int | float
     y: int | float
 
@@ -107,7 +111,9 @@ class Vector2(NamedTuple):
 
     def __divmod__(self, rhs: int | float) -> tuple[Self, Self]:
         "Return tuple of (self // rhs, self % rhs)"
-        return self // rhs, self % rhs
+        x_div, x_mod = divmod(self.x, rhs)
+        y_div, y_mod = divmod(self.y, rhs)
+        return self.from_iter((x_div, y_div)), self.from_iter((x_mod, y_mod))
 
     def dot(self, vec: Iterable[int | float]) -> int | float:
         """Return the dot product of this vector and another"""

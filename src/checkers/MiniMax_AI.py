@@ -16,10 +16,16 @@ from collections.abc import Iterable
 from typing import TypeVar
 
 import trio
-from checkers import GameClient
-from component import Component, ComponentManager, Event, ExternalRaiseManager
-from minimax import Minimax, MinimaxResult, Player
-from state import Action, Pos, State
+
+from checkers.checkers import GameClient
+from checkers.component import (
+    Component,
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
+)
+from checkers.minimax import Minimax, MinimaxResult, Player
+from checkers.state import Action, Pos, State
 
 T = TypeVar("T")
 

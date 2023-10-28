@@ -9,12 +9,13 @@ __title__ = "Objects"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
-import sprite
-from component import Event
 from pygame.color import Color
 from pygame.draw import rect
 from pygame.font import Font
 from pygame.surface import Surface
+
+from checkers import sprite
+from checkers.component import Event
 
 
 class Text(sprite.Sprite):

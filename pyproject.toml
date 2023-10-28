@@ -34,6 +34,12 @@ dependencies = [
 [tool.setuptools.package-data]
 checkers = ["py.typed", "pic/*.png", "*.ttf"]
 
+[tool.pytest.ini_options]
+addopts = "--cov-report term-missing --cov=checkers"
+testpaths = [
+    "tests",
+]
+
 [tool.mypy]
 mypy_path = "src"
 check_untyped_defs = true
@@ -82,10 +88,14 @@ select = [
     "UP",  # pyupgrade
     "W",  # Warning
     "YTT",  # flake8-2020
+    "TCH",  # flake8-type-checking
+    "PYI",  # flake8-pyi
+    "UP",  # pyupgrade
 ]
 extend-ignore = [
     'E501',  # line-too-long
     "S101",  # use of assert for tests and type narrowing
+    'PYI041',  # redundant-numeric-union
 ]
 
 [tool.tox]
