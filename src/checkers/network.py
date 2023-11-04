@@ -1,6 +1,3 @@
-#!/usr/bin/env python3
-# Network - Module for sending events over the network
-
 "Network - Module for sending events over the network"
 
 # Programmed by CoolCat467

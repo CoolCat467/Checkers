@@ -1,3 +1,5 @@
+"""Checkers Game Module"""
+
 # nopycln: file
 
 
@@ -11,6 +13,7 @@ from . import (
     game,
     network,
     objects,
+    server,
     sprite,
     state,
     statemachine,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, TypeAlias
+from typing import TYPE_CHECKING, NamedTuple, TypeAlias
 
 from .base_io import StructFormat
 
@@ -10,6 +10,13 @@ if TYPE_CHECKING:
     from .buffer import Buffer
 
 Pos: TypeAlias = tuple[int, int]
+
+
+class TickEventData(NamedTuple):
+    """Tick Event Data"""
+
+    time_passed: float
+    fps: float
 
 
 def read_position(buffer: Buffer) -> Pos:

@@ -1,5 +1,4 @@
 import traceback
-from typing import NamedTuple
 
 import trio
 
@@ -7,14 +6,7 @@ from .base_io import StructFormat
 from .buffer import Buffer
 from .component import Event
 from .network import NetworkEventComponent, TimeoutException
-from .network_shared import Pos, read_position, write_position
-
-
-class TickEventData(NamedTuple):
-    """Tick Event Data"""
-
-    time_passed: float
-    fps: float
+from .network_shared import Pos, TickEventData, read_position, write_position
 
 
 class GameClient(NetworkEventComponent):
