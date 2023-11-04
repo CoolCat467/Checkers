@@ -25,6 +25,7 @@ keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "a
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
+    "trio>=0.23.0",
 ]
 
 [project.urls]
@@ -108,12 +109,14 @@ extend-ignore = [
 [tool.tox]
 legacy_tox_ini = """
     [tox]
-    envlist = py311, pytest, mypy
+    envlist = py310, py311, py312, pytest, mypy
     isolated_build = false
 
     [gh-actions]
     python =
-        3.11: py311, pytest, mypy
+        3.10: py310, pytest
+        3.11: py311, pytest
+        3.12: py312, pytest, mypy
 
     [testenv]
     setenv =
