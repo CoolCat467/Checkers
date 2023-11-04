@@ -12,9 +12,10 @@ from typing import Final, cast
 
 import trio
 
+from .async_clock import Clock
 from .base_io import StructFormat
 from .buffer import Buffer
-from .component import Event
+from .component import Event, ExternalRaiseManager
 from .network import NetworkEventComponent, Server, TimeoutException
 from .network_shared import Pos, TickEventData, read_position, write_position
 from .state import ActionSet, State
@@ -770,21 +771,23 @@ async def run_server(server_class: type[GameServer]) -> None:
         )
         server = server_class()
         event_manager.add_component(server)
-        await manager.raise_event(Event("server_start", None))
+        await event_manager.raise_event(Event("server_start", None))
         print("Server running")
+
+        clock = Clock()
+
         while server.running:
+            await clock.tick()
             await event_manager.raise_event(
                 Event(
                     "tick",
                     TickEventData(
-                        time_passed=clock.get_time() / 1000,
+                        time_passed=clock.get_time()
+                        / 1e9,  # nanoseconds -> seconds
                         fps=clock.get_fps(),
                     ),
                 )
             )
-
-            # Not sure why we need this but nothing seems to work without it...
-            await trio.sleep(0.01)
         server.unbind_components()
 
 

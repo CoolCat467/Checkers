@@ -1378,7 +1378,8 @@ async def async_run() -> None:
                 Event(
                     "tick",
                     sprite.TickEventData(
-                        time_passed=clock.get_time() / 1000,
+                        time_passed=clock.get_time()
+                        / 1e9,  # nanoseconds -> seconds
                         fps=clock.get_fps(),
                     ),
                 )
