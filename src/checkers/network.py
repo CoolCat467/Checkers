@@ -201,22 +201,6 @@ class NetworkEventComponent(NetworkComponent):
             raise RuntimeError(f"Unhandled packet ID {packet_id!r}")
         return Event(event_name, event_data)
 
-    async def raise_event_from_read_network(
-        self,
-    ) -> tuple[bool, TimeoutException | trio.ClosedResourceError | None]:
-        """Raise event received from server, return if successful"""
-        try:
-            event = await self.read_event()
-        except (TimeoutException, trio.ClosedResourceError) as ex:
-            return False, ex
-        await self.raise_event(event)
-        return True, None
-
-    async def raise_events_from_read_network(self) -> None:
-        """Raise events received from server"""
-        while True:
-            await self.raise_event_from_read_network()
-
     def register_read_network_event(
         self, packet_id: int, event_name: str
     ) -> None:
@@ -269,7 +253,7 @@ class Server(ComponentManager):
             )
 
             async def handle_serve(
-                task_status: Any = trio.TASK_STATUS_IGNORED,
+                task_status: trio.TaskStatus[Any] = trio.TASK_STATUS_IGNORED,
             ) -> None:
                 assert self.cancel_scope is not None
                 try:
@@ -292,7 +276,10 @@ class Server(ComponentManager):
         """Main handler for new clients
 
         Override in a subclass - Default only closes the stream"""
-        await stream.aclose()
+        try:
+            await stream.send_eof()
+        finally:
+            await stream.aclose()
 
 
 def run() -> None:

@@ -1,12 +1,112 @@
+from __future__ import annotations
+
+import struct
 import traceback
 
 import trio
 
-from .base_io import StructFormat
-from .buffer import Buffer
-from .component import Event
-from .network import NetworkEventComponent, TimeoutException
-from .network_shared import Pos, TickEventData, read_position, write_position
+from checkers.base_io import StructFormat
+from checkers.buffer import Buffer
+from checkers.component import Event
+from checkers.network import NetworkEventComponent, TimeoutException
+from checkers.network_shared import (
+    ADVERTISEMENT_IP,
+    ADVERTISEMENT_PORT,
+    Pos,
+    TickEventData,
+    read_position,
+    write_position,
+)
+
+
+async def read_advertisements(
+    timeout: int = 3,
+) -> list[tuple[str, tuple[str, int]]]:
+    """Read server advertisements from network. Return tuples of (motd, (host, port))"""
+    # Look up multicast group address in name server and find out IP version
+    addrinfo = (await trio.socket.getaddrinfo(ADVERTISEMENT_IP, None))[0]
+
+    with trio.socket.socket(
+        family=trio.socket.AF_INET,  # IPv4
+        type=trio.socket.SOCK_DGRAM,  # UDP
+        proto=trio.socket.IPPROTO_UDP,
+    ) as udp_socket:
+        # SO_REUSEADDR: allows binding to port potentially already in use
+        # Allow multiple copies of this program on one machine
+        # (not strictly needed)
+        udp_socket.setsockopt(
+            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1
+        )
+
+        await udp_socket.bind(("", ADVERTISEMENT_PORT))
+
+        ##        # Tell the kernel that we are a multicast socket
+        ##        udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
+
+        # socket.IPPROTO_IP works on Linux and Windows
+        ##        # IP_MULTICAST_IF: force sending network traffic over specific network adapter
+        # IP_ADD_MEMBERSHIP: join multicast group
+        ##        udp_socket.setsockopt(
+        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
+        ##            trio.socket.inet_aton(network_adapter)
+        ##        )
+        ##    udp_socket.setsockopt(
+        ##        trio.socket.IPPROTO_IP,
+        ##        trio.socket.IP_ADD_MEMBERSHIP,
+        ##        struct.pack(
+        ##            "4s4s",
+        ##            trio.socket.inet_aton(group),
+        ##            trio.socket.inet_aton(network_adapter),
+        ##        ),
+        ##    )
+        group_bin = trio.socket.inet_pton(addrinfo[0], addrinfo[4][0])
+        # Join group
+        if addrinfo[0] == trio.socket.AF_INET:  # IPv4
+            mreq = group_bin + struct.pack("=I", trio.socket.INADDR_ANY)
+            udp_socket.setsockopt(
+                trio.socket.IPPROTO_IP, trio.socket.IP_ADD_MEMBERSHIP, mreq
+            )
+        else:
+            mreq = group_bin + struct.pack("@I", 0)
+            udp_socket.setsockopt(
+                trio.socket.IPPROTO_IPV6, trio.socket.IPV6_JOIN_GROUP, mreq
+            )
+
+        buffer = b""
+        address = ""
+        with trio.move_on_after(timeout):
+            buffer, address = await udp_socket.recvfrom(512)
+            host, port = address
+            print(f"{buffer = }")
+            print(f"{address = }")
+
+        response: list[tuple[str, tuple[str, int]]] = []
+
+        start = 0
+        for _ in range(1024):
+            ad_start = buffer.find(b"[AD]", start)
+            if ad_start == -1:
+                break
+            ad_end = buffer.find(b"[/AD]", ad_start)
+            if ad_end == -1:
+                break
+            start_block = buffer.find(b"[CHECKERS]", ad_end)
+            if start_block == -1:
+                break
+            start_end = buffer.find(b"[/CHECKERS]", start_block)
+            if start_end == -1:
+                break
+
+            start = start_end
+
+            motd = buffer[start_block + 10 : start_end].decode("utf-8")
+            raw_port = buffer[ad_start + 4 : ad_end].decode("utf-8")
+            try:
+                port = int(raw_port)
+            except ValueError:
+                continue
+            response.append((motd, (host, port)))
+        return response
 
 
 class GameClient(NetworkEventComponent):
@@ -15,7 +115,7 @@ class GameClient(NetworkEventComponent):
     This class handles connecting to the game server, transmitting events
     to the server, and reading and raising incoming events from the server."""
 
-    __slots__ = ("tick_lock",)
+    __slots__ = ()  # "tick_lock",
 
     def __init__(self, name: str) -> None:
         super().__init__(name)
@@ -47,7 +147,7 @@ class GameClient(NetworkEventComponent):
             }
         )
 
-        self.tick_lock = trio.Lock()
+    ##        self.tick_lock = trio.Lock()
 
     def bind_handlers(self) -> None:
         super().bind_handlers()
@@ -69,7 +169,7 @@ class GameClient(NetworkEventComponent):
                 "server->initial_config": self.read_initial_config,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
-                "tick": self.handle_tick,
+                f"client[{self.name}]_read_event": self.handle_read_event,
             }
         )
 
@@ -80,27 +180,41 @@ class GameClient(NetworkEventComponent):
         it stops the connection from timing out."""
         print(f"print_no_actions {event = }")
 
-    async def handle_tick(self, tick_event: Event[TickEventData]) -> None:
+    async def raise_disconnect(self, message: str) -> None:
+        """Raise client_disconnected event with given message"""
+        print(f"{self.__class__.__name__}: {message}")
+        if not self.manager_exists:
+            print(
+                f"{self.__class__.__name__}: Manager does not exist, not raising disconnect event."
+            )
+            return
+        await self.raise_event(Event("client_disconnected", message))
+        await self.close()
+        assert self.not_connected
+
+    async def handle_read_event(
+        self, tick_event: Event[TickEventData]
+    ) -> None:
         """Raise events from server"""
-        async with self.tick_lock:
-            ##            print("handle_tick")
-            if not self.manager_exists or self.not_connected:
-                return
-            try:
-                event = await self.read_event()
-            except trio.ClosedResourceError:
-                return
-            except TimeoutException as exc:
-                await self.close()
-                traceback.print_exception(exc)
-                message = "Failed to read event from server."
-                print(f"{self.__class__.__name__}: {message}")
-                if self.manager_exists:
-                    await self.raise_event(
-                        Event("client_disconnected", message)
-                    )
-            else:
-                await self.raise_event(event)
+        ##        async with self.tick_lock:
+        ##        print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
+        if not self.manager_exists:
+            return
+        if self.not_connected:
+            await self.raise_disconnect("Not connected to server.")
+            return
+        try:
+            event = await self.read_event()
+        except trio.ClosedResourceError:
+            assert self.not_connected
+            return
+        except TimeoutException as exc:
+            traceback.print_exception(exc)
+            await self.raise_disconnect("Failed to read event from server.")
+            return
+        else:
+            await self.raise_event(event)
+        await self.raise_event(Event(f"client[{self.name}]_read_event", None))
 
     async def handle_client_connect(
         self, event: Event[tuple[str, int]]
@@ -110,13 +224,14 @@ class GameClient(NetworkEventComponent):
             return
         try:
             await self.connect(*event.data)
-            return
         except OSError as ex:
             traceback.print_exception(ex)
-        message = "Error connecting to server."
-        print(f"{self.__class__.__name__}: {message}")
-        await self.close()
-        await self.raise_event(Event("client_disconnected", message))
+        else:
+            await self.raise_event(
+                Event(f"client[{self.name}]_read_event", None)
+            )
+            return
+        await self.raise_disconnect("Error connecting to server.")
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server"""
@@ -269,6 +384,7 @@ class GameClient(NetworkEventComponent):
         else:
             await self.send_eof()
         await self.close()
+        assert self.not_connected
 
     def __del__(self) -> None:
         print(f"del {self.__class__.__name__}")

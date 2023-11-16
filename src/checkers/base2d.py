@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Pygame Sprite Module
 
-"Two-Dimentional Game Base Module"
+"""Two-Dimentional Game Base Module"""
 
 from __future__ import annotations
 
@@ -95,6 +95,11 @@ def scale_surfs(
 ) -> list[pygame.surface.Surface]:
     "Scales multiple surfaces by a scalar"
     return [scale_surf(surface, scalar) for surface in surfaces]
+
+
+def set_surf_size(surface, wh):
+    """Sets the size of a surface"""
+    return pygame.transform.scale(surface, to_int(wh))
 
 
 def get_surf_len(surface: pygame.surface.Surface) -> float:

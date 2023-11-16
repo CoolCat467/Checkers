@@ -140,7 +140,9 @@ class MachineClient(ComponentManager):
         self.running = False
 
 
-async def run_client(remote_state_class: type[RemoteState]) -> None:
+async def run_client(
+    host: str, port: int, remote_state_class: type[RemoteState]
+) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
@@ -148,18 +150,16 @@ async def run_client(remote_state_class: type[RemoteState]) -> None:
         )
         client = MachineClient(remote_state_class)
         event_manager.add_component(client)
-        await event_manager.raise_event(
-            Event("client_connect", ("127.0.0.1", PORT))
-        )
+        await event_manager.raise_event(Event("client_connect", (host, port)))
         print("Connected to server")
         while client.running:
-            await event_manager.raise_event(Event("tick", None))
-
-            # Not sure why we need this but nothing seems to work without it...
-            await trio.sleep(0.01)
+            # Wait so backlog things happen
+            await trio.sleep(1)
         client.unbind_components()
 
 
-def run_client_sync(remote_state_class: type[RemoteState]) -> None:
+def run_client_sync(
+    host: int, port: int, remote_state_class: type[RemoteState]
+) -> None:
     """Synchronous entry point."""
-    trio.run(run_client, remote_state_class)
+    trio.run(run_client, host, port, remote_state_class)

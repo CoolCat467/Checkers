@@ -11,14 +11,18 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, TypeVar
 
+import trio
+from checkers.client import read_advertisements
 from checkers.state import Action, State
-from machine_client import RemoteState, run_client_sync
+from machine_client import RemoteState, run_client
 from minimax import Minimax, MinimaxResult, Player
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
 T = TypeVar("T")
+
+PORT = 31613
 
 # Player:
 # 0 = False = Person  = MIN = 0, 2
@@ -97,9 +101,24 @@ class MinimaxPlayer(RemoteState):
         return action
 
 
+async def run_async() -> None:
+    details: tuple[str, int] | None = None
+    while details is None:
+        print("Watching for advertisements...")
+        for advertisement in await read_advertisements():
+            motd, details = advertisement
+            print(f"{motd = } {details = }")
+            break
+
+    ##    host = "127.0.0.1"
+    ##    port = PORT
+    host, port = details
+    await run_client(host, port, MinimaxPlayer)
+
+
 def run() -> None:
     """Synchronous entry point."""
-    run_client_sync(MinimaxPlayer)
+    trio.run(run_async)
 
 
 print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")

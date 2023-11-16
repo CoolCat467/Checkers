@@ -17,7 +17,6 @@ from __future__ import annotations
 
 import os
 import platform
-import struct
 from collections import deque
 from os import path
 from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
@@ -28,19 +27,19 @@ from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 
-from . import base2d, objects, sprite
-from .async_clock import Clock
-from .client import GameClient
-from .component import (
+from checkers import base2d, objects, sprite
+from checkers.async_clock import Clock
+from checkers.client import GameClient, read_advertisements
+from checkers.component import (
     Component,
     ComponentManager,
     Event,
     ExternalRaiseManager,
 )
-from .objects import Button, OutlinedText
-from .server import GameServer
-from .statemachine import AsyncState
-from .vector import Vector2
+from checkers.objects import Button, OutlinedText
+from checkers.server import GameServer
+from checkers.statemachine import AsyncState
+from checkers.vector import Vector2
 
 if TYPE_CHECKING:
     from collections.abc import (
@@ -345,7 +344,6 @@ class GameBoard(sprite.Sprite):
 
     def __init__(
         self,
-        board_size: tuple[int, int],
         tile_size: int,
     ) -> None:
         super().__init__("board")
@@ -353,7 +351,7 @@ class GameBoard(sprite.Sprite):
         self.add_component(sprite.ImageComponent())
 
         # Store the Board Size and Tile Size
-        self.board_size = board_size
+        self.board_size: tuple[int, int]
         self.tile_size = tile_size
 
         self.update_location_on_resize = True
@@ -363,15 +361,17 @@ class GameBoard(sprite.Sprite):
         self.animation_queue: deque[Event[object]] = deque()
         self.processing_animations = False
 
+        self.generate_tile_images()
+
     def get_tile_name(self, x: int, y: int) -> str:
         """Get name of a given tile"""
-        return chr(65 + x) + str(self.board_size[1] - y)
+        return f"{x}_{y}"  # chr(65 + x) + str(self.board_size[1] - y)
 
     def bind_handlers(self) -> None:
         "Register handlers"
         self.register_handlers(
             {
-                "init": self.handle_init_event,
+                "game_initial_config": self.handle_initial_config_event,
                 "gameboard_create_piece": self.handle_create_piece_event,
                 "gameboard_select_piece": self.handle_select_piece_event,
                 "gameboard_create_tile": self.handle_create_tile_event,
@@ -389,10 +389,13 @@ class GameBoard(sprite.Sprite):
             }
         )
 
-    async def handle_init_event(self, event: Event[None]) -> None:
+    async def handle_initial_config_event(
+        self, event: Event[tuple[Pos, int]]
+    ) -> None:
         "Start up game"
+        self.board_size, _current_turn = event.data
+
         # Generate tile data
-        self.generate_tile_images()
         self.image = self.generate_board_image()
         self.visible = True
 
@@ -416,6 +419,10 @@ class GameBoard(sprite.Sprite):
         self, event: Event[tuple[Pos, int]]
     ) -> None:
         """Handle create_piece event"""
+        if not self.visible:
+            # If not visible, reraise until board is set up right
+            await self.raise_event(event)
+            return
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
 
@@ -906,89 +913,6 @@ async def find_ip() -> str:
     return candidates[0]
 
 
-async def read_advertisements(
-    network_adapter: str | None = None, timeout: int = 3
-) -> list[tuple[str, str, int]]:
-    """Read server advertisements from network."""
-    if network_adapter is None:
-        network_adapter = await find_ip()
-    with trio.socket.socket(
-        family=trio.socket.AF_INET,  # IPv4
-        type=trio.socket.SOCK_DGRAM,  # UDP
-        proto=trio.socket.IPPROTO_UDP,
-    ) as udp_socket:
-        # SO_REUSEADDR: allows binding to port potentially already in use
-        udp_socket.setsockopt(
-            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1
-        )
-
-        ##        udp_socket.setsockopt(
-        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 32
-        ##        )
-        ##        udp_socket.setsockopt(
-        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_LOOP,
-        ##            1
-        ##        )
-        # linux binds to multicast address, windows to interface address
-        ##        ip_bind = network_adapter if IS_WINDOWS else "224.0.2.60"
-        ip_bind = ""
-        await udp_socket.bind((ip_bind, 4445))
-
-        ##        # Tell the kernel that we are a multicast socket
-        ##        udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
-
-        # socket.IPPROTO_IP works on Linux and Windows
-        ##        # IP_MULTICAST_IF: force sending network traffic over specific network adapter
-        # IP_ADD_MEMBERSHIP: join multicast group
-        ##        udp_socket.setsockopt(
-        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
-        ##            trio.socket.inet_aton(network_adapter)
-        ##        )
-        udp_socket.setsockopt(
-            trio.socket.IPPROTO_IP,
-            trio.socket.IP_ADD_MEMBERSHIP,
-            struct.pack(
-                "4s4s",
-                trio.socket.inet_aton("224.0.2.60"),
-                trio.socket.inet_aton(network_adapter),
-            ),
-        )
-
-        buffer = b""
-        address = ""
-        with trio.move_on_after(timeout):
-            buffer, address = await udp_socket.recvfrom(32)
-            print(f"{buffer = }")
-            print(f"{address = }")
-
-        response: list[tuple[str, str, int]] = []
-
-        start = 0
-        while True:
-            ad_start = buffer.find(b"[AD]", start)
-            if ad_start == -1:
-                break
-            ad_end = buffer.find(b"[AD]", ad_start)
-            if ad_end == -1:
-                break
-            start_block = buffer.find(b"[CHECKERS]", ad_end)
-            if start_block == -1:
-                break
-            start_end = buffer.find(b"[/CHECKERS]", start_block)
-            if start_end == -1:
-                break
-
-            start = ad_end
-            response.append(
-                (
-                    buffer[start_block + 10 : start_end].decode("utf-8"),
-                    address,
-                    buffer[ad_start + 4 : ad_end].decode("utf-8"),
-                )
-            )
-        return response
-
-
 class HaltState(AsyncState["CheckersClient"]):
     "Halt state to set state to None so running becomes False"
     __slots__ = ()
@@ -1153,13 +1077,25 @@ class PlayHostingState(AsyncState["CheckersClient"]):
     async def entry_actions(self) -> None:
         "Start hosting server"
         assert self.machine is not None
-        self.machine.manager.add_component(GameServer(self.internal_server))
+        self.machine.manager.add_components(
+            (
+                GameServer(self.internal_server),
+                GameClient("network"),
+            )
+        )
 
         await self.machine.raise_event(Event("server_start", None))
-        await trio.sleep(0.1)  # Wait for server to start
 
-    async def check_conditions(self) -> str:
-        return "play_joining"
+    async def exit_actions(self) -> None:
+        "Have client connect"
+        assert self.machine is not None
+        await self.machine.raise_event(
+            Event("client_connect", ("127.0.0.1", PORT))
+        )
+
+    async def check_conditions(self) -> str | None:
+        server: GameServer = self.machine.manager.get_component("GameServer")
+        return "play" if server.running else None
 
 
 class PlayInternalHostingState(PlayHostingState):
@@ -1169,30 +1105,78 @@ class PlayInternalHostingState(PlayHostingState):
     internal_server = True
 
 
-class PlayJoiningState(AsyncState["CheckersClient"]):
-    "Start running client"
+class JoinButton(Button):
     __slots__ = ()
+
+    def __init__(self, id_: int, font: pygame.Font, motd: str) -> None:
+        super().__init__(f"join_button_{id_}", font)
+        self.text = motd
+        self.location = [x // 2 for x in SCREEN_SIZE]
+
+    async def handle_click(self, _: object) -> None:
+        print(self.manager)
+
+
+class PlayJoiningState(GameState):
+    "Start running client"
+    __slots__ = (
+        "font",
+        "buttons",
+        "next_button",
+    )
 
     def __init__(self) -> None:
         super().__init__("play_joining")
 
-    def add_actions(self) -> None:
-        "Add server component"
+        self.next_button = 0
+        self.buttons = {}
+
+        self.font = pygame.font.Font(
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+        )
+
+    async def entry_actions(self) -> None:
+        "Add game client component"
+        await super().entry_actions()
         assert self.machine is not None
+        self.id = self.machine.new_group("join")
         client = GameClient("network")
 
         self.machine.manager.add_component(client)
 
-    async def exit_actions(self) -> None:
-        "Have client connect"
-        assert self.machine is not None
-        await self.machine.raise_event(
-            Event("client_connect", ("127.0.0.1", PORT))
-        )
-        await super().exit_actions()
+        self.buttons.clear()
+        self.next_button = 0
 
-    async def check_conditions(self) -> str:
-        return "play"
+        self.manager.register_handler(
+            "update_listing", self.handle_update_listing
+        )
+
+        await self.manager.raise_event(Event("update_listing", None))
+
+    async def handle_update_listing(self, _: object) -> None:
+        assert self.machine is not None
+        for advertisement in await read_advertisements():
+            motd, details = advertisement
+
+            if details not in self.buttons:
+                self.buttons[details] = self.next_button
+
+                print(f"{motd = }  {details = }")
+                ##                button = JoinButton(self.next_button, self.font, motd, details)
+                ##                self.group_add(button)
+
+                self.next_button += 1
+                ####
+                await self.machine.raise_event(
+                    Event("client_connect", details, 1)
+                )
+                return "play"
+        print("click")
+        await self.manager.raise_event(Event("update_listing", None))
+
+
+##    async def check_conditions(self) -> str | None:
+##        return None
 
 
 class PlayState(GameState):
@@ -1202,8 +1186,7 @@ class PlayState(GameState):
     def __init__(self) -> None:
         super().__init__("play")
 
-    def add_actions(self) -> None:
-        super().add_actions()
+    def register_handlers(self) -> None:
         self.manager.register_handlers(
             {
                 "client_disconnected": self.handle_client_disconnected,
@@ -1211,13 +1194,16 @@ class PlayState(GameState):
             }
         )
 
+    def add_actions(self) -> None:
+        super().add_actions()
+        self.register_handlers()
+
     async def entry_actions(self) -> None:
         assert self.machine is not None
         self.id = self.machine.new_group("play")
 
         # self.group_add(())
         gameboard = GameBoard(
-            (8, 8),
             45,
         )
         gameboard.location = [x // 2 for x in SCREEN_SIZE]
@@ -1237,6 +1223,10 @@ class PlayState(GameState):
 
         # Unbind components and remove group
         await super().exit_actions()
+
+        self.register_handlers()
+
+        assert self.manager.has_handler("game_winner")
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""

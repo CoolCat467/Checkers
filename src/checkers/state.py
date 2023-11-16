@@ -85,7 +85,7 @@ class State:
     def __init__(
         self,
         size: tuple[int, int],
-        turn: bool,
+        turn: int,
         pieces: dict[Pos, int],
         /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
@@ -266,15 +266,19 @@ class State:
         return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
 
     @staticmethod
-    def get_enemy_piece_types(piece_type: int) -> tuple[int, int]:
-        """Return enemy piece types of given piece type."""
+    def get_enemy(self_type: int) -> int:
+        """Return enemy pawn piece type"""
         # If we are kinged, get a pawn version of ourselves.
         # Take that plus one mod 2 to get the pawn of the enemy
-        enemy_pawn = (piece_type + 1) % 2
-        # Then get the pawn and the king in a list so we can see if a piece
-        # is our enemy
-        enemy_pieces = (enemy_pawn, enemy_pawn + 2)
-        return enemy_pieces
+        enemy_pawn = (self_type + 1) % 2
+        return enemy_pawn
+
+    @staticmethod
+    def get_piece_types(self_type: int) -> tuple[int, int]:
+        """Return piece types of given piece type."""
+        # If we are kinged, get a pawn version of ourselves.
+        self_pawn = self_type % 2
+        return (self_pawn, self_pawn + 2)
 
     def get_jumps(
         self,
@@ -298,7 +302,7 @@ class State:
             _pieces = self.pieces
         _pieces = copy.deepcopy(_pieces)
 
-        enemy_pieces = self.get_enemy_piece_types(piece_type)
+        enemy_pieces = self.get_piece_types(self.get_enemy(piece_type))
 
         # Get the side choordinates of the tile and make them tuples so
         # the scan later works properly.
@@ -385,12 +389,13 @@ class State:
             ]
         )
 
-    def get_actions(self, position: Pos) -> list[Action]:
-        """Return list of all moves and jumps the piece at position can make"""
+    def get_actions(self, position: Pos) -> Generator[Action, None, None]:
+        """Yield all moves and jumps the piece at position can make"""
         ends = set(self.get_jumps(position))
         ends.update(self.get_moves(position))
         ##        ends = self.get_actions_set(position).ends
-        return [self.action_from_points(position, end) for end in ends]
+        for end in ends:
+            yield self.action_from_points(position, end)
 
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:
         """Yield all actions for given player"""
@@ -398,25 +403,22 @@ class State:
         for position, piece_type in self.pieces.items():
             if piece_type not in player_pieces:
                 continue
-            yield from iter(self.get_actions(position))
+            yield from self.get_actions(position)
 
     def check_for_win(self) -> int | None:
         """Return player number if they won else None"""
         # For each of the two players,
         for player in range(2):
-            # Get that player's possible pieces
-            player_pieces = {player, player + 2}
             # For each tile in the playable tiles,
-            for position, piece_type in self.pieces.items():
-                # If the tile's piece is one of the player's pieces,
-                if piece_type in player_pieces:
-                    if self.get_actions(position):
-                        # Player has at least one move, no need to continue
-                        break
-            else:
+            has_move = False
+            for _ in self.get_all_actions(player):
+                has_move = True
+                # Player has at least one move, no need to continue
+                break
+            if not has_move and self.turn == player:
                 # Continued without break, so player either has no moves
                 # or no possible moves, so their opponent wins
-                return ((player + 1) % 2) == self.turn
+                return (player + 1) % 2
         return None
 
     def can_player_select_piece(self, player: int, tile_pos: Pos) -> bool:

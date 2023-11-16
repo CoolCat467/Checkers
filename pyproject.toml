@@ -67,7 +67,7 @@ warn_unused_ignores = true
 
 [tool.black]
 line-length = 79
-target-version = ['py311']
+target-version = ['py312']
 
 [tool.ruff.isort]
 combine-as-imports = true

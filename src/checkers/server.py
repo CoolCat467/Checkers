@@ -12,13 +12,20 @@ from typing import Final, cast
 
 import trio
 
-from .async_clock import Clock
-from .base_io import StructFormat
-from .buffer import Buffer
-from .component import Event, ExternalRaiseManager
-from .network import NetworkEventComponent, Server, TimeoutException
-from .network_shared import Pos, TickEventData, read_position, write_position
-from .state import ActionSet, State
+from checkers.async_clock import Clock
+from checkers.base_io import StructFormat
+from checkers.buffer import Buffer
+from checkers.component import Event, ExternalRaiseManager
+from checkers.network import NetworkEventComponent, Server, TimeoutException
+from checkers.network_shared import (
+    ADVERTISEMENT_IP,
+    ADVERTISEMENT_PORT,
+    Pos,
+    TickEventData,
+    read_position,
+    write_position,
+)
+from checkers.state import ActionSet, State
 
 PORT: Final = 31613
 
@@ -313,6 +320,7 @@ class GameServer(Server):
         "players_can_interact",
         "internal_singleplayer_mode",
         "advertisement_scope",
+        "running",
     )
 
     board_size = (8, 8)
@@ -330,6 +338,7 @@ class GameServer(Server):
 
         self.internal_singleplayer_mode = internal_singleplayer_mode
         self.advertisement_scope: trio.CancelScope | None = None
+        self.running = False
 
     def bind_handlers(self) -> None:
         """Register start_server and stop_server"""
@@ -352,23 +361,28 @@ class GameServer(Server):
         for component in self.get_all_components():
             if isinstance(component, NetworkEventComponent):
                 close_methods.append(component.close)
-                self.remove_component(component.name)
+            print(f"{component.name = }")
+            self.remove_component(component.name)
         async with trio.open_nursery() as nursery:
             while close_methods:
                 nursery.start_soon(close_methods.popleft())
+        self.running = False
 
     async def post_advertisement(
         self,
         udp_socket: trio._socket._SocketType,
+        send_to_ip: str,
         hosting_port: int,
     ) -> None:
         """Post server advertisement packet."""
+        motd = "Checkers Game"
         advertisement = (
-            f"[AD]{hosting_port}[/AD][CHECKERS][/CHECKERS]"
+            f"[AD]{hosting_port}[/AD][CHECKERS]{motd}[/CHECKERS]"
         ).encode()
-        await udp_socket.sendto(advertisement, ("224.0.2.60", 4445))
-        ##        await udp_socket.sendto(advertisement, ("255.255.255.255", 4445))
-        print("click")
+        print("post_advertisement")
+        await udp_socket.sendto(
+            advertisement, (send_to_ip, ADVERTISEMENT_PORT)
+        )
 
     def stop_advertising(self) -> None:
         """Cancel self.advertisement_scope"""
@@ -380,25 +394,32 @@ class GameServer(Server):
         """Post lan UDP packets so server can be found."""
         self.stop_advertising()
         self.advertisement_scope = trio.CancelScope()
+
+        # Look up multicast group address in name server and find out IP version
+        addrinfo = (await trio.socket.getaddrinfo(ADVERTISEMENT_IP, None))[0]
+        send_to_ip = addrinfo[4][0]
+
         with trio.socket.socket(
             family=trio.socket.AF_INET,  # IPv4
             type=trio.socket.SOCK_DGRAM,  # UDP
             proto=trio.socket.IPPROTO_UDP,  # UDP
         ) as udp_socket:
-            udp_socket.setsockopt(
-                trio.socket.SOL_SOCKET, trio.socket.SO_BROADCAST, 1
-            )
-            # for all packets sent, after two hops on the network the packet will not
-            # be re-sent/broadcast (see https://www.tldp.org/HOWTO/Multicast-HOWTO-6.html)
-            ##            udp_socket.setsockopt(
-            ##                trio.socket.IPPROTO_IP,
-            ##                trio.socket.IP_MULTICAST_TTL,
-            ##                2,
-            ##            )
+            ### Set Time-to-live (optional)
+            ##ttl_bin = struct.pack('@i', MYTTL)
+            ##if addrinfo[0] == trio.socket.AF_INET: # IPv4
+            ##    udp_socket.setsockopt(
+            ##        trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, ttl_bin)
+            ##else:
+            ##    udp_socket.setsockopt(
+            ##        trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
             with self.advertisement_scope:
                 while not self.can_start():
                     try:
-                        await self.post_advertisement(udp_socket, hosting_port)
+                        await self.post_advertisement(
+                            udp_socket,
+                            send_to_ip,
+                            hosting_port,
+                        )
                     except OSError as exc:
                         traceback.print_exception(exc)
                         print(
@@ -457,11 +478,12 @@ class GameServer(Server):
         print(f"{self.__class__.__name__}: Starting Server")
         self.client_count = 0
         port = PORT
+        self.running = True
         async with trio.open_nursery() as nursery:
-            nursery.start_soon(partial(self.serve, port, backlog=0))
             # Do not post advertisements when using internal singleplayer mode
             if not self.internal_singleplayer_mode:
                 nursery.start_soon(self.post_advertisements, port)
+            nursery.start_soon(partial(self.serve, port, backlog=0))
 
     async def handle_server_start_new_game(self, event: Event[None]) -> None:
         """Handle game start."""
@@ -494,31 +516,26 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
-        while True:
+        while not client.not_connected:
+            print(f"{client.name} client_network_loop tick")
             try:
-                # print(f"{client.name} client_network_loop tick")
-                try:
-                    await client.write_event(
-                        Event("server[write]->no_actions", bytearray())
-                    )
-                except (
-                    trio.BrokenResourceError,
-                    trio.ClosedResourceError,
-                    RuntimeError,
-                ):
-                    break
-                except Exception as exc:
-                    traceback.print_exception(exc)
-                    break
-                try:
-                    event = await client.read_event()
-                except TimeoutException:
-                    continue
-                else:
-                    await client.raise_event(event)
-                # traceback.print_exception(exception)
-            except (trio.ClosedResourceError, trio.BrokenResourceError):
+                await client.write_event(
+                    Event("server[write]->no_actions", bytearray())
+                )
+                event = await client.read_event()
+            except TimeoutException:
+                continue
+            except (
+                trio.BrokenResourceError,
+                trio.ClosedResourceError,
+                RuntimeError,
+            ):
                 break
+            except Exception as exc:
+                traceback.print_exception(exc)
+                break
+            else:
+                await client.raise_event(event)
 
     def can_start(self) -> bool:
         """Return if game can start."""
@@ -540,6 +557,9 @@ class GameServer(Server):
         if can_start:
             self.stop_serving()
         if self.client_count > self.max_clients:
+            print(
+                f"{self.__class__.__name__}: client disconnected, too many clients"
+            )
             await stream.aclose()
 
         client = ServerClient.from_stream(new_client_id, stream=stream)
@@ -771,7 +791,12 @@ async def run_server(server_class: type[GameServer]) -> None:
         )
         server = server_class()
         event_manager.add_component(server)
+
         await event_manager.raise_event(Event("server_start", None))
+        while not server.running:
+            print("Server starting...")
+            await trio.sleep(1)
+
         print("Server running")
 
         clock = Clock()
@@ -788,9 +813,19 @@ async def run_server(server_class: type[GameServer]) -> None:
                     ),
                 )
             )
+            await trio.sleep(0.01)
         server.unbind_components()
 
 
 def run_server_sync(server_class: type[GameServer]) -> None:
     """Synchronous entry point."""
     trio.run(run_server, server_class)
+
+
+def cli_run() -> None:
+    """Run game server."""
+    run_server_sync(GameServer)
+
+
+##if __name__ == "__main__":
+##    cli_run()

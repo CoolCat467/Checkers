@@ -2,12 +2,15 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, NamedTuple, TypeAlias
+from typing import TYPE_CHECKING, Final, NamedTuple, TypeAlias
 
 from .base_io import StructFormat
 
 if TYPE_CHECKING:
     from .buffer import Buffer
+
+ADVERTISEMENT_IP: Final = "224.0.2.60"
+ADVERTISEMENT_PORT: Final = 4445
 
 Pos: TypeAlias = tuple[int, int]
 
