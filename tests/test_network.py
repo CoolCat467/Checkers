@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
 import trio
 from checkers.component import Event
 from checkers.network import NetworkEventComponent, Server
@@ -12,6 +13,7 @@ if TYPE_CHECKING:
 pytest_plugins = ("pytest_trio",)
 
 
+@pytest.mark.trio
 async def client_connect(port: int, stop_server: Callable[[], None]) -> None:
     await trio.sleep(0.05)
     # manager = ComponentManager("manager")
@@ -38,6 +40,7 @@ async def client_connect(port: int, stop_server: Callable[[], None]) -> None:
     stop_server()
 
 
+@pytest.mark.trio
 async def run_async() -> None:
     "Run asynchronous test"
 

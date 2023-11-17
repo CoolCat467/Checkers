@@ -1,7 +1,4 @@
-#!/usr/bin/env python3
-# Component - Components instead of chaotic class hierarchy mess
-
-"Component system module"
+"Component system module -  Components instead of chaotic class hierarchy mess"
 
 # Programmed by CoolCat467
 
@@ -9,9 +6,8 @@ __title__ = "Component"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
-import functools
 from collections.abc import Awaitable, Callable, Iterable
-from typing import Any, Generic, TypeVar, cast
+from typing import Any, Generic, TypeVar
 from weakref import ref
 
 import trio
@@ -152,7 +148,7 @@ class ComponentManager(Component):
 
     def __add_self_as_component(self, name: str) -> None:
         "Add this manager as component to self without binding."
-        if self.component_exists(name):
+        if self.component_exists(name):  # pragma: nocover
             raise ValueError(f'Component named "{name}" already exists!')
         self.__components[name] = self
 
@@ -161,7 +157,7 @@ class ComponentManager(Component):
         event_name: str,
         handler_coro: Callable[[Event[Any]], Awaitable[None]],
     ) -> None:
-        "Register handler_func as handler for event_name"
+        "Register handler_func as handler for event_name (self component)"
         self.register_component_handler(event_name, handler_coro, self.name)
 
     def register_component_handler(
@@ -311,47 +307,5 @@ class ExternalRaiseManager(ComponentManager):
         await super().raise_event(event)
 
 
-F = TypeVar("F", bound=Callable[..., Any])
-
-
-def comps_must_exist(component_names: tuple[str, ...]) -> Callable[[F], F]:
-    "Decorator for Components & ComponentManagers to ensure components exist"
-
-    def must_exist_decorator(func: F) -> F:
-        "Wrap function and ensure component names exist."
-
-        @functools.wraps(func)
-        def must_exist_wrapper(self: Any, *args: Any, **kwargs: Any) -> Any:
-            if not isinstance(self, Component | ComponentManager):
-                raise TypeError(
-                    "comps_must_exist must wrap a "
-                    "Component or ComponentManager function, "
-                    f'not "{type(self)}"!'
-                )
-            if not self.components_exist(component_names):
-                raise RuntimeError(
-                    f"Not all components from {component_names} exist!"
-                )
-            return func(self, *args, **kwargs)
-
-        return cast(F, must_exist_wrapper)
-
-    return must_exist_decorator
-
-
-async def run_async() -> None:
-    "Run test asynchronously"
-    cat = ComponentManager("cat")
-    sound_effect = Component("sound_effect")
-    cat.add_component(sound_effect)
-    print(cat)
-
-
-def run() -> None:
-    "Run test"
-    trio.run(run_async)
-
-
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__}\nProgrammed by {__author__}.")
-    run()
