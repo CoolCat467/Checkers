@@ -16,9 +16,10 @@ __ver_minor__ = 0
 __ver_patch__ = 7
 
 import math
-from typing import TYPE_CHECKING, NamedTuple, Self
+import sys
+from typing import TYPE_CHECKING, NamedTuple, Self, override
 
-if TYPE_CHECKING:
+if TYPE_CHECKING:  # pragma: nocover
     from collections.abc import Iterable
 
 
@@ -43,8 +44,17 @@ class Vector2(NamedTuple):
     def from_radians(
         cls, radians: int | float, distance: int | float = 1
     ) -> Self:
-        """Return vector from angle in radians"""
+        """Return vector from angle in radians."""
         return cls(math.cos(radians), math.sin(radians)) * distance
+
+    @classmethod
+    def from_degrees(
+        cls, degrees: int | float, distance: int | float = 1
+    ) -> Self:
+        """Return vector from angle in degrees.
+
+        Angle is measured from the positive X axis counterclockwise."""
+        return cls.from_radians(math.radians(degrees), distance)
 
     def magnitude(self) -> float:
         "Return the magnitude (length) of self."
@@ -52,7 +62,8 @@ class Vector2(NamedTuple):
 
     def get_distance_to(self, point: Iterable[int | float]) -> float:
         "Return the magnitude (distance) to a given point."
-        return self.from_points(point, self).magnitude()
+        # return self.from_points(point, self).magnitude()
+        return math.dist(point, self)
 
     def normalized(self) -> Self:
         """Return a normalized (unit) vector"""
@@ -65,7 +76,7 @@ class Vector2(NamedTuple):
     def heading(self) -> float:
         """Returns the arc tangent (measured in degrees) of self.y/self.x.
 
-        Angle is measured from the positive X axis counterclockwise"""
+        Angle is measured from the positive X axis counterclockwise."""
         return math.degrees(self.heading_radians())
 
     def rotate_radians(self, radians: int | float) -> Self:
@@ -74,16 +85,20 @@ class Vector2(NamedTuple):
         return self.from_radians(new_heading, self.magnitude())
 
     def rotate(self, degrees: int | float) -> Self:
-        """Returns a new vector by rotating self around (0, 0) by degrees
+        """Returns a new vector by rotating self around (0, 0) by degrees.
 
-        Angle is measured from the positive X axis counterclockwise"""
+        Angle is measured from the positive X axis counterclockwise."""
         return self.rotate_radians(math.radians(degrees))
 
     # rhs is Right Hand Side
+    @override
     def __add__(  # type: ignore[override]
-        self, rhs: Iterable[int | float]
+        self,
+        rhs: Iterable[int | float],
     ) -> Self:
         return self.from_iter(a + b for a, b in zip(self, rhs, strict=True))
+
+    __radd__ = __add__
 
     def __sub__(self, rhs: Iterable[int | float]) -> Self:
         return self.from_iter(a - b for a, b in zip(self, rhs, strict=True))
@@ -91,8 +106,11 @@ class Vector2(NamedTuple):
     def __neg__(self) -> Self:
         return self.from_iter(-c for c in self)
 
+    @override
     def __mul__(self, scalar: int | float) -> Self:  # type: ignore[override]
         return self.from_iter(c * scalar for c in self)
+
+    __rmul__ = __mul__
 
     def __truediv__(self, scalar: int | float) -> Self:
         return self.from_iter(c / scalar for c in self)
@@ -110,15 +128,33 @@ class Vector2(NamedTuple):
         return self.from_iter(c % scalar for c in self)
 
     def __divmod__(self, rhs: int | float) -> tuple[Self, Self]:
-        "Return tuple of (self // rhs, self % rhs)"
+        "Return tuple of (self // rhs, self % rhs)."
         x_div, x_mod = divmod(self.x, rhs)
         y_div, y_mod = divmod(self.y, rhs)
         return self.from_iter((x_div, y_div)), self.from_iter((x_mod, y_mod))
 
-    def dot(self, vec: Iterable[int | float]) -> int | float:
-        """Return the dot product of this vector and another"""
-        return sum(a * b for a, b in zip(self, vec, strict=True))
+    if sys.version_info >= (3, 12):
+        # math.sumprod is new in python 3.12
+        def __matmul__(self, vec: Iterable[int | float]) -> int | float:
+            """Return the dot product of this vector and another."""
+            return math.sumprod(self, vec)
 
-    def __matmul__(self, vec: Iterable[int | float]) -> int | float:
-        """Return the dot product of this vector and another"""
-        return self.dot(vec)
+    else:  # pragma: nocover
+
+        def __matmul__(self, vec: Iterable[int | float]) -> int | float:
+            """Return the dot product of this vector and another."""
+            return sum(a * b for a, b in zip(self, vec, strict=True))
+
+    def dot(self, vec: Iterable[int | float]) -> int | float:
+        """Return the dot product of this vector and another (same as @)."""
+        return self @ vec
+
+
+def get_angle_between_vectors(vec_a: Vector2, vec_b: Vector2) -> int | float:
+    """Return the angle between two vectors (measured in radians)."""
+    return math.acos((vec_a @ vec_b) / (vec_a.magnitude() * vec_b.magnitude()))
+
+
+def project_v_onto_w(vec_v: Vector2, vec_w: Vector2) -> Vector2:
+    """Return the projection of v onto w."""
+    return vec_w * ((vec_v @ vec_w) / (vec_w.magnitude() ** 2))

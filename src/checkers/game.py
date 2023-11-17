@@ -1094,6 +1094,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
         )
 
     async def check_conditions(self) -> str | None:
+        assert self.machine is not None
         server: GameServer = self.machine.manager.get_component("GameServer")
         return "play" if server.running else None
 

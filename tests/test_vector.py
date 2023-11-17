@@ -1,8 +1,14 @@
 """Test vector module."""
 from __future__ import annotations
 
+import math
+
 import pytest
-from checkers.vector import Vector2
+from checkers.vector import (
+    Vector2,
+    get_angle_between_vectors,
+    project_v_onto_w,
+)
 
 
 def test_str() -> None:
@@ -23,6 +29,10 @@ def test_eq_tuple() -> None:
 
 def test_from_points() -> None:
     assert Vector2.from_points((0, 3), (2, 5)) == Vector2(2, 2)
+
+
+def test_from_degrees() -> None:
+    assert round(Vector2.from_degrees(-90, 10), 9) == Vector2(0, -10)
 
 
 def test_get_magnitude() -> None:
@@ -107,3 +117,29 @@ def test_divmod() -> None:
 
 def test_matmul() -> None:
     assert Vector2(9, 7) @ Vector2(2, 3) == (9 * 2) + (7 * 3)
+    assert Vector2(21, 75).dot(Vector2(5, 28)) == (21 * 5) + (75 * 28)
+
+
+def test_get_angle_between_vectors() -> None:
+    assert (
+        math.degrees(get_angle_between_vectors(Vector2(0, 3), Vector2(3, 0)))
+        == 90
+    )
+    assert (
+        math.degrees(get_angle_between_vectors(Vector2(3, 0), Vector2(0, -3)))
+        == 90
+    )
+    assert (
+        math.degrees(get_angle_between_vectors(Vector2(0, -3), Vector2(-3, 0)))
+        == 90
+    )
+    assert (
+        math.degrees(get_angle_between_vectors(Vector2(-3, 0), Vector2(0, 3)))
+        == 90
+    )
+
+
+def test_project_v_onto_w() -> None:
+    assert round(
+        project_v_onto_w(Vector2(4, 16), Vector2(2, -6)), 4
+    ) == Vector2(x=-4.4, y=13.2)

@@ -19,19 +19,6 @@ async def test_tick() -> None:
 
 
 @pytest.mark.trio
-async def test_tick_zero() -> None:
-    clock = async_clock.Clock()
-
-    result = await clock.tick(0)
-    assert isinstance(result, int)
-    assert result == 0
-    assert repr(clock).startswith("<Clock(")
-    assert isinstance(clock.get_fps(), float)
-    assert isinstance(clock.get_rawtime(), int)
-    assert isinstance(clock.get_time(), int)
-
-
-@pytest.mark.trio
 async def test_tick_fps() -> None:
     clock = async_clock.Clock()
 

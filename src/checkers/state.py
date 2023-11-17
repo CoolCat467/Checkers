@@ -249,8 +249,8 @@ class State:
         ##        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
         return Action(start, end)
 
-    def get_turn(self) -> bool:
-        """Return whose turn it is. True = AI (us)"""
+    def get_turn(self) -> int:
+        """Return whose turn it is. 0 = red, 1 = black"""
         return self.turn
 
     def valid_location(self, position: Pos) -> bool:

@@ -13,12 +13,11 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 import pygame
 
-from . import sprite
-from .statemachine import StateMachine
-from .vector import Vector2
+from checkers.statemachine import StateMachine
+from checkers.vector import Vector2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Generator, Iterable, Sequence
 
 
 def amol(
@@ -97,7 +96,9 @@ def scale_surfs(
     return [scale_surf(surface, scalar) for surface in surfaces]
 
 
-def set_surf_size(surface, wh):
+def set_surf_size(
+    surface: pygame.surface.Surface, wh: tuple[int | float, int | float]
+) -> pygame.surface.Surface:
     """Sets the size of a surface"""
     return pygame.transform.scale(surface, to_int(wh))
 
@@ -127,7 +128,9 @@ def get_colors(
     return tuple(colors)
 
 
-def average_color(surface: pygame.surface.Surface) -> list[int]:
+def average_color(
+    surface: pygame.surface.Surface,
+) -> Generator[int, None, None]:
     "Returns the average RGB value of a surface"
     s_r, s_g, s_b = 0, 0, 0
     colors = get_colors(surface)
@@ -197,17 +200,23 @@ def farthest(number: int | float, lst: list[L]) -> L:
     return lst[delta.index(max(delta))]
 
 
-class GameEntity(sprite.Sprite):
+class GameEntity:
     "Base Class for all entities"
 
     def __init__(
         self,
         name: str,
+        world: WorldBase,
+        image: pygame.surface.Surface | None = None,
         **kwargs: Any,
     ) -> None:
-        super().__init__(name)
+        self.name = name
+        self.world = world
+        self.image = image
 
-        self.add_components((sprite.MovementComponent(),))
+        self.location = Vector2(0, 0)
+        self.destination = Vector2(0, 0)
+        self.speed = 0
 
         self.scan = 100
         if self.image is not None:
@@ -258,6 +267,16 @@ class GameEntity(sprite.Sprite):
         "Process brain and move according to time passed if speed > 0 and not at destination"
         if self.doprocess:
             self.brain.think()
+
+        if self.speed > 0 and self.location != self.destination:
+            # vec_to_dest = self.destination - self.location
+            # distance_to_dest = vec_to_dest.get_length()
+            vec_to_dest = Vector2.from_points(self.location, self.destination)
+            distance_to_dest = self.location.get_distance_to(self.destination)
+            heading = vec_to_dest.normalized()
+            # prevent going back and forward really fast once it make it close to destination
+            travel_distance = min(distance_to_dest, (time_passed * self.speed))
+            self.location += heading * round(travel_distance)
 
     def is_over(self, point: tuple[int, int]) -> bool:
         "Return True if point is over self.image"
