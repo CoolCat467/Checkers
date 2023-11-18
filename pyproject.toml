@@ -1,10 +1,10 @@
 [build-system]
-requires = ["setuptools>=61.0"]
+requires = ["setuptools >= 64"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "checkers"
-version = "2.0.0"
+dynamic = ["version"]
 authors = [
   { name="CoolCat467" },
 ]
@@ -17,6 +17,7 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
     "Operating System :: OS Independent",
     "Typing :: Typed",
@@ -25,8 +26,11 @@ keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "a
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
-    "trio>=0.23.0",
+    "trio>=0.23.1",
 ]
+
+[tool.setuptools.dynamic]
+version = {attr = "checkers.game.__version__"}
 
 [project.urls]
 "Homepage" = "https://github.com/CoolCat467/Checkers"

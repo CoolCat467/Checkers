@@ -19,7 +19,7 @@ import os
 import platform
 from collections import deque
 from os import path
-from typing import TYPE_CHECKING, Any, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeAlias, TypeVar
 
 import pygame
 import trio
@@ -53,31 +53,31 @@ if TYPE_CHECKING:
     from pygame.surface import Surface
 
 __title__ = "Checkers"
-__version__ = "0.0.5"
+__version__ = "2.0.1"
 __author__ = "CoolCat467"
 
 SCREEN_SIZE = (640, 480)
 
-FPS = 48
+FPS: Final = 48
 VSYNC = True
-PORT = 31613
+PORT: Final = 31613
 
-PLAYERS = ["Red Player", "Black Player"]
+PLAYERS: Final = ["Red Player", "Black Player"]
 
 
-BLACK = (0, 0, 0)
-BLUE = (15, 15, 255)
-GREEN = (0, 255, 0)
-CYAN = (0, 255, 255)
-RED = (255, 0, 0)
-MAGENTA = (255, 0, 255)
-YELLOW = (255, 255, 0)
-WHITE = (255, 255, 255)
+BLACK: Final = (0, 0, 0)
+BLUE: Final = (15, 15, 255)
+GREEN: Final = (0, 255, 0)
+CYAN: Final = (0, 255, 255)
+RED: Final = (255, 0, 0)
+MAGENTA: Final = (255, 0, 255)
+YELLOW: Final = (255, 255, 0)
+WHITE: Final = (255, 255, 255)
 
 
 T = TypeVar("T")
 
-IS_WINDOWS = platform.system() == "Windows"
+IS_WINDOWS: Final = platform.system() == "Windows"
 
 Pos: TypeAlias = tuple[int, int]
 
