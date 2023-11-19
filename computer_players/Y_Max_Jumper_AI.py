@@ -104,6 +104,7 @@ def turn(state: State) -> Action:
 
 
 class MaxYJumperPlayer(RemoteState):
+
     """Max Y Jumper Player"""
 
     __slots__ = ()

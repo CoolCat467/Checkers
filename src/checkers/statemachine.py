@@ -23,6 +23,7 @@ Machine = TypeVar("Machine", bound="BaseStateMachine", covariant=True)
 
 
 class BaseState(Generic[Machine]):
+
     "Base class for states."
 
     __slots__ = ("name", "machine_ref")
@@ -54,6 +55,7 @@ SyncMachine = TypeVar("SyncMachine", bound="StateMachine", covariant=True)
 
 
 class State(BaseState[SyncMachine]):
+
     "Base class for synchronous states."
 
     __slots__ = ()
@@ -76,11 +78,14 @@ class State(BaseState[SyncMachine]):
 
 
 AsyncMachine = TypeVar(
-    "AsyncMachine", bound="AsyncStateMachine", covariant=True,
+    "AsyncMachine",
+    bound="AsyncStateMachine",
+    covariant=True,
 )
 
 
 class AsyncState(BaseState[AsyncMachine]):
+
     "Base class for asynchronous states."
 
     __slots__ = ()
@@ -103,6 +108,7 @@ class AsyncState(BaseState[AsyncMachine]):
 
 
 class BaseStateMachine:
+
     "State Machine base class."
 
     __slots__ = ("states", "active_state", "__weakref__")
@@ -116,6 +122,7 @@ class BaseStateMachine:
 
 
 class StateMachine(BaseStateMachine):
+
     "Synchronous State Machine base class."
 
     __slots__ = ()
@@ -178,6 +185,7 @@ class StateMachine(BaseStateMachine):
 
 
 class AsyncStateMachine(BaseStateMachine):
+
     "Asynchronous State Machine base class."
 
     __slots__ = ()

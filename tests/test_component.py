@@ -52,7 +52,8 @@ def test_component_manager_property_error() -> None:
     component = Component("waffle")
     assert not component.manager_exists
     with pytest.raises(
-        AttributeError, match="^No component manager bound for",
+        AttributeError,
+        match="^No component manager bound for",
     ):
         component.manager  # noqa: B018
 

@@ -21,7 +21,8 @@ if TYPE_CHECKING:
 
 
 def amol(
-    lst: Iterable[int | float], **kwargs: int | float,
+    lst: Iterable[int | float],
+    **kwargs: int | float,
 ) -> tuple[int | float, ...]:
     "All Math On List; a=Add, s=Subtract, m=Multiply, d=Divide, p=To the power of."
     # Math Operator acting upon All values of a List
@@ -82,7 +83,8 @@ def to_chr(lst: Iterable[int]) -> list[str]:
 
 
 def scale_surf(
-    surface: pygame.surface.Surface, scalar: float,
+    surface: pygame.surface.Surface,
+    scalar: float,
 ) -> pygame.surface.Surface:
     "Scales surfaces by a scalar."
     size = surface.get_size()
@@ -90,14 +92,16 @@ def scale_surf(
 
 
 def scale_surfs(
-    surfaces: Iterable[pygame.surface.Surface], scalar: float,
+    surfaces: Iterable[pygame.surface.Surface],
+    scalar: float,
 ) -> list[pygame.surface.Surface]:
     "Scales multiple surfaces by a scalar."
     return [scale_surf(surface, scalar) for surface in surfaces]
 
 
 def set_surf_size(
-    surface: pygame.surface.Surface, wh: tuple[int | float, int | float],
+    surface: pygame.surface.Surface,
+    wh: tuple[int | float, int | float],
 ) -> pygame.surface.Surface:
     """Sets the size of a surface."""
     return pygame.transform.scale(surface, to_int(wh))
@@ -143,7 +147,8 @@ def average_color(
 
 
 def replace_with_color(
-    surface: pygame.surface.Surface, color: tuple[int, int, int],
+    surface: pygame.surface.Surface,
+    color: tuple[int, int, int],
 ) -> pygame.surface.Surface:
     "Fill all pixels of the surface with color, preserve transparency."
     surface = surface.copy().convert_alpha()
@@ -179,7 +184,8 @@ def replace_color(
 
 
 def get_deltas(
-    number: int | float, lst: Iterable[int | float],
+    number: int | float,
+    lst: Iterable[int | float],
 ) -> list[int | float]:
     "Returns a list of the change from a number each value of a list is."
     return [abs(i - number) for i in lst]
@@ -201,6 +207,7 @@ def farthest(number: int | float, lst: list[L]) -> L:
 
 
 class GameEntity:
+
     "Base Class for all entities."
 
     def __init__(
@@ -260,7 +267,11 @@ class GameEntity:
             pygame.draw.rect(surface, (0, 0, 0), self.rect, 1)
             if self.scan:
                 pygame.draw.circle(
-                    surface, (0, 0, 60), to_int([x, y]), self.scan, 1,
+                    surface,
+                    (0, 0, 60),
+                    to_int([x, y]),
+                    self.scan,
+                    1,
                 )
 
     def process(self, time_passed: float) -> None:
@@ -289,7 +300,9 @@ class GameEntity:
         return self.rect.colliderect(sprite.rect)
 
     def collide(
-        self, entityname: str, action: Callable[[GameEntity, GameEntity], None],
+        self,
+        entityname: str,
+        action: Callable[[GameEntity, GameEntity], None],
     ) -> None:
         "For every entity with the name of entityname, call action(self, entity)."
         for entity in self.world.get_type(entityname):
@@ -298,6 +311,7 @@ class GameEntity:
 
 
 class BaseButton(GameEntity):
+
     "Base button, if entity self.trigger is over image and mouse down, call self.action(self)."
 
     def __init__(
@@ -351,6 +365,7 @@ class BaseButton(GameEntity):
 
 
 class WorldBase:
+
     "Base class of world objects."
 
     def __init__(self) -> None:
@@ -415,7 +430,10 @@ class WorldBase:
         surface.lock()
 
     def get_close_entity(
-        self, name: str, location: tuple[int, int] | Vector2, rnge: int = 100,
+        self,
+        name: str,
+        location: tuple[int, int] | Vector2,
+        rnge: int = 100,
     ) -> GameEntity | None:
         "Find an entity with name within range of location."
         # find an entity within range of location
@@ -429,7 +447,10 @@ class WorldBase:
         return None
 
     def get_closest_entity(
-        self, name: str, location: tuple[int, int] | Vector2, rnge: int = 100,
+        self,
+        name: str,
+        location: tuple[int, int] | Vector2,
+        rnge: int = 100,
     ) -> GameEntity | None:
         "Find the closest entity with name within range of location."
         # find the closest entity within range of location

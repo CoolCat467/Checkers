@@ -10,6 +10,7 @@ from unittest.mock import AsyncMock, Mock
 
 
 class WriteFunctionMock(Mock):
+
     """Mock write function, storing the written data."""
 
     def __init__(self, *a, **kw):
@@ -17,7 +18,8 @@ class WriteFunctionMock(Mock):
         self.combined_data = bytearray()
 
     def __call__(
-        self, data: bytes,
+        self,
+        data: bytes,
     ) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Override mock's ``__call__`` to extend our :attr:`.combined_data` bytearray.
 
@@ -29,7 +31,9 @@ class WriteFunctionMock(Mock):
         return super().__call__(data)
 
     def assert_has_data(
-        self, data: bytearray, ensure_called: bool = True,
+        self,
+        data: bytearray,
+        ensure_called: bool = True,
     ) -> None:
         """Ensure that the combined write data by the mocked function matches expected ``data``."""
         if ensure_called:
@@ -42,10 +46,12 @@ class WriteFunctionMock(Mock):
 
 
 class WriteFunctionAsyncMock(WriteFunctionMock, AsyncMock):
+
     """Asynchronous mock write function, storing the written data."""
 
 
 class ReadFunctionMock(Mock):
+
     """Mock read function, giving pre-defined data."""
 
     def __init__(self, *a, combined_data: bytearray | None = None, **kw):
@@ -55,7 +61,8 @@ class ReadFunctionMock(Mock):
         self.combined_data = combined_data
 
     def __call__(
-        self, length: int,
+        self,
+        length: int,
     ) -> bytearray:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Override mock's __call__ to make it return part of our :attr:`.combined_data` bytearray.
 
@@ -80,4 +87,5 @@ class ReadFunctionMock(Mock):
 
 
 class ReadFunctionAsyncMock(ReadFunctionMock, AsyncMock):
+
     """Asynchronous mock read function, giving pre-defined data."""

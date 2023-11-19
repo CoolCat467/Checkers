@@ -38,6 +38,7 @@ def synchronize(f: Callable[P, Coroutine[Any, Any, T]]) -> Callable[P, T]:
 
 
 class SynchronizedMixin:
+
     """Class acting as another wrapped object, with all async methods synchronized.
 
     This class needs :attr:`._WRAPPED_ATTRIBUTE` class variable to be set as the name of the internally
@@ -102,6 +103,7 @@ class SynchronizedMixin:
 
 
 class UnpropagatingMockMixin(Generic[T_Mock]):
+
     """Provides common functionality for our :class:`~unittest.mock.Mock` classes.
 
     By default, mock objects propagate themselves by returning a new instance of the same mock
@@ -160,6 +162,7 @@ class UnpropagatingMockMixin(Generic[T_Mock]):
 
 
 class CustomMockMixin(UnpropagatingMockMixin):
+
     """Provides common functionality for our custom mock types.
 
     * Stops propagation of same ``spec_set`` restricted mock in child mocks

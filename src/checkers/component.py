@@ -16,6 +16,7 @@ T = TypeVar("T")
 
 
 class Event(Generic[T]):
+
     "Event with name and data."
 
     __slots__ = ("name", "data", "level")
@@ -42,6 +43,7 @@ class Event(Generic[T]):
 
 
 class Component:
+
     "Component base class."
 
     __slots__ = ("name", "__manager")
@@ -79,7 +81,9 @@ class Component:
     ) -> None:
         "Register handler with bound component manager."
         self.manager.register_component_handler(
-            event_name, handler_coro, self.name,
+            event_name,
+            handler_coro,
+            self.name,
         )
 
     def register_handlers(
@@ -123,13 +127,15 @@ class Component:
         return self.manager.get_component(component_name)
 
     def get_components(
-        self, component_names: Iterable[str],
+        self,
+        component_names: Iterable[str],
     ) -> list["Component"]:
         "Get Components from manager."
         return self.manager.get_components(component_names)
 
 
 class ComponentManager(Component):
+
     "Component manager class."
 
     __slots__ = ("__event_handlers", "__components", "__weakref__")
@@ -138,7 +144,8 @@ class ComponentManager(Component):
         "If own_name is set, add self to list of components as specified name."
         super().__init__(name)
         self.__event_handlers: dict[
-            str, set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]],
+            str,
+            set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]],
         ] = {}
         self.__components: dict[str, Component] = {}
 
@@ -179,7 +186,9 @@ class ComponentManager(Component):
         return bool(self.__event_handlers.get(event_name))
 
     async def raise_event_in_nursery(
-        self, event: Event[Any], nursery: trio.Nursery,
+        self,
+        event: Event[Any],
+        nursery: trio.Nursery,
     ) -> None:
         """Raise event in a particular trio nursery."""
         # Forward leveled events up; They'll come back to us soon enough.
@@ -289,12 +298,16 @@ class ComponentManager(Component):
 
 
 class ExternalRaiseManager(ComponentManager):
+
     """Component Manager, but raises events in an external nursery."""
 
     __slots__ = ("nursery",)
 
     def __init__(
-        self, name: str, nursery: trio.Nursery, own_name: str | None = None,
+        self,
+        name: str,
+        nursery: trio.Nursery,
+        own_name: str | None = None,
     ) -> None:
         super().__init__(name, own_name)
         self.nursery = nursery

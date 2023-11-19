@@ -14,6 +14,7 @@ from typing import Generic, NamedTuple, TypeVar
 
 
 class Player(IntEnum):
+
     """Enum for player status"""
 
     __slots__ = ()
@@ -26,6 +27,7 @@ Action = TypeVar("Action")
 
 
 class MinimaxResult(NamedTuple, Generic[Action]):
+
     """Minimax Result"""
 
     value: int | float
@@ -33,6 +35,7 @@ class MinimaxResult(NamedTuple, Generic[Action]):
 
 
 class Minimax(ABC, Generic[State, Action]):
+
     """Base class for Minimax AIs"""
 
     __slots__ = ()
@@ -75,7 +78,8 @@ class Minimax(ABC, Generic[State, Action]):
             return MinimaxResult(cls.value(state), None)
         if depth is not None and depth <= 0:
             return MinimaxResult(
-                cls.value(state), next(iter(cls.actions(state))),
+                cls.value(state),
+                next(iter(cls.actions(state))),
             )
         next_down = None if depth is None else depth - 1
 
@@ -99,6 +103,7 @@ class Minimax(ABC, Generic[State, Action]):
 
 
 class AsyncMinimax(ABC, Generic[State, Action]):
+
     """Base class for Minimax AIs"""
 
     __slots__ = ()
@@ -141,7 +146,8 @@ class AsyncMinimax(ABC, Generic[State, Action]):
             return MinimaxResult(await cls.value(state), None)
         if depth is not None and depth <= 0:
             return MinimaxResult(
-                await cls.value(state), next(iter(await cls.actions(state))),
+                await cls.value(state),
+                next(iter(await cls.actions(state))),
             )
         next_down = None if depth is None else depth - 1
 
@@ -157,7 +163,8 @@ class AsyncMinimax(ABC, Generic[State, Action]):
         best_action: Action | None = None
         for action in await cls.actions(state):
             result = await cls.minimax(
-                await cls.result(state, action), next_down,
+                await cls.result(state, action),
+                next_down,
             )
             new_value = best(value, result.value)
             if new_value != value:

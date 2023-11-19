@@ -27,6 +27,7 @@ PORT = 31613
 
 
 class RemoteState(Component, metaclass=ABCMeta):
+
     """Remote State
 
     Keeps track of game state and call preform_action when it's this clients
@@ -80,7 +81,8 @@ class RemoteState(Component, metaclass=ABCMeta):
         await self.preform_action(action)
 
     async def handle_action_complete(
-        self, event: Event[tuple[Pos, Pos, int]],
+        self,
+        event: Event[tuple[Pos, Pos, int]],
     ) -> None:
         """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
@@ -98,7 +100,8 @@ class RemoteState(Component, metaclass=ABCMeta):
         self.pieces[pos] = type_
 
     async def handle_initial_config(
-        self, event: Event[tuple[Pos, int]],
+        self,
+        event: Event[tuple[Pos, int]],
     ) -> None:
         """Set up initial state and perform our turn if possible."""
         board_size, turn = event.data
@@ -114,6 +117,7 @@ class RemoteState(Component, metaclass=ABCMeta):
 
 
 class MachineClient(ComponentManager):
+
     """Manager that runs until client_disconnected event fires."""
 
     __slots__ = ("running",)
@@ -142,12 +146,16 @@ class MachineClient(ComponentManager):
 
 
 async def run_client(
-    host: str, port: int, remote_state_class: type[RemoteState],
+    host: str,
+    port: int,
+    remote_state_class: type[RemoteState],
 ) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
-            "checkers", main_nursery, "client",
+            "checkers",
+            main_nursery,
+            "client",
         )
         client = MachineClient(remote_state_class)
         event_manager.add_component(client)
@@ -160,7 +168,9 @@ async def run_client(
 
 
 def run_client_sync(
-    host: int, port: int, remote_state_class: type[RemoteState],
+    host: int,
+    port: int,
+    remote_state_class: type[RemoteState],
 ) -> None:
     """Synchronous entry point."""
     trio.run(run_client, host, port, remote_state_class)

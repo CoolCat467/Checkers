@@ -35,7 +35,9 @@ async def read_advertisements(
         # Allow multiple copies of this program on one machine
         # (not strictly needed)
         udp_socket.setsockopt(
-            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1,
+            trio.socket.SOL_SOCKET,
+            trio.socket.SO_REUSEADDR,
+            1,
         )
 
         await udp_socket.bind(("", ADVERTISEMENT_PORT))
@@ -64,12 +66,16 @@ async def read_advertisements(
         if addrinfo[0] == trio.socket.AF_INET:  # IPv4
             mreq = group_bin + struct.pack("=I", trio.socket.INADDR_ANY)
             udp_socket.setsockopt(
-                trio.socket.IPPROTO_IP, trio.socket.IP_ADD_MEMBERSHIP, mreq,
+                trio.socket.IPPROTO_IP,
+                trio.socket.IP_ADD_MEMBERSHIP,
+                mreq,
             )
         else:
             mreq = group_bin + struct.pack("@I", 0)
             udp_socket.setsockopt(
-                trio.socket.IPPROTO_IPV6, trio.socket.IPV6_JOIN_GROUP, mreq,
+                trio.socket.IPPROTO_IPV6,
+                trio.socket.IPV6_JOIN_GROUP,
+                mreq,
             )
 
         buffer = b""
@@ -110,6 +116,7 @@ async def read_advertisements(
 
 
 class GameClient(NetworkEventComponent):
+
     """Game Client Network Event Component.
 
     This class handles connecting to the game server, transmitting events
@@ -195,7 +202,8 @@ class GameClient(NetworkEventComponent):
         assert self.not_connected
 
     async def handle_read_event(
-        self, tick_event: Event[TickEventData],
+        self,
+        tick_event: Event[TickEventData],
     ) -> None:
         """Raise events from server."""
         ##        async with self.tick_lock:
@@ -219,7 +227,8 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event(f"client[{self.name}]_read_event", None))
 
     async def handle_client_connect(
-        self, event: Event[tuple[str, int]],
+        self,
+        event: Event[tuple[str, int]],
     ) -> None:
         """Have client connect to address specified in event."""
         if not self.not_connected:
@@ -297,7 +306,8 @@ class GameClient(NetworkEventComponent):
         await self.write_event(Event("select_tile->server", buffer))
 
     async def read_delete_piece_animation(
-        self, event: Event[bytearray],
+        self,
+        event: Event[bytearray],
     ) -> None:
         """Read delete_piece_animation event from server."""
         buffer = Buffer(event.data)
@@ -309,7 +319,8 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_update_piece_animation(
-        self, event: Event[bytearray],
+        self,
+        event: Event[bytearray],
     ) -> None:
         """Read update_piece_animation event from server."""
         buffer = Buffer(event.data)

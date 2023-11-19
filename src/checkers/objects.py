@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
 
 class Text(sprite.Sprite):
+
     "Text element."
 
     __slots__ = ("__text", "font")
@@ -57,6 +58,7 @@ class Text(sprite.Sprite):
 
 
 class OutlinedText(Text):
+
     "Outlined Text element."
 
     __slots__ = ("outline", "inside")
@@ -100,6 +102,7 @@ class OutlinedText(Text):
 
 
 class Button(OutlinedText):
+
     "Button element."
 
     __slots__ = ()
@@ -110,7 +113,8 @@ class Button(OutlinedText):
         self.add_component(sprite.DragClickEventComponent())
 
     async def handle_click(
-        self, event: Event[dict[str, tuple[int, int] | int]],
+        self,
+        event: Event[dict[str, tuple[int, int] | int]],
     ) -> None:
         """Handle ckick events."""
 

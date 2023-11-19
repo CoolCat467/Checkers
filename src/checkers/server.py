@@ -31,7 +31,9 @@ PORT: Final = 31613
 
 
 def generate_pieces(
-    board_width: int, board_height: int, colors: int = 2,
+    board_width: int,
+    board_height: int,
+    colors: int = 2,
 ) -> dict[Pos, int]:
     """Generate data about each piece."""
     pieces: dict[Pos, int] = {}
@@ -53,6 +55,7 @@ def generate_pieces(
 
 
 class ServerClient(NetworkEventComponent):
+
     """Server Client Network Event Component.
 
     When clients connect to server, this class handles the incoming
@@ -143,7 +146,8 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->create_piece", buffer))
 
     async def handle_piece_select(
-        self, event: Event[tuple[Pos, bool]],
+        self,
+        event: Event[tuple[Pos, bool]],
     ) -> None:
         """Read piece select event and reraise as server[write]->select_piece."""
         piece_pos, outline_value = event.data
@@ -188,7 +192,8 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_update_piece_animation(
-        self, event: Event[tuple[Pos, int]],
+        self,
+        event: Event[tuple[Pos, int]],
     ) -> None:
         """Read update piece animation event and reraise as server[write]->update_piece_animation."""
         piece_pos, piece_type = event.data
@@ -203,7 +208,8 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_move_piece_animation(
-        self, event: Event[tuple[Pos, Pos]],
+        self,
+        event: Event[tuple[Pos, Pos]],
     ) -> None:
         """Read move piece animation event and reraise as server[write]->move_piece_animation."""
         piece_current_pos, piece_new_pos = event.data
@@ -238,7 +244,8 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->game_over", buffer))
 
     async def handle_action_complete(
-        self, event: Event[tuple[Pos, Pos, int]],
+        self,
+        event: Event[tuple[Pos, Pos, int]],
     ) -> None:
         """Read action complete event and reraise as server[write]->action_complete."""
         from_pos, to_pos, player_turn = event.data
@@ -252,7 +259,8 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->action_complete", buffer))
 
     async def handle_initial_config(
-        self, event: Event[tuple[Pos, int]],
+        self,
+        event: Event[tuple[Pos, int]],
     ) -> None:
         """Read initial config event and reraise as server[write]->initial_config."""
         board_size, player_turn = event.data
@@ -266,6 +274,7 @@ class ServerClient(NetworkEventComponent):
 
 
 class CheckersState(State):
+
     """Subclass of State that keeps track of actions in `action_queue`."""
 
     __slots__ = ("action_queue",)
@@ -307,6 +316,7 @@ class CheckersState(State):
 
 
 class GameServer(Server):
+
     """Checkers server.
 
     Handles accepting incoming connections from clients and handles
@@ -383,7 +393,8 @@ class GameServer(Server):
         ).encode()
         print("post_advertisement")
         await udp_socket.sendto(
-            advertisement, (send_to_ip, ADVERTISEMENT_PORT),
+            advertisement,
+            (send_to_ip, ADVERTISEMENT_PORT),
         )
 
     def stop_advertising(self) -> None:
@@ -512,7 +523,8 @@ class GameServer(Server):
         # Raise initial config event with board size and initial turn.
         await self.raise_event(
             Event(
-                "initial_config->network", (self.board_size, self.state.turn),
+                "initial_config->network",
+                (self.board_size, self.state.turn),
             ),
         )
 
@@ -580,7 +592,8 @@ class GameServer(Server):
             self.client_count -= 1
 
     async def handle_network_select_piece(
-        self, event: Event[tuple[int, Pos]],
+        self,
+        event: Event[tuple[int, Pos]],
     ) -> None:
         """Handle piece event from client."""
         client_id, tile_pos = event.data
@@ -612,7 +625,9 @@ class GameServer(Server):
         await self.player_select_piece(player, tile_pos)
 
     async def player_select_piece(
-        self, player: int, piece_pos: Pos | None,
+        self,
+        player: int,
+        piece_pos: Pos | None,
     ) -> None:
         """Update glowing tiles from new selected piece."""
         ignore: set[Pos] = set()
@@ -639,7 +654,8 @@ class GameServer(Server):
                     nursery.start_soon(
                         self.raise_event,
                         Event(
-                            "select_piece->network", (prev_selection, False),
+                            "select_piece->network",
+                            (prev_selection, False),
                         ),
                     )
 
@@ -679,7 +695,9 @@ class GameServer(Server):
         )
 
     async def handle_king_animation(
-        self, kinged_pos: Pos, piece_type: int,
+        self,
+        kinged_pos: Pos,
+        piece_type: int,
     ) -> None:
         """Handle jump animation."""
         await self.raise_event(
@@ -687,7 +705,8 @@ class GameServer(Server):
         )
 
     async def handle_action_animations(
-        self, actions: deque[tuple[str, Iterable[Pos | int]]],
+        self,
+        actions: deque[tuple[str, Iterable[Pos | int]]],
     ) -> None:
         """Handle action animations."""
         while actions:
@@ -708,7 +727,8 @@ class GameServer(Server):
                 raise NotImplementedError(f"Animation for action {name}")
 
     async def handle_network_select_tile(
-        self, event: Event[tuple[int, Pos]],
+        self,
+        event: Event[tuple[int, Pos]],
     ) -> None:
         """Handle select tile event from network."""
         client_id, tile_pos = event.data
@@ -789,7 +809,9 @@ async def run_server(server_class: type[GameServer]) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
-            "checkers", main_nursery, "client",
+            "checkers",
+            main_nursery,
+            "client",
         )
         server = server_class()
         event_manager.add_component(server)

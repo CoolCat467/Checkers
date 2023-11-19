@@ -31,6 +31,7 @@ class TimeoutException(Exception):
 
 
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
+
     """Network Component (client)."""
 
     __slots__ = ("_stream", "timeout")
@@ -134,6 +135,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
 
 class NetworkEventComponent(NetworkComponent):
+
     """Network Event Component - Send events over the network."""
 
     __slots__ = (
@@ -162,7 +164,9 @@ class NetworkEventComponent(NetworkComponent):
         )
 
     def register_network_write_event(
-        self, event_name: str, packet_id: int,
+        self,
+        event_name: str,
+        packet_id: int,
     ) -> None:
         """Map event name to serverbound packet id."""
         if event_name in self._write_event_name_to_packet_id:
@@ -202,7 +206,9 @@ class NetworkEventComponent(NetworkComponent):
         return Event(event_name, event_data)
 
     def register_read_network_event(
-        self, packet_id: int, event_name: str,
+        self,
+        packet_id: int,
+        event_name: str,
     ) -> None:
         """Map clientbound packet id to event name."""
         if packet_id in self._read_packet_id_to_event_name:
@@ -222,6 +228,7 @@ class NetworkEventComponent(NetworkComponent):
 
 
 class Server(ComponentManager):
+
     """Asynchronous TCP Server."""
 
     __slots__ = ("cancel_scope",)
@@ -250,7 +257,9 @@ class Server(ComponentManager):
         self.cancel_scope = trio.CancelScope()
         async with trio.open_nursery() as nursery:
             listeners = await trio.open_tcp_listeners(
-                port, host=host, backlog=backlog,
+                port,
+                host=host,
+                backlog=backlog,
             )
 
             async def handle_serve(
@@ -288,7 +297,8 @@ def run() -> None:
     "Run test of module."
 
     async def client_connect(
-        port: int, stop_server: Callable[[], None],
+        port: int,
+        stop_server: Callable[[], None],
     ) -> None:
         await trio.sleep(0.05)
         # manager = ComponentManager("manager")
@@ -320,7 +330,8 @@ def run() -> None:
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:
                 client = NetworkEventComponent.from_stream(
-                    "client", stream=stream,
+                    "client",
+                    stream=stream,
                 )
 
                 client.register_read_network_event(0, "repost_event")

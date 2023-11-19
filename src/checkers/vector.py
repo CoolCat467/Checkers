@@ -21,6 +21,7 @@ if TYPE_CHECKING:  # pragma: nocover
 
 
 class Vector2(NamedTuple):
+
     """Vector2 Object. Takes an x and a y choordinate."""
 
     x: float

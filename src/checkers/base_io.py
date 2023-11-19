@@ -35,6 +35,7 @@ R = TypeVar("R")
 
 
 class StructFormat(str, Enum):
+
     """All possible write/read struct types.
 
     .. seealso:
@@ -72,7 +73,9 @@ INT_FORMATS_TYPE: TypeAlias = Literal[
 ]
 
 FLOAT_FORMATS_TYPE: TypeAlias = Literal[
-    StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT,
+    StructFormat.FLOAT,
+    StructFormat.DOUBLE,
+    StructFormat.HALFFLOAT,
 ]
 
 # endregion
@@ -81,6 +84,7 @@ FLOAT_FORMATS_TYPE: TypeAlias = Literal[
 
 
 class BaseAsyncWriter(ABC):
+
     """Base class holding asynchronous write buffer/connection interactions."""
 
     __slots__ = ()
@@ -95,19 +99,28 @@ class BaseAsyncWriter(ABC):
 
     @overload
     async def write_value(
-        self, fmt: FLOAT_FORMATS_TYPE, value: float, /,
+        self,
+        fmt: FLOAT_FORMATS_TYPE,
+        value: float,
+        /,
     ) -> None:
         ...
 
     @overload
     async def write_value(
-        self, fmt: Literal[StructFormat.BOOL], value: bool, /,
+        self,
+        fmt: Literal[StructFormat.BOOL],
+        value: bool,
+        /,
     ) -> None:
         ...
 
     @overload
     async def write_value(
-        self, fmt: Literal[StructFormat.CHAR], value: str, /,
+        self,
+        fmt: Literal[StructFormat.CHAR],
+        value: str,
+        /,
     ) -> None:
         ...
 
@@ -116,7 +129,11 @@ class BaseAsyncWriter(ABC):
         await self.write(struct.pack(">" + fmt.value, value))
 
     async def _write_varuint(
-        self, value: int, /, *, max_bits: int | None = None,
+        self,
+        value: int,
+        /,
+        *,
+        max_bits: int | None = None,
     ) -> None:
         """Write an arbitrarily big unsigned integer in a variable length format.
 
@@ -198,7 +215,10 @@ class BaseAsyncWriter(ABC):
         await self.write(data)
 
     async def write_optional(
-        self, value: T | None, /, writer: Callable[[T], Awaitable[R]],
+        self,
+        value: T | None,
+        /,
+        writer: Callable[[T], Awaitable[R]],
     ) -> R | None:
         """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
@@ -215,6 +235,7 @@ class BaseAsyncWriter(ABC):
 
 
 class BaseSyncWriter(ABC):
+
     """Base class holding synchronous write buffer/connection interactions."""
 
     __slots__ = ()
@@ -233,13 +254,19 @@ class BaseSyncWriter(ABC):
 
     @overload
     def write_value(
-        self, fmt: Literal[StructFormat.BOOL], value: bool, /,
+        self,
+        fmt: Literal[StructFormat.BOOL],
+        value: bool,
+        /,
     ) -> None:
         ...
 
     @overload
     def write_value(
-        self, fmt: Literal[StructFormat.CHAR], value: str, /,
+        self,
+        fmt: Literal[StructFormat.CHAR],
+        value: str,
+        /,
     ) -> None:
         ...
 
@@ -248,7 +275,11 @@ class BaseSyncWriter(ABC):
         self.write(struct.pack(">" + fmt.value, value))
 
     def _write_varuint(
-        self, value: int, /, *, max_bits: int | None = None,
+        self,
+        value: int,
+        /,
+        *,
+        max_bits: int | None = None,
     ) -> None:
         """Write an arbitrarily big unsigned integer in a variable length format.
 
@@ -330,7 +361,10 @@ class BaseSyncWriter(ABC):
         self.write(data)
 
     def write_optional(
-        self, value: T | None, /, writer: Callable[[T], R],
+        self,
+        value: T | None,
+        /,
+        writer: Callable[[T], R],
     ) -> R | None:
         """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
@@ -351,6 +385,7 @@ class BaseSyncWriter(ABC):
 
 
 class BaseAsyncReader(ABC):
+
     """Base class holding asynchronous read buffer/connection interactions."""
 
     __slots__ = ()
@@ -487,7 +522,8 @@ class BaseAsyncReader(ABC):
         return chars
 
     async def read_optional(
-        self, reader: Callable[[], Awaitable[R]],
+        self,
+        reader: Callable[[], Awaitable[R]],
     ) -> R | None:
         """Reads a bool showing if a value is present, if so, also reads this value with ``reader`` function.
 
@@ -501,6 +537,7 @@ class BaseAsyncReader(ABC):
 
 
 class BaseSyncReader(ABC):
+
     """Base class holding synchronous read buffer/connection interactions."""
 
     __slots__ = ()

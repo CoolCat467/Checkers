@@ -31,6 +31,7 @@ Pos = tuple[int, int]
 
 
 class Action(NamedTuple):
+
     """Represents an action."""
 
     from_pos: Pos
@@ -38,6 +39,7 @@ class Action(NamedTuple):
 
 
 class ActionSet(NamedTuple):
+
     """Represents a set of actions."""
 
     jumps: dict[Pos, list[Pos]]
@@ -78,6 +80,7 @@ def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
 
 
 class State:
+
     """Represents state of checkers game."""
 
     __slots__ = ("size", "turn", "pieces", "pre_calculated_actions")
@@ -316,7 +319,8 @@ class State:
 
         # For each side tile in the jumpable tiles for this type of piece,
         for direction, side in pawn_modify(
-            tuple(enumerate(sides)), piece_type,
+            tuple(enumerate(sides)),
+            piece_type,
         ):
             # Make sure side exists
             if not self.valid_location(side):

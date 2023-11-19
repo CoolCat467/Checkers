@@ -70,6 +70,7 @@ def turn(state: State) -> Action:
 
 
 class ComputerPlayer(RemoteState):
+
     """Computer player"""
 
     __slots__ = ()
