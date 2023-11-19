@@ -22,7 +22,7 @@ from checkers.network_shared import (
 async def read_advertisements(
     timeout: int = 3,
 ) -> list[tuple[str, tuple[str, int]]]:
-    """Read server advertisements from network. Return tuples of (motd, (host, port))"""
+    """Read server advertisements from network. Return tuples of (motd, (host, port))."""
     # Look up multicast group address in name server and find out IP version
     addrinfo = (await trio.socket.getaddrinfo(ADVERTISEMENT_IP, None))[0]
 
@@ -183,7 +183,7 @@ class GameClient(NetworkEventComponent):
         print(f"print_no_actions {event = }")
 
     async def raise_disconnect(self, message: str) -> None:
-        """Raise client_disconnected event with given message"""
+        """Raise client_disconnected event with given message."""
         print(f"{self.__class__.__name__}: {message}")
         if not self.manager_exists:
             print(
@@ -197,7 +197,7 @@ class GameClient(NetworkEventComponent):
     async def handle_read_event(
         self, tick_event: Event[TickEventData],
     ) -> None:
-        """Raise events from server"""
+        """Raise events from server."""
         ##        async with self.tick_lock:
         ##        print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
@@ -221,7 +221,7 @@ class GameClient(NetworkEventComponent):
     async def handle_client_connect(
         self, event: Event[tuple[str, int]],
     ) -> None:
-        """Have client connect to address specified in event"""
+        """Have client connect to address specified in event."""
         if not self.not_connected:
             return
         try:
@@ -236,7 +236,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_disconnect("Error connecting to server.")
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event from server"""
+        """Read create_piece event from server."""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
@@ -247,7 +247,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_select_piece(self, event: Event[bytearray]) -> None:
-        """Read create_piece event from server"""
+        """Read create_piece event from server."""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
@@ -258,7 +258,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_create_tile(self, event: Event[bytearray]) -> None:
-        """Read create_tile event from server"""
+        """Read create_tile event from server."""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
@@ -266,7 +266,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event("gameboard_create_tile", tile_pos))
 
     async def read_delete_tile(self, event: Event[bytearray]) -> None:
-        """Read delete_tile event from server"""
+        """Read delete_tile event from server."""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
@@ -274,7 +274,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event("gameboard_delete_tile", tile_pos))
 
     async def write_piece_click(self, event: Event[tuple[Pos, int]]) -> None:
-        """Write piece click event to server"""
+        """Write piece click event to server."""
         if self.not_connected:
             return
         piece_position, piece_type = event.data
@@ -286,7 +286,7 @@ class GameClient(NetworkEventComponent):
         await self.write_event(Event("select_piece->server", buffer))
 
     async def write_tile_click(self, event: Event[Pos]) -> None:
-        """Write tile click event to server"""
+        """Write tile click event to server."""
         if self.not_connected:
             return
         tile_position = event.data
@@ -299,7 +299,7 @@ class GameClient(NetworkEventComponent):
     async def read_delete_piece_animation(
         self, event: Event[bytearray],
     ) -> None:
-        """Read delete_piece_animation event from server"""
+        """Read delete_piece_animation event from server."""
         buffer = Buffer(event.data)
 
         tile_pos = read_position(buffer)
@@ -311,7 +311,7 @@ class GameClient(NetworkEventComponent):
     async def read_update_piece_animation(
         self, event: Event[bytearray],
     ) -> None:
-        """Read update_piece_animation event from server"""
+        """Read update_piece_animation event from server."""
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
@@ -322,7 +322,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_move_piece_animation(self, event: Event[bytearray]) -> None:
-        """Read move_piece_animation event from server"""
+        """Read move_piece_animation event from server."""
         buffer = Buffer(event.data)
 
         piece_current_pos = read_position(buffer)
@@ -336,7 +336,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_animation_state(self, event: Event[bytearray]) -> None:
-        """Read animation_state event from server"""
+        """Read animation_state event from server."""
         buffer = Buffer(event.data)
 
         animation_state = buffer.read_value(StructFormat.BOOL)
@@ -346,7 +346,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_game_over(self, event: Event[bytearray]) -> None:
-        """Read update_piece event from server"""
+        """Read update_piece event from server."""
         buffer = Buffer(event.data)
 
         winner = buffer.read_value(StructFormat.UBYTE)
@@ -370,7 +370,7 @@ class GameClient(NetworkEventComponent):
         )
 
     async def read_initial_config(self, event: Event[bytearray]) -> None:
-        """Read initial_config event from server"""
+        """Read initial_config event from server."""
         buffer = Buffer(event.data)
 
         board_size = read_position(buffer)

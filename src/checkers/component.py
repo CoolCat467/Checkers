@@ -1,4 +1,4 @@
-"Component system module -  Components instead of chaotic class hierarchy mess"
+"Component system module -  Components instead of chaotic class hierarchy mess."
 
 # Programmed by CoolCat467
 
@@ -16,7 +16,7 @@ T = TypeVar("T")
 
 
 class Event(Generic[T]):
-    "Event with name and data"
+    "Event with name and data."
 
     __slots__ = ("name", "data", "level")
 
@@ -26,7 +26,7 @@ class Event(Generic[T]):
         self.level = levels
 
     def __repr__(self) -> str:
-        "Return representation of self"
+        "Return representation of self."
         items = {
             x: getattr(self, x)
             for x in self.__slots__
@@ -35,14 +35,14 @@ class Event(Generic[T]):
         return f"<{self.__class__.__name__} {items}>"
 
     def pop_level(self) -> bool:
-        "Travel up one level and return if should continue or not"
+        "Travel up one level and return if should continue or not."
         continue_level = self.level > 0
         self.level = max(0, self.level - 1)
         return continue_level
 
 
 class Component:
-    "Component base class"
+    "Component base class."
 
     __slots__ = ("name", "__manager")
 
@@ -51,12 +51,12 @@ class Component:
         self.__manager: ref["ComponentManager"] | None = None
 
     def __repr__(self) -> str:
-        "Return representation of self"
+        "Return representation of self."
         return f"{self.__class__.__name__}({self.name!r})"
 
     @property
     def manager(self) -> "ComponentManager":
-        "ComponentManager if bound to one, otherwise raise AttributeError"
+        "ComponentManager if bound to one, otherwise raise AttributeError."
         if self.__manager is not None:
             manager = self.__manager()
             if manager is not None:
@@ -64,12 +64,12 @@ class Component:
         raise AttributeError(f"No component manager bound for {self.name}")
 
     def _unbind(self) -> None:
-        "If you use this you are evil. This is only for ComponentManagers!"
+        "If you use this you are evil. This is only for ComponentManagers!."
         self.__manager = None
 
     @property
     def manager_exists(self) -> bool:
-        "Return if manager is bound or not"
+        "Return if manager is bound or not."
         return self.__manager is not None and self.__manager() is not None
 
     def register_handler(
@@ -77,7 +77,7 @@ class Component:
         event_name: str,
         handler_coro: Callable[[Event[Any]], Awaitable[Any]],
     ) -> None:
-        "Register handler with bound component manager"
+        "Register handler with bound component manager."
         self.manager.register_component_handler(
             event_name, handler_coro, self.name,
         )
@@ -86,15 +86,15 @@ class Component:
         self,
         handlers: dict[str, Callable[[Event[Any]], Awaitable[Any]]],
     ) -> None:
-        "Register multiple handler Coroutines"
+        "Register multiple handler Coroutines."
         for name, coro in handlers.items():
             self.register_handler(name, coro)
 
     def bind_handlers(self) -> None:
-        "Add handlers in subclass"
+        "Add handlers in subclass."
 
     def bind(self, manager: "ComponentManager") -> None:
-        "Bind self to manager"
+        "Bind self to manager."
         if self.manager_exists:
             raise RuntimeError(
                 f"{self.name} component is already bound to {self.manager}",
@@ -103,39 +103,39 @@ class Component:
         self.bind_handlers()
 
     def has_handler(self, event_name: str) -> bool:
-        """Return if manager has event handlers registered for a given event"""
+        """Return if manager has event handlers registered for a given event."""
         return self.manager.has_handler(event_name)
 
     async def raise_event(self, event: Event[Any]) -> None:
-        "Raise event for bound manager"
+        "Raise event for bound manager."
         await self.manager.raise_event(event)
 
     def component_exists(self, component_name: str) -> bool:
-        "Return if component exists in manager"
+        "Return if component exists in manager."
         return self.manager.component_exists(component_name)
 
     def components_exist(self, component_names: Iterable[str]) -> bool:
-        "Return if all component names given exist in manager"
+        "Return if all component names given exist in manager."
         return self.manager.components_exist(component_names)
 
     def get_component(self, component_name: str) -> Any:
-        "Get Component from manager"
+        "Get Component from manager."
         return self.manager.get_component(component_name)
 
     def get_components(
         self, component_names: Iterable[str],
     ) -> list["Component"]:
-        "Get Components from manager"
+        "Get Components from manager."
         return self.manager.get_components(component_names)
 
 
 class ComponentManager(Component):
-    "Component manager class"
+    "Component manager class."
 
     __slots__ = ("__event_handlers", "__components", "__weakref__")
 
     def __init__(self, name: str, own_name: str | None = None) -> None:
-        "If own_name is set, add self to list of components as specified name"
+        "If own_name is set, add self to list of components as specified name."
         super().__init__(name)
         self.__event_handlers: dict[
             str, set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]],
@@ -160,7 +160,7 @@ class ComponentManager(Component):
         event_name: str,
         handler_coro: Callable[[Event[Any]], Awaitable[None]],
     ) -> None:
-        "Register handler_func as handler for event_name (self component)"
+        "Register handler_func as handler for event_name (self component)."
         self.register_component_handler(event_name, handler_coro, self.name)
 
     def register_component_handler(
@@ -169,19 +169,19 @@ class ComponentManager(Component):
         handler_coro: Callable[[Event[Any]], Awaitable[None]],
         component_name: str,
     ) -> None:
-        "Register handler_func as handler for event_name"
+        "Register handler_func as handler for event_name."
         if event_name not in self.__event_handlers:
             self.__event_handlers[event_name] = set()
         self.__event_handlers[event_name].add((handler_coro, component_name))
 
     def has_handler(self, event_name: str) -> bool:
-        """Return if there are event handlers registered for a given event"""
+        """Return if there are event handlers registered for a given event."""
         return bool(self.__event_handlers.get(event_name))
 
     async def raise_event_in_nursery(
         self, event: Event[Any], nursery: trio.Nursery,
     ) -> None:
-        """Raise event in a particular trio nursery"""
+        """Raise event in a particular trio nursery."""
         # Forward leveled events up; They'll come back to us soon enough.
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
@@ -204,12 +204,12 @@ class ComponentManager(Component):
                 nursery.start_soon(component.raise_event, event)
 
     async def raise_event(self, event: Event[Any]) -> None:
-        "Raise event for all components that have handlers registered"
+        "Raise event for all components that have handlers registered."
         async with trio.open_nursery() as nursery:
             await self.raise_event_in_nursery(event, nursery)
 
     def add_component(self, component: Component) -> None:
-        "Add component to this manager"
+        "Add component to this manager."
         assert isinstance(component, Component), "Must be component instance"
         if self.component_exists(component.name):
             raise ValueError(
@@ -219,12 +219,12 @@ class ComponentManager(Component):
         component.bind(self)
 
     def add_components(self, components: Iterable[Component]) -> None:
-        "Add multiple components to this manager"
+        "Add multiple components to this manager."
         for component in components:
             self.add_component(component)
 
     def remove_component(self, component_name: str) -> None:
-        "Remove a component"
+        "Remove a component."
         if not self.component_exists(component_name):
             raise ValueError(f"Component {component_name!r} does not exist!")
         # Remove component from registered components
@@ -247,32 +247,29 @@ class ComponentManager(Component):
             self.__event_handlers.pop(name)
 
     def component_exists(self, component_name: str) -> bool:
-        "Return if component exists in this manager"
+        "Return if component exists in this manager."
         return component_name in self.__components
 
     def components_exist(self, component_names: Iterable[str]) -> bool:
-        "Return if all component names given exist in this manager"
-        for name in component_names:
-            if not self.component_exists(name):
-                return False
-        return True
+        "Return if all component names given exist in this manager."
+        return all(self.component_exists(name) for name in component_names)
 
     def get_component(self, component_name: str) -> Any:
-        "Return Component or raise ValueError"
+        "Return Component or raise ValueError."
         if not self.component_exists(component_name):
             raise ValueError(f'"{component_name}" component does not exist')
         return self.__components[component_name]
 
     def get_components(self, component_names: Iterable[str]) -> list[Any]:
-        "Return iterable of components asked for or raise ValueError"
+        "Return iterable of components asked for or raise ValueError."
         return [self.get_component(name) for name in component_names]
 
     def list_components(self) -> tuple[str, ...]:
-        "Return list of components bound to this manager"
+        "Return list of components bound to this manager."
         return tuple(self.__components)
 
     def get_all_components(self) -> tuple[Component, ...]:
-        "Return all bound components"
+        "Return all bound components."
         return tuple(self.__components.values())
 
     def unbind_components(self) -> None:
@@ -292,7 +289,7 @@ class ComponentManager(Component):
 
 
 class ExternalRaiseManager(ComponentManager):
-    """Component Manager, but raises events in an external nursery"""
+    """Component Manager, but raises events in an external nursery."""
 
     __slots__ = ("nursery",)
 
@@ -306,7 +303,7 @@ class ExternalRaiseManager(ComponentManager):
         await self.raise_event_in_nursery(event, self.nursery)
 
     async def raise_event_internal(self, event: Event[Any]) -> None:
-        "Raise event in internal nursery"
+        "Raise event in internal nursery."
         await super().raise_event(event)
 
 

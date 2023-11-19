@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # State Machines
 
-"State Machine module"
+"State Machine module."
 
 # Programmed by CoolCat467
 
@@ -33,7 +33,7 @@ class BaseState(Generic[Machine]):
         self.machine_ref: ref[Machine]
 
     def __str__(self) -> str:
-        "Return <{self.name} {class-name}>"
+        "Return <{self.name} {class-name}>."
         return f"<{self.name} {self.__class__.__name__}>"
 
     def __repr__(self) -> str:
@@ -42,11 +42,11 @@ class BaseState(Generic[Machine]):
 
     @property
     def machine(self) -> Machine | None:
-        """Get machine from internal weak reference"""
+        """Get machine from internal weak reference."""
         return self.machine_ref()
 
     def add_actions(self) -> None:
-        "Perform actions when this state added to a State Machine"
+        "Perform actions when this state added to a State Machine."
         return
 
 
@@ -67,7 +67,7 @@ class State(BaseState[SyncMachine]):
         return
 
     def check_conditions(self) -> str | None:
-        "Check state and return new state name or stay in current"
+        "Check state and return new state name or stay in current."
         return None
 
     def exit_actions(self) -> None:
@@ -94,7 +94,7 @@ class AsyncState(BaseState[AsyncMachine]):
         return
 
     async def check_conditions(self) -> str | None:
-        "Check state and return new state name or stay in current"
+        "Check state and return new state name or stay in current."
         return None
 
     async def exit_actions(self) -> None:
@@ -103,12 +103,12 @@ class AsyncState(BaseState[AsyncMachine]):
 
 
 class BaseStateMachine:
-    "State Machine base class"
+    "State Machine base class."
 
     __slots__ = ("states", "active_state", "__weakref__")
 
     def __repr__(self) -> str:
-        "Return <{class-name} {self.states}>"
+        "Return <{class-name} {self.states}>."
         text = f"<{self.__class__.__name__}"
         if hasattr(self, "states"):
             text += f" {self.states}"
@@ -116,7 +116,7 @@ class BaseStateMachine:
 
 
 class StateMachine(BaseStateMachine):
-    "Synchronous State Machine base class"
+    "Synchronous State Machine base class."
 
     __slots__ = ()
 
@@ -164,7 +164,7 @@ class StateMachine(BaseStateMachine):
             self.active_state.entry_actions()
 
     def think(self) -> None:
-        "Perform actions check conditions and potentially change states"
+        "Perform actions check conditions and potentially change states."
         # Only continue if there is an active state
         if self.active_state is None:
             return
@@ -178,7 +178,7 @@ class StateMachine(BaseStateMachine):
 
 
 class AsyncStateMachine(BaseStateMachine):
-    "Asynchronous State Machine base class"
+    "Asynchronous State Machine base class."
 
     __slots__ = ()
 
@@ -224,7 +224,7 @@ class AsyncStateMachine(BaseStateMachine):
             await self.active_state.entry_actions()
 
     async def think(self) -> None:
-        "Perform actions check conditions and potentially change states"
+        "Perform actions check conditions and potentially change states."
         # Only continue if there is an active state
         if self.active_state is None:
             return

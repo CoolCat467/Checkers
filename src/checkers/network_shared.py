@@ -16,7 +16,7 @@ Pos: TypeAlias = tuple[int, int]
 
 
 class TickEventData(NamedTuple):
-    """Tick Event Data"""
+    """Tick Event Data."""
 
     time_passed: float
     fps: float

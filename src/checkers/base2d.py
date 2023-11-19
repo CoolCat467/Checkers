@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Pygame Sprite Module
 
-"""Two-Dimentional Game Base Module"""
+"""Two-Dimentional Game Base Module."""
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 def amol(
     lst: Iterable[int | float], **kwargs: int | float,
 ) -> tuple[int | float, ...]:
-    "All Math On List; a=Add, s=Subtract, m=Multiply, d=Divide, p=To the power of"
+    "All Math On List; a=Add, s=Subtract, m=Multiply, d=Divide, p=To the power of."
     # Math Operator acting upon All values of a List
     data = list(lst)
     rng = range(len(data))
@@ -52,39 +52,39 @@ def part_quotes(text: str, which: int, quotes: str = "'") -> str:
 
 
 def to_int(lst: Iterable[int | float]) -> list[int]:
-    "Makes all values of a list into intigers"
+    "Makes all values of a list into intigers."
     return [int(i) for i in lst]
 
 
 def to_flt(lst: Iterable[int | float]) -> list[float]:
-    "Makes all values of a list into floats"
+    "Makes all values of a list into floats."
     return [float(i) for i in lst]
 
 
 def to_str(lst: Iterable[int | float]) -> list[str]:
-    "Makes all values of a list into strings"
+    "Makes all values of a list into strings."
     return [str(i) for i in lst]
 
 
 def round_all(lst: Iterable[int | float]) -> list[int]:
-    "Rounds all values of a list"
+    "Rounds all values of a list."
     return [round(i) for i in lst]
 
 
 def abs_all(lst: Iterable[int | float]) -> list[int | float]:
-    "Makes all values of a list into the absolute value of that number"
+    "Makes all values of a list into the absolute value of that number."
     return [abs(i) for i in lst]
 
 
 def to_chr(lst: Iterable[int]) -> list[str]:
-    "Converts every value of a list into a character"
+    "Converts every value of a list into a character."
     return [chr(i) for i in lst]
 
 
 def scale_surf(
     surface: pygame.surface.Surface, scalar: float,
 ) -> pygame.surface.Surface:
-    "Scales surfaces by a scalar"
+    "Scales surfaces by a scalar."
     size = surface.get_size()
     return pygame.transform.scale(surface, [int(s * scalar) for s in size])
 
@@ -92,31 +92,31 @@ def scale_surf(
 def scale_surfs(
     surfaces: Iterable[pygame.surface.Surface], scalar: float,
 ) -> list[pygame.surface.Surface]:
-    "Scales multiple surfaces by a scalar"
+    "Scales multiple surfaces by a scalar."
     return [scale_surf(surface, scalar) for surface in surfaces]
 
 
 def set_surf_size(
     surface: pygame.surface.Surface, wh: tuple[int | float, int | float],
 ) -> pygame.surface.Surface:
-    """Sets the size of a surface"""
+    """Sets the size of a surface."""
     return pygame.transform.scale(surface, to_int(wh))
 
 
 def get_surf_len(surface: pygame.surface.Surface) -> float:
-    "Get the length of a surface"
+    "Get the length of a surface."
     return math.hypot(*surface.get_size())
 
 
 def get_surf_lens(surfaces: Iterable[pygame.surface.Surface]) -> list[float]:
-    "Get the lengths of multiple surfaces"
+    "Get the lengths of multiple surfaces."
     return [get_surf_len(surf) for surf in surfaces]
 
 
 def get_colors(
     surface: pygame.surface.Surface,
 ) -> tuple[tuple[int, int, int], ...]:
-    "Returns a list of all different colors in a surface"
+    "Returns a list of all different colors in a surface."
     surface = surface.copy()
     width, height = surface.get_size()
     colors = []
@@ -131,7 +131,7 @@ def get_colors(
 def average_color(
     surface: pygame.surface.Surface,
 ) -> Generator[int, None, None]:
-    "Returns the average RGB value of a surface"
+    "Returns the average RGB value of a surface."
     s_r, s_g, s_b = 0, 0, 0
     colors = get_colors(surface)
     for color in colors:
@@ -181,7 +181,7 @@ def replace_color(
 def get_deltas(
     number: int | float, lst: Iterable[int | float],
 ) -> list[int | float]:
-    "Returns a list of the change from a number each value of a list is"
+    "Returns a list of the change from a number each value of a list is."
     return [abs(i - number) for i in lst]
 
 
@@ -189,19 +189,19 @@ L = TypeVar("L", bound=int | float)
 
 
 def closest(number: int | float, lst: list[L]) -> L:
-    "Returns the closest value of lst a number is"
+    "Returns the closest value of lst a number is."
     delta = get_deltas(number, lst)
     return lst[delta.index(min(delta))]
 
 
 def farthest(number: int | float, lst: list[L]) -> L:
-    "Returns the farthest value of lst a number is"
+    "Returns the farthest value of lst a number is."
     delta = get_deltas(number, lst)
     return lst[delta.index(max(delta))]
 
 
 class GameEntity:
-    "Base Class for all entities"
+    "Base Class for all entities."
 
     def __init__(
         self,
@@ -245,7 +245,7 @@ class GameEntity:
         self.id = 0
 
     def render(self, surface: pygame.surface.Surface) -> None:
-        "Render an entity and it's hitbox if show_hitbox is True, and blit it to the surface"
+        "Render an entity and it's hitbox if show_hitbox is True, and blit it to the surface."
         x, y = self.location
         try:
             x, y = float(x), float(y)
@@ -264,7 +264,7 @@ class GameEntity:
                 )
 
     def process(self, time_passed: float) -> None:
-        "Process brain and move according to time passed if speed > 0 and not at destination"
+        "Process brain and move according to time passed if speed > 0 and not at destination."
         if self.doprocess:
             self.brain.think()
 
@@ -279,27 +279,26 @@ class GameEntity:
             self.location += heading * round(travel_distance)
 
     def is_over(self, point: tuple[int, int]) -> bool:
-        "Return True if point is over self.image"
+        "Return True if point is over self.image."
         # Return True if a point is over image
         return self.rect.collidepoint(point)
 
     def collision(self, sprite: GameEntity) -> bool:
-        "Return True if a sprite's image is over self.image"
+        "Return True if a sprite's image is over self.image."
         # Return True if a sprite's image is over our image
         return self.rect.colliderect(sprite.rect)
 
     def collide(
         self, entityname: str, action: Callable[[GameEntity, GameEntity], None],
     ) -> None:
-        "For every entity with the name of entityname, call action(self, entity)"
+        "For every entity with the name of entityname, call action(self, entity)."
         for entity in self.world.get_type(entityname):
-            if entity is not None:
-                if self.collision(entity):
-                    action(self, entity)
+            if entity is not None and self.collision(entity):
+                action(self, entity)
 
 
 class BaseButton(GameEntity):
-    "Base button, if entity self.trigger is over image and mouse down, call self.action(self)"
+    "Base button, if entity self.trigger is over image and mouse down, call self.action(self)."
 
     def __init__(
         self,
@@ -325,7 +324,7 @@ class BaseButton(GameEntity):
             self.press_time = float(kwargs["time"])
 
     def process(self, time_passed: float) -> None:
-        "Call self.action(self) if any self.trigger entity is over self"
+        "Call self.action(self) if any self.trigger entity is over self."
         # Do regular processing
         GameEntity.process(self, time_passed)
 
@@ -352,7 +351,7 @@ class BaseButton(GameEntity):
 
 
 class WorldBase:
-    "Base class of world objects"
+    "Base class of world objects."
 
     def __init__(self) -> None:
         self.entities: dict[int, GameEntity] = {}  # Store all the entities
@@ -363,35 +362,35 @@ class WorldBase:
         return "<World Object>"
 
     def add_entity(self, entity: Any) -> None:
-        "Stores the entity then advances the current id"
+        "Stores the entity then advances the current id."
         # stores the entity then advances the current id
         self.entities[self.entity_id] = entity
         entity.id = self.entity_id
         self.entity_id += 1
 
     def add_entities(self, entities: Iterable[GameEntity]) -> None:
-        "Add multiple entities from a list"
+        "Add multiple entities from a list."
         for entity in entities:
             self.add_entity(entity)
 
     def remove_entity(self, entity: GameEntity) -> None:
-        "Remove an entity from the world"
+        "Remove an entity from the world."
         del self.entities[entity.id]
 
     def remove_entities(self, entities: Iterable[GameEntity]) -> None:
-        "Remove multiple entities from a list"
+        "Remove multiple entities from a list."
         for entity in entities:
             self.remove_entity(entity)
 
     def get(self, entity_id: int) -> GameEntity | None:
-        "Find an entity, given it's id, and return None if it's not found"
+        "Find an entity, given it's id, and return None if it's not found."
         # find the entity, given it's id, (or None if it's not found)
         if (entity_id is not None) and (entity_id in self.entities):
             return self.entities[entity_id]
         return None
 
     def get_type(self, entityname: str) -> list[GameEntity]:
-        "Returns all entities by the name of entityname in the world"
+        "Returns all entities by the name of entityname in the world."
         matches = []
         for entity in self.entities.values():
             if entity.name == entityname:
@@ -399,14 +398,14 @@ class WorldBase:
         return matches
 
     def process(self, time_passed: float) -> None:
-        "Process every entity stored the world"
+        "Process every entity stored the world."
         # process every entity in the world
         time_passed_secconds = time_passed / 1000
         for entity in list(self.entities.values()):
             entity.process(time_passed_secconds)
 
     def render(self, surface: pygame.surface.Surface) -> None:
-        "Draw the background and render all entities"
+        "Draw the background and render all entities."
         # draw the background and all it's entities
         surface.unlock()
         if self.background is not None:
@@ -418,7 +417,7 @@ class WorldBase:
     def get_close_entity(
         self, name: str, location: tuple[int, int] | Vector2, rnge: int = 100,
     ) -> GameEntity | None:
-        "Find an entity with name within range of location"
+        "Find an entity with name within range of location."
         # find an entity within range of location
         vec_location = Vector2(*location)
 
@@ -432,7 +431,7 @@ class WorldBase:
     def get_closest_entity(
         self, name: str, location: tuple[int, int] | Vector2, rnge: int = 100,
     ) -> GameEntity | None:
-        "Find the closest entity with name within range of location"
+        "Find the closest entity with name within range of location."
         # find the closest entity within range of location
         vec_location = Vector2(*location)
 

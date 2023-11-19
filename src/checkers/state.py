@@ -1,4 +1,4 @@
-"""Checkers State"""
+"""Checkers State."""
 
 # Programmed by CoolCat467
 
@@ -31,14 +31,14 @@ Pos = tuple[int, int]
 
 
 class Action(NamedTuple):
-    """Represents an action"""
+    """Represents an action."""
 
     from_pos: Pos
     to_pos: Pos
 
 
 class ActionSet(NamedTuple):
-    """Represents a set of actions"""
+    """Represents a set of actions."""
 
     jumps: dict[Pos, list[Pos]]
     moves: tuple[Pos, ...]
@@ -46,7 +46,7 @@ class ActionSet(NamedTuple):
 
 
 def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
-    "Returns the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates"
+    "Returns the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates."
     cx, cy = xy
     sides = []
     for raw_dy in range(2):
@@ -62,7 +62,7 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
 
 
 def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
-    "Modifies a list based on piece id to take out invalid moves for pawns"
+    "Modifies a list based on piece id to take out invalid moves for pawns."
     assert (
         len(moves) == 4
     ), "List size MUST be four for this to return valid results!"
@@ -78,7 +78,7 @@ def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
 
 
 class State:
-    """Represents state of checkers game"""
+    """Represents state of checkers game."""
 
     __slots__ = ("size", "turn", "pieces", "pre_calculated_actions")
 
@@ -129,7 +129,7 @@ class State:
     def get_pieces_from_tiles(
         tiles: dict[str, dict[str, Any]],
     ) -> dict[Pos, int]:
-        """Convert board data from game to internal representation"""
+        """Convert board data from game to internal representation."""
         pieces: dict[Pos, int] = {}
         for _tile_name, tile_data in tiles.items():
             piece_type = tile_data["piece"]
@@ -140,7 +140,7 @@ class State:
         return pieces
 
     def calculate_actions(self, position: Pos) -> ActionSet:
-        "Calculate all the actions the piece at given position can make"
+        "Calculate all the actions the piece at given position can make."
         jumps = self.get_jumps(position)
         moves = self.get_moves(position)
         ends = set(jumps)
@@ -148,7 +148,7 @@ class State:
         return ActionSet(jumps, moves, ends)
 
     def get_actions_set(self, piece_position: Pos) -> ActionSet:
-        """Calculate and return ActionSet if required"""
+        """Calculate and return ActionSet if required."""
         if piece_position in self.pre_calculated_actions:
             new_action_set = self.pre_calculated_actions[piece_position]
         else:
@@ -180,7 +180,7 @@ class State:
         self.invalidate_all_locations()
 
     def preform_action(self, action: Action) -> Self:
-        """Return new state after performing action on self"""
+        """Return new state after performing action on self."""
         from_pos, to_pos = action
 
         pieces_copy = dict(self.pieces.items())
@@ -235,43 +235,42 @@ class State:
         )
 
     def get_tile_name(self, x: int, y: int) -> str:
-        """Get name of a given tile"""
+        """Get name of a given tile."""
         return chr(65 + x) + str(self.size[1] - y)
 
     def get_tile_pos(self, name: str) -> Pos:
-        """Get tile position from it's name"""
+        """Get tile position from it's name."""
         x = ord(name[0]) - 65
         y = self.size[1] - int(name[1:])
         return (x, y)
 
     def action_from_points(self, start: Pos, end: Pos) -> Action:
-        """Return action from given start and end coordinates"""
+        """Return action from given start and end coordinates."""
         ##        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
         return Action(start, end)
 
     def get_turn(self) -> int:
-        """Return whose turn it is. 0 = red, 1 = black"""
+        """Return whose turn it is. 0 = red, 1 = black."""
         return self.turn
 
     def valid_location(self, position: Pos) -> bool:
-        """Return if position is valid"""
+        """Return if position is valid."""
         x, y = position
         w, h = self.size
         return x >= 0 and y >= 0 and x < w and y < h
 
     def does_piece_king(self, piece_type: int, position: Pos) -> bool:
-        """Return if piece needs to be kinged given it's type and position"""
+        """Return if piece needs to be kinged given it's type and position."""
         _, y = position
         _, h = self.size
         return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
 
     @staticmethod
     def get_enemy(self_type: int) -> int:
-        """Return enemy pawn piece type"""
+        """Return enemy pawn piece type."""
         # If we are kinged, get a pawn version of ourselves.
         # Take that plus one mod 2 to get the pawn of the enemy
-        enemy_pawn = (self_type + 1) % 2
-        return enemy_pawn
+        return (self_type + 1) % 2
 
     @staticmethod
     def get_piece_types(self_type: int) -> tuple[int, int]:
@@ -287,7 +286,7 @@ class State:
         _pieces: dict[Pos, int] | None = None,
         _recursion: int = 0,
     ) -> dict[Pos, list[Pos]]:
-        """Gets valid jumps a piece can make
+        """Gets valid jumps a piece can make.
 
         position is a xy coordinate tuple pointing to a board position
             that may or may not have a piece on it.
@@ -377,7 +376,7 @@ class State:
         return valid
 
     def get_moves(self, position: Pos) -> tuple[Pos, ...]:
-        "Gets valid moves piece at position can make, not including jumps"
+        "Gets valid moves piece at position can make, not including jumps."
         piece_type = self.pieces[position]
         # Get the side xy choords of the tile's xy pos,
         # then modify results for pawns
@@ -391,7 +390,7 @@ class State:
         )
 
     def get_actions(self, position: Pos) -> Generator[Action, None, None]:
-        """Yield all moves and jumps the piece at position can make"""
+        """Yield all moves and jumps the piece at position can make."""
         ends = set(self.get_jumps(position))
         ends.update(self.get_moves(position))
         ##        ends = self.get_actions_set(position).ends
@@ -399,7 +398,7 @@ class State:
             yield self.action_from_points(position, end)
 
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:
-        """Yield all actions for given player"""
+        """Yield all actions for given player."""
         player_pieces = {player, player + 2}
         for position, piece_type in self.pieces.items():
             if piece_type not in player_pieces:
@@ -407,7 +406,7 @@ class State:
             yield from self.get_actions(position)
 
     def check_for_win(self) -> int | None:
-        """Return player number if they won else None"""
+        """Return player number if they won else None."""
         # For each of the two players,
         for player in range(2):
             # For each tile in the playable tiles,
@@ -430,5 +429,5 @@ class State:
         return (piece_at_pos % 2) == player
 
     def get_pieces(self) -> tuple[tuple[Pos, int], ...]:
-        """Get all pieces"""
+        """Get all pieces."""
         return tuple((pos, type_) for pos, type_ in self.pieces.items())

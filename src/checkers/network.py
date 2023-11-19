@@ -1,4 +1,4 @@
-"Network - Module for sending events over the network"
+"Network - Module for sending events over the network."
 
 # Programmed by CoolCat467
 
@@ -31,7 +31,7 @@ class TimeoutException(Exception):
 
 
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
-    """Network Component (client)"""
+    """Network Component (client)."""
 
     __slots__ = ("_stream", "timeout")
 
@@ -43,7 +43,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     @property
     def not_connected(self) -> bool:
-        """Is stream None?"""
+        """Is stream None?."""
         return self._stream is None
 
     @property
@@ -59,7 +59,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         kwargs: dict[str, object] | None = None,
         stream: trio.SocketStream,
     ) -> Self:
-        """Initialize from stream"""
+        """Initialize from stream."""
         if kwargs is None:
             kwargs = {}
         self = cls(*args, **kwargs)  # type: ignore[arg-type]
@@ -67,7 +67,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         return self
 
     async def connect(self, host: str, port: int) -> None:
-        """Connect to host:port on TCP"""
+        """Connect to host:port on TCP."""
         if not self.not_connected:
             await self.close()
         try:
@@ -104,7 +104,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         return content
 
     async def write(self, data: bytes) -> None:
-        """Write data to stream"""
+        """Write data to stream."""
         try:
             await self.stream.send_all(data)
         except (trio.BrokenResourceError, trio.ClosedResourceError):
@@ -112,18 +112,18 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             raise
 
     async def close(self) -> None:
-        """Close the stream"""
+        """Close the stream."""
         if self.not_connected:
             return
         await self.stream.aclose()
         self._stream = None
 
     async def send_eof(self) -> None:
-        """Close the sending half of the stream"""
+        """Close the sending half of the stream."""
         await self.stream.send_eof()
 
     async def wait_write_might_not_block(self) -> None:
-        """stream.wait_send_all_might_not_block"""
+        """stream.wait_send_all_might_not_block."""
         return await self.stream.wait_send_all_might_not_block()
 
 
@@ -134,7 +134,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
 
 class NetworkEventComponent(NetworkComponent):
-    """Network Event Component - Send events over the network"""
+    """Network Event Component - Send events over the network."""
 
     __slots__ = (
         "_read_packet_id_to_event_name",
@@ -153,7 +153,7 @@ class NetworkEventComponent(NetworkComponent):
         self.write_lock = trio.Lock()
 
     def bind_handlers(self) -> None:
-        """Register serverbound event handlers"""
+        """Register serverbound event handlers."""
         self.register_handlers(
             {
                 name: self.write_event
@@ -164,7 +164,7 @@ class NetworkEventComponent(NetworkComponent):
     def register_network_write_event(
         self, event_name: str, packet_id: int,
     ) -> None:
-        """Map event name to serverbound packet id"""
+        """Map event name to serverbound packet id."""
         if event_name in self._write_event_name_to_packet_id:
             raise ValueError(f"{event_name!r} event already registered!")
         if self._read_packet_id_to_event_name.get(packet_id) == event_name:
@@ -178,12 +178,12 @@ class NetworkEventComponent(NetworkComponent):
             self.register_handler(event_name, self.write_event)
 
     def register_network_write_events(self, event_map: dict[str, int]) -> None:
-        """Map event names to serverbound packet ids"""
+        """Map event names to serverbound packet ids."""
         for event_name, packet_id in event_map.items():
             self.register_network_write_event(event_name, packet_id)
 
     async def write_event(self, event: Event[bytearray]) -> None:
-        """Send event to network"""
+        """Send event to network."""
         packet_id = self._write_event_name_to_packet_id.get(event.name)
         if packet_id is None:
             raise RuntimeError(f"Unhandled network event name {event.name!r}")
@@ -192,7 +192,7 @@ class NetworkEventComponent(NetworkComponent):
             await self.write_bytearray(event.data)
 
     async def read_event(self) -> Event[bytearray]:
-        """Receive event from network"""
+        """Receive event from network."""
         async with self.read_lock:
             packet_id = await self.read_value(self.packet_id_format)
             event_data = await self.read_bytearray()
@@ -204,7 +204,7 @@ class NetworkEventComponent(NetworkComponent):
     def register_read_network_event(
         self, packet_id: int, event_name: str,
     ) -> None:
-        """Map clientbound packet id to event name"""
+        """Map clientbound packet id to event name."""
         if packet_id in self._read_packet_id_to_event_name:
             raise ValueError(f"Packet ID {packet_id!r} already registered!")
         if self._write_event_name_to_packet_id.get(event_name) == packet_id:
@@ -216,13 +216,13 @@ class NetworkEventComponent(NetworkComponent):
         self._read_packet_id_to_event_name[packet_id] = event_name
 
     def register_read_network_events(self, packet_map: dict[int, str]) -> None:
-        """Map clientbound packet ids to event names"""
+        """Map clientbound packet ids to event names."""
         for packet_id, event_name in packet_map.items():
             self.register_read_network_event(packet_id, event_name)
 
 
 class Server(ComponentManager):
-    """Asynchronous TCP Server"""
+    """Asynchronous TCP Server."""
 
     __slots__ = ("cancel_scope",)
 
@@ -274,7 +274,7 @@ class Server(ComponentManager):
             await nursery.start(handle_serve)
 
     async def handler(self, stream: trio.SocketStream) -> None:
-        """Main handler for new clients
+        """Main handler for new clients.
 
         Override in a subclass - Default only closes the stream
         """
@@ -285,7 +285,7 @@ class Server(ComponentManager):
 
 
 def run() -> None:
-    "Run test of module"
+    "Run test of module."
 
     async def client_connect(
         port: int, stop_server: Callable[[], None],
@@ -315,7 +315,7 @@ def run() -> None:
         stop_server()
 
     async def run_async() -> None:
-        "Run asynchronous test"
+        "Run asynchronous test."
 
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:

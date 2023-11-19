@@ -1,4 +1,4 @@
-"Asynchronous Clock - Asynchronous version of pygame.time.Clock"
+"Asynchronous Clock - Asynchronous version of pygame.time.Clock."
 
 # Programmed by CoolCat467
 
@@ -15,12 +15,12 @@ nanoseconds = NewType("nanoseconds", int)
 
 
 def get_ticks() -> nanoseconds:
-    """Get Ticks"""
+    """Get Ticks."""
     return nanoseconds(perf_counter_ns())
 
 
 class Clock:
-    "pygame.time.Clock but with asynchronous tick"
+    "pygame.time.Clock but with asynchronous tick."
 
     __slots__ = (
         "fps_tick",
@@ -43,23 +43,20 @@ class Clock:
         return f"<{self.__class__.__name__}({self.fps:2f})>"
 
     def get_fps(self) -> float:
-        "Return the clock framerate in Frames Per Second"
+        "Return the clock framerate in Frames Per Second."
         return self.fps
 
     def get_rawtime(self) -> nanoseconds:
-        "Return the actual time used in the previous tick in nanoseconds (original was milliseconds)"
+        "Return the actual time used in the previous tick in nanoseconds (original was milliseconds)."
         return self.rawpassed
 
     def get_time(self) -> nanoseconds:
-        "Return time used in the previous tick (in nanoseconds, original was milliseconds)"
+        "Return time used in the previous tick (in nanoseconds, original was milliseconds)."
         return self.timepassed
 
     async def tick(self, framerate: int = 0) -> int:
-        "Tick the clock. Return time passed in nanoseconds, same as get_time (original was milliseconds)"
-        if framerate > 0:
-            endtime = 1e9 // framerate
-        else:
-            endtime = 0
+        "Tick the clock. Return time passed in nanoseconds, same as get_time (original was milliseconds)."
+        endtime = 1000000000.0 // framerate if framerate > 0 else 0
         self.rawpassed: nanoseconds = get_ticks() - self.last_tick
         delay: nanoseconds = endtime - self.rawpassed
         if delay > 0:

@@ -42,7 +42,7 @@ async def client_connect(port: int, stop_server: Callable[[], None]) -> None:
 
 @pytest.mark.trio()
 async def run_async() -> None:
-    "Run asynchronous test"
+    "Run asynchronous test."
 
     class TestServer(Server):
         async def handler(self, stream: trio.SocketStream) -> None:

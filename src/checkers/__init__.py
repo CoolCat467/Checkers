@@ -1,1 +1,1 @@
-"""Checkers Game Module"""
+"""Checkers Game Module."""

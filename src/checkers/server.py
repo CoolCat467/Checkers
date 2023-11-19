@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 # Checkers Game Server
 
-"""Checkers Game Server"""
+"""Checkers Game Server."""
 
 import random
 import traceback
@@ -33,7 +33,7 @@ PORT: Final = 31613
 def generate_pieces(
     board_width: int, board_height: int, colors: int = 2,
 ) -> dict[Pos, int]:
-    """Generate data about each piece"""
+    """Generate data about each piece."""
     pieces: dict[Pos, int] = {}
     # Get where pieces should be placed
     z_to_1 = round(board_height / 3)  # White
@@ -112,7 +112,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_raw_select_piece(self, event: Event[bytearray]) -> None:
-        """Read raw select piece event and reraise as network->select_piece"""
+        """Read raw select piece event and reraise as network->select_piece."""
         buffer = Buffer(event.data)
 
         pos_x, pos_y = read_position(buffer)
@@ -122,7 +122,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_raw_select_tile(self, event: Event[bytearray]) -> None:
-        """Read raw select tile event and reraise as network->select_tile"""
+        """Read raw select tile event and reraise as network->select_tile."""
         buffer = Buffer(event.data)
 
         pos_x, pos_y = read_position(buffer)
@@ -132,7 +132,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
-        """Read create piece event and reraise as server[write]->create_piece"""
+        """Read create piece event and reraise as server[write]->create_piece."""
         piece_pos, piece_type = event.data
 
         buffer = Buffer()
@@ -145,7 +145,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_piece_select(
         self, event: Event[tuple[Pos, bool]],
     ) -> None:
-        """Read piece select event and reraise as server[write]->select_piece"""
+        """Read piece select event and reraise as server[write]->select_piece."""
         piece_pos, outline_value = event.data
 
         buffer = Buffer()
@@ -156,7 +156,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->select_piece", buffer))
 
     async def handle_create_tile(self, event: Event[Pos]) -> None:
-        """Read create tile event and reraise as server[write]->create_tile"""
+        """Read create tile event and reraise as server[write]->create_tile."""
         tile_pos = event.data
 
         buffer = Buffer()
@@ -166,7 +166,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->create_tile", buffer))
 
     async def handle_delete_tile(self, event: Event[Pos]) -> None:
-        """Read delete tile event and reraise as server[write]->delete_tile"""
+        """Read delete tile event and reraise as server[write]->delete_tile."""
         tile_pos = event.data
 
         buffer = Buffer()
@@ -176,7 +176,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->delete_tile", buffer))
 
     async def handle_delete_piece_animation(self, event: Event[Pos]) -> None:
-        """Read delete piece animation event and reraise as server[write]->delete_piece_animation"""
+        """Read delete piece animation event and reraise as server[write]->delete_piece_animation."""
         piece_pos = event.data
 
         buffer = Buffer()
@@ -190,7 +190,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_update_piece_animation(
         self, event: Event[tuple[Pos, int]],
     ) -> None:
-        """Read update piece animation event and reraise as server[write]->update_piece_animation"""
+        """Read update piece animation event and reraise as server[write]->update_piece_animation."""
         piece_pos, piece_type = event.data
 
         buffer = Buffer()
@@ -205,7 +205,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_move_piece_animation(
         self, event: Event[tuple[Pos, Pos]],
     ) -> None:
-        """Read move piece animation event and reraise as server[write]->move_piece_animation"""
+        """Read move piece animation event and reraise as server[write]->move_piece_animation."""
         piece_current_pos, piece_new_pos = event.data
 
         buffer = Buffer()
@@ -218,7 +218,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     async def handle_animation_state(self, event: Event[bool]) -> None:
-        """Read animation state change event and reraise as server[write]->animation_state"""
+        """Read animation state change event and reraise as server[write]->animation_state."""
         state = event.data
 
         buffer = Buffer()
@@ -228,7 +228,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->animation_state", buffer))
 
     async def handle_game_over(self, event: Event[int]) -> None:
-        """Read game over event and reraise as server[write]->game_over"""
+        """Read game over event and reraise as server[write]->game_over."""
         winner = event.data
 
         buffer = Buffer()
@@ -240,7 +240,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_action_complete(
         self, event: Event[tuple[Pos, Pos, int]],
     ) -> None:
-        """Read action complete event and reraise as server[write]->action_complete"""
+        """Read action complete event and reraise as server[write]->action_complete."""
         from_pos, to_pos, player_turn = event.data
 
         buffer = Buffer()
@@ -254,7 +254,7 @@ class ServerClient(NetworkEventComponent):
     async def handle_initial_config(
         self, event: Event[tuple[Pos, int]],
     ) -> None:
-        """Read initial config event and reraise as server[write]->initial_config"""
+        """Read initial config event and reraise as server[write]->initial_config."""
         board_size, player_turn = event.data
 
         buffer = Buffer()
@@ -266,7 +266,7 @@ class ServerClient(NetworkEventComponent):
 
 
 class CheckersState(State):
-    """Subclass of State that keeps track of actions in `action_queue`"""
+    """Subclass of State that keeps track of actions in `action_queue`."""
 
     __slots__ = ("action_queue",)
 
@@ -302,12 +302,12 @@ class CheckersState(State):
         self.action_queue.append(("jump", (jumped_piece_pos,)))
 
     def get_action_queue(self) -> deque[tuple[str, Iterable[Pos | int]]]:
-        """Return action queue"""
+        """Return action queue."""
         return self.action_queue
 
 
 class GameServer(Server):
-    """Checkers server
+    """Checkers server.
 
     Handles accepting incoming connections from clients and handles
     main game logic via State subclass above.
@@ -343,7 +343,7 @@ class GameServer(Server):
         self.running = False
 
     def bind_handlers(self) -> None:
-        """Register start_server and stop_server"""
+        """Register start_server and stop_server."""
         self.register_handlers(
             {
                 "server_start": self.start_server,
@@ -355,7 +355,7 @@ class GameServer(Server):
         )
 
     async def stop_server(self, event: Event[None] | None = None) -> None:
-        """Stop serving and disconnect all NetworkEventComponents"""
+        """Stop serving and disconnect all NetworkEventComponents."""
         self.stop_serving()
         self.stop_advertising()
 
@@ -387,7 +387,7 @@ class GameServer(Server):
         )
 
     def stop_advertising(self) -> None:
-        """Cancel self.advertisement_scope"""
+        """Cancel self.advertisement_scope."""
         if self.advertisement_scope is None:
             return
         self.advertisement_scope.cancel()
@@ -474,7 +474,7 @@ class GameServer(Server):
         self.players_can_interact = True
 
     async def start_server(self, event: Event[None] | None = None) -> None:
-        """Serve clients"""
+        """Serve clients."""
         print(f"{self.__class__.__name__}: Closing old server clients")
         await self.stop_server()
         print(f"{self.__class__.__name__}: Starting Server")
@@ -550,7 +550,7 @@ class GameServer(Server):
         return self.state.check_for_win() is None
 
     async def handler(self, stream: trio.SocketStream) -> None:
-        """Accept clients"""
+        """Accept clients."""
         print(f"{self.__class__.__name__}: client connected")
         new_client_id = self.client_count
         self.client_count += 1
@@ -614,7 +614,7 @@ class GameServer(Server):
     async def player_select_piece(
         self, player: int, piece_pos: Pos | None,
     ) -> None:
-        """Update glowing tiles from new selected piece"""
+        """Update glowing tiles from new selected piece."""
         ignore: set[Pos] = set()
 
         if piece_pos is not None:
@@ -689,7 +689,7 @@ class GameServer(Server):
     async def handle_action_animations(
         self, actions: deque[tuple[str, Iterable[Pos | int]]],
     ) -> None:
-        """Handle action animations"""
+        """Handle action animations."""
         while actions:
             name, params = actions.popleft()
             if name == "move":

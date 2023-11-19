@@ -2,7 +2,7 @@ import checkers.MiniMax_AI as ai
 
 
 def generate_pieces(board_size: tuple[int, int]) -> dict[tuple[int, int], int]:
-    """Generate data about each tile"""
+    """Generate data about each tile."""
     pieces: dict[tuple[int, int], int] = {}
 
     board_width, board_height = board_size

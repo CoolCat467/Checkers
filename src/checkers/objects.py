@@ -1,4 +1,4 @@
-"Objects - Common objects that are useful"
+"Objects - Common objects that are useful."
 
 from __future__ import annotations
 
@@ -23,7 +23,7 @@ if TYPE_CHECKING:
 
 
 class Text(sprite.Sprite):
-    "Text element"
+    "Text element."
 
     __slots__ = ("__text", "font")
 
@@ -35,19 +35,19 @@ class Text(sprite.Sprite):
         self.font = font
 
     def render(self) -> Surface:
-        """Render text surface"""
+        """Render text surface."""
         return self.font.render(self.__text, True, self.color)
 
     def update_image(self) -> None:
-        "Update image"
+        "Update image."
         self.image = self.render()
 
     def __get_text(self) -> str:
-        "Get text"
+        "Get text."
         return self.__text
 
     def __set_text(self, value: str) -> None:
-        "Set text"
+        "Set text."
         if value == self.__text:
             return
         self.__text = value
@@ -57,7 +57,7 @@ class Text(sprite.Sprite):
 
 
 class OutlinedText(Text):
-    "Outlined Text element"
+    "Outlined Text element."
 
     __slots__ = ("outline", "inside")
 
@@ -100,7 +100,7 @@ class OutlinedText(Text):
 
 
 class Button(OutlinedText):
-    "Button element"
+    "Button element."
 
     __slots__ = ()
 
@@ -112,7 +112,7 @@ class Button(OutlinedText):
     async def handle_click(
         self, event: Event[dict[str, tuple[int, int] | int]],
     ) -> None:
-        """Handle ckick events"""
+        """Handle ckick events."""
 
     def bind_handlers(self) -> None:
         super().bind_handlers()
