@@ -78,8 +78,8 @@ def turn(state: State) -> Action:
                 min_y = min(y_pos)
                 return state.action_from_points(
                     *random.choice(  # noqa: S311  # Not important to be cryptographically safe
-                        y_pos[min_y]
-                    )
+                        y_pos[min_y],
+                    ),
                 )
         ##            target = random.choice(selectable)
         ##            # Get the possible moves that piece can make
@@ -88,8 +88,8 @@ def turn(state: State) -> Action:
         ##            destination= random.choice(possibleMoves)#[len(possibleMoves)-1]
         return state.action_from_points(
             *random.choice(  # noqa: S311  # Not important to be cryptographically safe
-                best_y
-            )
+                best_y,
+            ),
         )
     else:
         # If we can make jumps,

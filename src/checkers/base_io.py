@@ -72,7 +72,7 @@ INT_FORMATS_TYPE: TypeAlias = Literal[
 ]
 
 FLOAT_FORMATS_TYPE: TypeAlias = Literal[
-    StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT
+    StructFormat.FLOAT, StructFormat.DOUBLE, StructFormat.HALFFLOAT,
 ]
 
 # endregion
@@ -95,19 +95,19 @@ class BaseAsyncWriter(ABC):
 
     @overload
     async def write_value(
-        self, fmt: FLOAT_FORMATS_TYPE, value: float, /
+        self, fmt: FLOAT_FORMATS_TYPE, value: float, /,
     ) -> None:
         ...
 
     @overload
     async def write_value(
-        self, fmt: Literal[StructFormat.BOOL], value: bool, /
+        self, fmt: Literal[StructFormat.BOOL], value: bool, /,
     ) -> None:
         ...
 
     @overload
     async def write_value(
-        self, fmt: Literal[StructFormat.CHAR], value: str, /
+        self, fmt: Literal[StructFormat.CHAR], value: str, /,
     ) -> None:
         ...
 
@@ -116,7 +116,7 @@ class BaseAsyncWriter(ABC):
         await self.write(struct.pack(">" + fmt.value, value))
 
     async def _write_varuint(
-        self, value: int, /, *, max_bits: int | None = None
+        self, value: int, /, *, max_bits: int | None = None,
     ) -> None:
         """Write an arbitrarily big unsigned integer in a variable length format.
 
@@ -136,7 +136,7 @@ class BaseAsyncWriter(ABC):
         )
         if value < 0 or value > value_max:
             raise ValueError(
-                f"Tried to write varint outside of the range of {max_bits}-bit int."
+                f"Tried to write varint outside of the range of {max_bits}-bit int.",
             )
 
         remaining = value
@@ -190,7 +190,7 @@ class BaseAsyncWriter(ABC):
         """
         if len(value) > 32767:
             raise ValueError(
-                "Maximum character limit for writing strings is 32767 characters."
+                "Maximum character limit for writing strings is 32767 characters.",
             )
 
         data = bytearray(value, "utf-8")
@@ -198,7 +198,7 @@ class BaseAsyncWriter(ABC):
         await self.write(data)
 
     async def write_optional(
-        self, value: T | None, /, writer: Callable[[T], Awaitable[R]]
+        self, value: T | None, /, writer: Callable[[T], Awaitable[R]],
     ) -> R | None:
         """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
@@ -233,13 +233,13 @@ class BaseSyncWriter(ABC):
 
     @overload
     def write_value(
-        self, fmt: Literal[StructFormat.BOOL], value: bool, /
+        self, fmt: Literal[StructFormat.BOOL], value: bool, /,
     ) -> None:
         ...
 
     @overload
     def write_value(
-        self, fmt: Literal[StructFormat.CHAR], value: str, /
+        self, fmt: Literal[StructFormat.CHAR], value: str, /,
     ) -> None:
         ...
 
@@ -248,7 +248,7 @@ class BaseSyncWriter(ABC):
         self.write(struct.pack(">" + fmt.value, value))
 
     def _write_varuint(
-        self, value: int, /, *, max_bits: int | None = None
+        self, value: int, /, *, max_bits: int | None = None,
     ) -> None:
         """Write an arbitrarily big unsigned integer in a variable length format.
 
@@ -268,7 +268,7 @@ class BaseSyncWriter(ABC):
         )
         if value < 0 or value > value_max:
             raise ValueError(
-                f"Tried to write varint outside of the range of {max_bits}-bit int."
+                f"Tried to write varint outside of the range of {max_bits}-bit int.",
             )
 
         remaining = value
@@ -322,7 +322,7 @@ class BaseSyncWriter(ABC):
         """
         if len(value) > 32767:
             raise ValueError(
-                "Maximum character limit for writing strings is 32767 characters."
+                "Maximum character limit for writing strings is 32767 characters.",
             )
 
         data = bytearray(value, "utf-8")
@@ -330,7 +330,7 @@ class BaseSyncWriter(ABC):
         self.write(data)
 
     def write_optional(
-        self, value: T | None, /, writer: Callable[[T], R]
+        self, value: T | None, /, writer: Callable[[T], R],
     ) -> R | None:
         """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
@@ -414,7 +414,7 @@ class BaseAsyncReader(ABC):
             # (if the current amount of bits is higher than allowed size in bits)
             if result > value_max:
                 raise OSError(
-                    f"Received varint was outside the range of {max_bits}-bit int."
+                    f"Received varint was outside the range of {max_bits}-bit int.",
                 )
 
             # If the most significant bit is 0, we should stop reading
@@ -475,7 +475,7 @@ class BaseAsyncReader(ABC):
         length = await self.read_varint()
         if length > 131068:
             raise OSError(
-                f"Maximum read limit for utf strings is 131068 bytes, got {length}."
+                f"Maximum read limit for utf strings is 131068 bytes, got {length}.",
             )
 
         data = await self.read(length)
@@ -483,13 +483,13 @@ class BaseAsyncReader(ABC):
 
         if len(chars) > 32767:
             raise OSError(
-                f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}."
+                f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}.",
             )
 
         return chars
 
     async def read_optional(
-        self, reader: Callable[[], Awaitable[R]]
+        self, reader: Callable[[], Awaitable[R]],
     ) -> R | None:
         """Reads a bool showing if a value is present, if so, also reads this value with ``reader`` function.
 
@@ -566,7 +566,7 @@ class BaseSyncReader(ABC):
             # (if the current amount of bits is higher than allowed size in bits)
             if result > value_max:
                 raise OSError(
-                    f"Received varint was outside the range of {max_bits}-bit int."
+                    f"Received varint was outside the range of {max_bits}-bit int.",
                 )
 
             # If the most significant bit is 0, we should stop reading
@@ -627,7 +627,7 @@ class BaseSyncReader(ABC):
         length = self.read_varint()
         if length > 131068:
             raise OSError(
-                f"Maximum read limit for utf strings is 131068 bytes, got {length}."
+                f"Maximum read limit for utf strings is 131068 bytes, got {length}.",
             )
 
         data = self.read(length)
@@ -635,7 +635,7 @@ class BaseSyncReader(ABC):
 
         if len(chars) > 32767:
             raise OSError(
-                f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}."
+                f"Maximum read limit for utf strings is 32767 characters, got {len(chars)}.",
             )
 
         return chars

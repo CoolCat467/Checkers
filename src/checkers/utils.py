@@ -22,7 +22,7 @@ def to_twos_complement(number: int, bits: int) -> int:
     # this means we can't be exactly at value_max, but we can be at exactly value_min
     if number >= value_max or number < value_min:
         raise ValueError(
-            f"Can't convert number {number} into {bits}-bit twos complement format - out of range"
+            f"Can't convert number {number} into {bits}-bit twos complement format - out of range",
         )
 
     return number + (1 << bits) if number < 0 else number
@@ -38,7 +38,7 @@ def from_twos_complement(number: int, bits: int) -> int:
     value_max = (1 << bits) - 1
     if number < 0 or number > value_max:
         raise ValueError(
-            f"Can't convert number {number} from {bits}-bit twos complement format - out of range"
+            f"Can't convert number {number} from {bits}-bit twos complement format - out of range",
         )
 
     if number & (1 << (bits - 1)) != 0:

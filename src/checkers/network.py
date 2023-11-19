@@ -93,13 +93,13 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
                 if len(content) == 0:
                     raise TimeoutException(
                         "Server did not respond with any information. "
-                        "This may be from a connection timeout."
+                        "This may be from a connection timeout.",
                     )
                 # Only sent a few bytes, but we requested more
                 raise OSError(
                     f"Server stopped responding (got {len(content)} bytes, "
                     f"but expected {length} bytes)."
-                    f" Partial obtained data: {content!r}"
+                    f" Partial obtained data: {content!r}",
                 )
         return content
 
@@ -158,11 +158,11 @@ class NetworkEventComponent(NetworkComponent):
             {
                 name: self.write_event
                 for name in self._write_event_name_to_packet_id
-            }
+            },
         )
 
     def register_network_write_event(
-        self, event_name: str, packet_id: int
+        self, event_name: str, packet_id: int,
     ) -> None:
         """Map event name to serverbound packet id"""
         if event_name in self._write_event_name_to_packet_id:
@@ -171,7 +171,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(
                 f"{event_name!r} events are also being received"
                 f"from server with packet id {packet_id!r}, "
-                "which will would lead to infinite looping over network"
+                "which will would lead to infinite looping over network",
             )
         self._write_event_name_to_packet_id[event_name] = packet_id
         if self.manager_exists:
@@ -202,7 +202,7 @@ class NetworkEventComponent(NetworkComponent):
         return Event(event_name, event_data)
 
     def register_read_network_event(
-        self, packet_id: int, event_name: str
+        self, packet_id: int, event_name: str,
     ) -> None:
         """Map clientbound packet id to event name"""
         if packet_id in self._read_packet_id_to_event_name:
@@ -211,7 +211,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(
                 f"Packet id {packet_id!r} packets are also being received"
                 f"from server with as {event_name!r} events, "
-                "which will would lead to infinite looping over network"
+                "which will would lead to infinite looping over network",
             )
         self._read_packet_id_to_event_name[packet_id] = event_name
 
@@ -234,7 +234,8 @@ class Server(ComponentManager):
         """Cancels serve scope immediately.
 
         This method is idempotent, i.e., if the scope was already
-        cancelled then this method silently does nothing."""
+        cancelled then this method silently does nothing.
+        """
         if self.cancel_scope is None:
             return
         self.cancel_scope.cancel()
@@ -249,7 +250,7 @@ class Server(ComponentManager):
         self.cancel_scope = trio.CancelScope()
         async with trio.open_nursery() as nursery:
             listeners = await trio.open_tcp_listeners(
-                port, host=host, backlog=backlog
+                port, host=host, backlog=backlog,
             )
 
             async def handle_serve(
@@ -275,7 +276,8 @@ class Server(ComponentManager):
     async def handler(self, stream: trio.SocketStream) -> None:
         """Main handler for new clients
 
-        Override in a subclass - Default only closes the stream"""
+        Override in a subclass - Default only closes the stream
+        """
         try:
             await stream.send_eof()
         finally:
@@ -286,7 +288,7 @@ def run() -> None:
     "Run test of module"
 
     async def client_connect(
-        port: int, stop_server: Callable[[], None]
+        port: int, stop_server: Callable[[], None],
     ) -> None:
         await trio.sleep(0.05)
         # manager = ComponentManager("manager")
@@ -318,7 +320,7 @@ def run() -> None:
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:
                 client = NetworkEventComponent.from_stream(
-                    "client", stream=stream
+                    "client", stream=stream,
                 )
 
                 client.register_read_network_event(0, "repost_event")

@@ -141,5 +141,6 @@ def test_get_angle_between_vectors() -> None:
 
 def test_project_v_onto_w() -> None:
     assert round(
-        project_v_onto_w(Vector2(4, 16), Vector2(2, -6)), 4
+        project_v_onto_w(Vector2(4, 16), Vector2(2, -6)),
+        4,
     ) == Vector2(x=-4.4, y=13.2)

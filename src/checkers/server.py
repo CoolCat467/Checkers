@@ -31,7 +31,7 @@ PORT: Final = 31613
 
 
 def generate_pieces(
-    board_width: int, board_height: int, colors: int = 2
+    board_width: int, board_height: int, colors: int = 2,
 ) -> dict[Pos, int]:
     """Generate data about each piece"""
     pieces: dict[Pos, int] = {}
@@ -57,7 +57,8 @@ class ServerClient(NetworkEventComponent):
 
     When clients connect to server, this class handles the incoming
     connections to the server in the way of reading and raising events
-    that are transferred over the network."""
+    that are transferred over the network.
+    """
 
     __slots__ = ("client_id",)
 
@@ -81,13 +82,13 @@ class ServerClient(NetworkEventComponent):
                 "server[write]->game_over": 9,
                 "server[write]->action_complete": 10,
                 "server[write]->initial_config": 11,
-            }
+            },
         )
         self.register_read_network_events(
             {
                 0: f"client[{self.client_id}]->select_piece",
                 1: f"client[{self.client_id}]->select_tile",
-            }
+            },
         )
 
     def bind_handlers(self) -> None:
@@ -107,7 +108,7 @@ class ServerClient(NetworkEventComponent):
                 "game_over->network": self.handle_game_over,
                 "action_complete->network": self.handle_action_complete,
                 "initial_config->network": self.handle_initial_config,
-            }
+            },
         )
 
     async def handle_raw_select_piece(self, event: Event[bytearray]) -> None:
@@ -117,7 +118,7 @@ class ServerClient(NetworkEventComponent):
         pos_x, pos_y = read_position(buffer)
 
         await self.raise_event(
-            Event("network->select_piece", (self.client_id, (pos_x, pos_y)))
+            Event("network->select_piece", (self.client_id, (pos_x, pos_y))),
         )
 
     async def handle_raw_select_tile(self, event: Event[bytearray]) -> None:
@@ -127,7 +128,7 @@ class ServerClient(NetworkEventComponent):
         pos_x, pos_y = read_position(buffer)
 
         await self.raise_event(
-            Event("network->select_tile", (self.client_id, (pos_x, pos_y)))
+            Event("network->select_tile", (self.client_id, (pos_x, pos_y))),
         )
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
@@ -142,7 +143,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->create_piece", buffer))
 
     async def handle_piece_select(
-        self, event: Event[tuple[Pos, bool]]
+        self, event: Event[tuple[Pos, bool]],
     ) -> None:
         """Read piece select event and reraise as server[write]->select_piece"""
         piece_pos, outline_value = event.data
@@ -183,11 +184,11 @@ class ServerClient(NetworkEventComponent):
         write_position(buffer, piece_pos)
 
         await self.write_event(
-            Event("server[write]->delete_piece_animation", buffer)
+            Event("server[write]->delete_piece_animation", buffer),
         )
 
     async def handle_update_piece_animation(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Read update piece animation event and reraise as server[write]->update_piece_animation"""
         piece_pos, piece_type = event.data
@@ -198,11 +199,11 @@ class ServerClient(NetworkEventComponent):
         buffer.write_value(StructFormat.UBYTE, piece_type)
 
         await self.write_event(
-            Event("server[write]->update_piece_animation", buffer)
+            Event("server[write]->update_piece_animation", buffer),
         )
 
     async def handle_move_piece_animation(
-        self, event: Event[tuple[Pos, Pos]]
+        self, event: Event[tuple[Pos, Pos]],
     ) -> None:
         """Read move piece animation event and reraise as server[write]->move_piece_animation"""
         piece_current_pos, piece_new_pos = event.data
@@ -213,7 +214,7 @@ class ServerClient(NetworkEventComponent):
         write_position(buffer, piece_new_pos)
 
         await self.write_event(
-            Event("server[write]->move_piece_animation", buffer)
+            Event("server[write]->move_piece_animation", buffer),
         )
 
     async def handle_animation_state(self, event: Event[bool]) -> None:
@@ -237,7 +238,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->game_over", buffer))
 
     async def handle_action_complete(
-        self, event: Event[tuple[Pos, Pos, int]]
+        self, event: Event[tuple[Pos, Pos, int]],
     ) -> None:
         """Read action complete event and reraise as server[write]->action_complete"""
         from_pos, to_pos, player_turn = event.data
@@ -251,7 +252,7 @@ class ServerClient(NetworkEventComponent):
         await self.write_event(Event("server[write]->action_complete", buffer))
 
     async def handle_initial_config(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Read initial config event and reraise as server[write]->initial_config"""
         board_size, player_turn = event.data
@@ -293,7 +294,7 @@ class CheckersState(State):
                     start_pos,
                     end_pos,
                 ),
-            )
+            ),
         )
 
     def piece_jumped(self, jumped_piece_pos: Pos) -> None:
@@ -309,7 +310,8 @@ class GameServer(Server):
     """Checkers server
 
     Handles accepting incoming connections from clients and handles
-    main game logic via State subclass above."""
+    main game logic via State subclass above.
+    """
 
     __slots__ = (
         "client_count",
@@ -349,7 +351,7 @@ class GameServer(Server):
                 "server_send_game_start": self.handle_server_start_new_game,
                 "network->select_piece": self.handle_network_select_piece,
                 "network->select_tile": self.handle_network_select_tile,
-            }
+            },
         )
 
     async def stop_server(self, event: Event[None] | None = None) -> None:
@@ -381,7 +383,7 @@ class GameServer(Server):
         ).encode()
         print("post_advertisement")
         await udp_socket.sendto(
-            advertisement, (send_to_ip, ADVERTISEMENT_PORT)
+            advertisement, (send_to_ip, ADVERTISEMENT_PORT),
         )
 
     def stop_advertising(self) -> None:
@@ -423,7 +425,7 @@ class GameServer(Server):
                     except OSError as exc:
                         traceback.print_exception(exc)
                         print(
-                            f"{self.__class__.__name__}: Failed to post server advertisement"
+                            f"{self.__class__.__name__}: Failed to post server advertisement",
                         )
                         break
                     await trio.sleep(1.5)
@@ -510,8 +512,8 @@ class GameServer(Server):
         # Raise initial config event with board size and initial turn.
         await self.raise_event(
             Event(
-                "initial_config->network", (self.board_size, self.state.turn)
-            )
+                "initial_config->network", (self.board_size, self.state.turn),
+            ),
         )
 
     async def client_network_loop(self, client: ServerClient) -> None:
@@ -520,7 +522,7 @@ class GameServer(Server):
             print(f"{client.name} client_network_loop tick")
             try:
                 await client.write_event(
-                    Event("server[write]->no_actions", bytearray())
+                    Event("server[write]->no_actions", bytearray()),
                 )
                 event = await client.read_event()
             except TimeoutException:
@@ -558,7 +560,7 @@ class GameServer(Server):
             self.stop_serving()
         if self.client_count > self.max_clients:
             print(
-                f"{self.__class__.__name__}: client disconnected, too many clients"
+                f"{self.__class__.__name__}: client disconnected, too many clients",
             )
             await stream.aclose()
 
@@ -578,7 +580,7 @@ class GameServer(Server):
             self.client_count -= 1
 
     async def handle_network_select_piece(
-        self, event: Event[tuple[int, Pos]]
+        self, event: Event[tuple[int, Pos]],
     ) -> None:
         """Handle piece event from client."""
         client_id, tile_pos = event.data
@@ -589,13 +591,13 @@ class GameServer(Server):
 
         if player != self.state.turn:
             print(
-                f"{player = } cannot select piece {tile_pos = } because it is not that player's turn"
+                f"{player = } cannot select piece {tile_pos = } because it is not that player's turn",
             )
             return
 
         if not self.players_can_interact:
             print(
-                f"{player = } cannot select piece {tile_pos = } because players_can_interact is False"
+                f"{player = } cannot select piece {tile_pos = } because players_can_interact is False",
             )
             return
         if not self.state.can_player_select_piece(player, tile_pos):
@@ -610,7 +612,7 @@ class GameServer(Server):
         await self.player_select_piece(player, tile_pos)
 
     async def player_select_piece(
-        self, player: int, piece_pos: Pos | None
+        self, player: int, piece_pos: Pos | None,
     ) -> None:
         """Update glowing tiles from new selected piece"""
         ignore: set[Pos] = set()
@@ -637,7 +639,7 @@ class GameServer(Server):
                     nursery.start_soon(
                         self.raise_event,
                         Event(
-                            "select_piece->network", (prev_selection, False)
+                            "select_piece->network", (prev_selection, False),
                         ),
                     )
 
@@ -667,46 +669,46 @@ class GameServer(Server):
     async def handle_move_animation(self, from_pos: Pos, to_pos: Pos) -> None:
         """Handle move animation."""
         await self.raise_event(
-            Event("move_piece_animation->network", (from_pos, to_pos))
+            Event("move_piece_animation->network", (from_pos, to_pos)),
         )
 
     async def handle_jump_animation(self, jumped_pos: Pos) -> None:
         """Handle jump animation."""
         await self.raise_event(
-            Event("delete_piece_animation->network", jumped_pos)
+            Event("delete_piece_animation->network", jumped_pos),
         )
 
     async def handle_king_animation(
-        self, kinged_pos: Pos, piece_type: int
+        self, kinged_pos: Pos, piece_type: int,
     ) -> None:
         """Handle jump animation."""
         await self.raise_event(
-            Event("update_piece_animation->network", (kinged_pos, piece_type))
+            Event("update_piece_animation->network", (kinged_pos, piece_type)),
         )
 
     async def handle_action_animations(
-        self, actions: deque[tuple[str, Iterable[Pos | int]]]
+        self, actions: deque[tuple[str, Iterable[Pos | int]]],
     ) -> None:
         """Handle action animations"""
         while actions:
             name, params = actions.popleft()
             if name == "move":
                 await self.handle_move_animation(
-                    *cast("Iterable[Pos]", params)
+                    *cast("Iterable[Pos]", params),
                 )
             elif name == "jump":
                 await self.handle_jump_animation(
-                    *cast("Iterable[Pos]", params)
+                    *cast("Iterable[Pos]", params),
                 )
             elif name == "king":
                 await self.handle_king_animation(
-                    *cast("tuple[Pos, int]", params)
+                    *cast("tuple[Pos, int]", params),
                 )
             else:
                 raise NotImplementedError(f"Animation for action {name}")
 
     async def handle_network_select_tile(
-        self, event: Event[tuple[int, Pos]]
+        self, event: Event[tuple[int, Pos]],
     ) -> None:
         """Handle select tile event from network."""
         client_id, tile_pos = event.data
@@ -717,26 +719,26 @@ class GameServer(Server):
 
         if not self.players_can_interact:
             print(
-                f"{player = } cannot select tile {tile_pos = } because players_can_interact is False"
+                f"{player = } cannot select tile {tile_pos = } because players_can_interact is False",
             )
             return
 
         if player != self.state.turn:
             print(
-                f"{player = } cannot select tile {tile_pos = } because it is not their turn."
+                f"{player = } cannot select tile {tile_pos = } because it is not their turn.",
             )
             return
 
         piece_pos = self.player_selections.get(player)
         if piece_pos is None:
             print(
-                f"{player = } cannot select tile {tile_pos = } because has no selection"
+                f"{player = } cannot select tile {tile_pos = } because has no selection",
             )
             return
 
         if tile_pos not in self.state.get_actions_set(piece_pos).ends:
             print(
-                f"{player = } cannot select tile {piece_pos!r} because not valid move"
+                f"{player = } cannot select tile {piece_pos!r} because not valid move",
             )
             return
 
@@ -765,7 +767,7 @@ class GameServer(Server):
             Event(
                 "action_complete->network",
                 (piece_pos, tile_pos, self.state.turn),
-            )
+            ),
         )
 
         win_value = self.state.check_for_win()
@@ -787,7 +789,7 @@ async def run_server(server_class: type[GameServer]) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
-            "checkers", main_nursery, "client"
+            "checkers", main_nursery, "client",
         )
         server = server_class()
         event_manager.add_component(server)
@@ -811,7 +813,7 @@ async def run_server(server_class: type[GameServer]) -> None:
                         / 1e9,  # nanoseconds -> seconds
                         fps=clock.get_fps(),
                     ),
-                )
+                ),
             )
             await trio.sleep(0.01)
         server.unbind_components()

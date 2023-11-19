@@ -17,7 +17,7 @@ class WriteFunctionMock(Mock):
         self.combined_data = bytearray()
 
     def __call__(
-        self, data: bytes
+        self, data: bytes,
     ) -> None:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Override mock's ``__call__`` to extend our :attr:`.combined_data` bytearray.
 
@@ -29,7 +29,7 @@ class WriteFunctionMock(Mock):
         return super().__call__(data)
 
     def assert_has_data(
-        self, data: bytearray, ensure_called: bool = True
+        self, data: bytearray, ensure_called: bool = True,
     ) -> None:
         """Ensure that the combined write data by the mocked function matches expected ``data``."""
         if ensure_called:
@@ -37,7 +37,7 @@ class WriteFunctionMock(Mock):
 
         if self.combined_data != data:
             raise AssertionError(
-                f"Write function mock expected data {data!r}, but was {self.call_data!r}"
+                f"Write function mock expected data {data!r}, but was {self.call_data!r}",
             )
 
 
@@ -55,7 +55,7 @@ class ReadFunctionMock(Mock):
         self.combined_data = combined_data
 
     def __call__(
-        self, length: int
+        self, length: int,
     ) -> bytearray:  # pyright: ignore[reportIncompatibleMethodOverride]
         """Override mock's __call__ to make it return part of our :attr:`.combined_data` bytearray.
 
@@ -75,7 +75,7 @@ class ReadFunctionMock(Mock):
 
         if len(self.combined_data) != 0:
             raise AssertionError(
-                f"Read function didn't deplete all of it's data, remaining data: {self.combined_data!r}"
+                f"Read function didn't deplete all of it's data, remaining data: {self.combined_data!r}",
             )
 
 

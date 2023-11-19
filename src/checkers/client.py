@@ -35,7 +35,7 @@ async def read_advertisements(
         # Allow multiple copies of this program on one machine
         # (not strictly needed)
         udp_socket.setsockopt(
-            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1
+            trio.socket.SOL_SOCKET, trio.socket.SO_REUSEADDR, 1,
         )
 
         await udp_socket.bind(("", ADVERTISEMENT_PORT))
@@ -64,12 +64,12 @@ async def read_advertisements(
         if addrinfo[0] == trio.socket.AF_INET:  # IPv4
             mreq = group_bin + struct.pack("=I", trio.socket.INADDR_ANY)
             udp_socket.setsockopt(
-                trio.socket.IPPROTO_IP, trio.socket.IP_ADD_MEMBERSHIP, mreq
+                trio.socket.IPPROTO_IP, trio.socket.IP_ADD_MEMBERSHIP, mreq,
             )
         else:
             mreq = group_bin + struct.pack("@I", 0)
             udp_socket.setsockopt(
-                trio.socket.IPPROTO_IPV6, trio.socket.IPV6_JOIN_GROUP, mreq
+                trio.socket.IPPROTO_IPV6, trio.socket.IPV6_JOIN_GROUP, mreq,
             )
 
         buffer = b""
@@ -113,7 +113,8 @@ class GameClient(NetworkEventComponent):
     """Game Client Network Event Component.
 
     This class handles connecting to the game server, transmitting events
-    to the server, and reading and raising incoming events from the server."""
+    to the server, and reading and raising incoming events from the server.
+    """
 
     __slots__ = ()  # "tick_lock",
 
@@ -128,7 +129,7 @@ class GameClient(NetworkEventComponent):
             {
                 "select_piece->server": 0,
                 "select_tile->server": 1,
-            }
+            },
         )
         self.register_read_network_events(
             {
@@ -144,7 +145,7 @@ class GameClient(NetworkEventComponent):
                 9: "server->game_over",
                 10: "server->action_complete",
                 11: "server->initial_config",
-            }
+            },
         )
 
     ##        self.tick_lock = trio.Lock()
@@ -170,14 +171,15 @@ class GameClient(NetworkEventComponent):
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
                 f"client[{self.name}]_read_event": self.handle_read_event,
-            }
+            },
         )
 
     async def print_no_actions(self, event: Event[bytearray]) -> None:
         """Print received `no_actions` event from server.
 
         This event is used as a sort of keepalive heartbeat, because
-        it stops the connection from timing out."""
+        it stops the connection from timing out.
+        """
         print(f"print_no_actions {event = }")
 
     async def raise_disconnect(self, message: str) -> None:
@@ -185,7 +187,7 @@ class GameClient(NetworkEventComponent):
         print(f"{self.__class__.__name__}: {message}")
         if not self.manager_exists:
             print(
-                f"{self.__class__.__name__}: Manager does not exist, not raising disconnect event."
+                f"{self.__class__.__name__}: Manager does not exist, not raising disconnect event.",
             )
             return
         await self.raise_event(Event("client_disconnected", message))
@@ -193,7 +195,7 @@ class GameClient(NetworkEventComponent):
         assert self.not_connected
 
     async def handle_read_event(
-        self, tick_event: Event[TickEventData]
+        self, tick_event: Event[TickEventData],
     ) -> None:
         """Raise events from server"""
         ##        async with self.tick_lock:
@@ -217,7 +219,7 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(Event(f"client[{self.name}]_read_event", None))
 
     async def handle_client_connect(
-        self, event: Event[tuple[str, int]]
+        self, event: Event[tuple[str, int]],
     ) -> None:
         """Have client connect to address specified in event"""
         if not self.not_connected:
@@ -228,7 +230,7 @@ class GameClient(NetworkEventComponent):
             traceback.print_exception(ex)
         else:
             await self.raise_event(
-                Event(f"client[{self.name}]_read_event", None)
+                Event(f"client[{self.name}]_read_event", None),
             )
             return
         await self.raise_disconnect("Error connecting to server.")
@@ -241,7 +243,7 @@ class GameClient(NetworkEventComponent):
         piece_type = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
-            Event("gameboard_create_piece", (piece_pos, piece_type))
+            Event("gameboard_create_piece", (piece_pos, piece_type)),
         )
 
     async def read_select_piece(self, event: Event[bytearray]) -> None:
@@ -252,7 +254,7 @@ class GameClient(NetworkEventComponent):
         outline_value = buffer.read_value(StructFormat.BOOL)
 
         await self.raise_event(
-            Event("gameboard_select_piece", (piece_pos, outline_value))
+            Event("gameboard_select_piece", (piece_pos, outline_value)),
         )
 
     async def read_create_tile(self, event: Event[bytearray]) -> None:
@@ -295,7 +297,7 @@ class GameClient(NetworkEventComponent):
         await self.write_event(Event("select_tile->server", buffer))
 
     async def read_delete_piece_animation(
-        self, event: Event[bytearray]
+        self, event: Event[bytearray],
     ) -> None:
         """Read delete_piece_animation event from server"""
         buffer = Buffer(event.data)
@@ -303,11 +305,11 @@ class GameClient(NetworkEventComponent):
         tile_pos = read_position(buffer)
 
         await self.raise_event(
-            Event("gameboard_delete_piece_animation", tile_pos)
+            Event("gameboard_delete_piece_animation", tile_pos),
         )
 
     async def read_update_piece_animation(
-        self, event: Event[bytearray]
+        self, event: Event[bytearray],
     ) -> None:
         """Read update_piece_animation event from server"""
         buffer = Buffer(event.data)
@@ -316,7 +318,7 @@ class GameClient(NetworkEventComponent):
         piece_type = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
-            Event("gameboard_update_piece_animation", (piece_pos, piece_type))
+            Event("gameboard_update_piece_animation", (piece_pos, piece_type)),
         )
 
     async def read_move_piece_animation(self, event: Event[bytearray]) -> None:
@@ -330,7 +332,7 @@ class GameClient(NetworkEventComponent):
             Event(
                 "gameboard_move_piece_animation",
                 (piece_current_pos, piece_new_pos),
-            )
+            ),
         )
 
     async def read_animation_state(self, event: Event[bytearray]) -> None:
@@ -340,7 +342,7 @@ class GameClient(NetworkEventComponent):
         animation_state = buffer.read_value(StructFormat.BOOL)
 
         await self.raise_event(
-            Event("gameboard_animation_state", animation_state)
+            Event("gameboard_animation_state", animation_state),
         )
 
     async def read_game_over(self, event: Event[bytearray]) -> None:
@@ -355,7 +357,8 @@ class GameClient(NetworkEventComponent):
         """Read action_complete event from server.
 
         Sent when last action from client is done, great for AIs.
-        As of writing, not used for main client."""
+        As of writing, not used for main client.
+        """
         buffer = Buffer(event.data)
 
         from_pos = read_position(buffer)
@@ -363,7 +366,7 @@ class GameClient(NetworkEventComponent):
         current_turn = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
-            Event("game_action_complete", (from_pos, to_pos, current_turn))
+            Event("game_action_complete", (from_pos, to_pos, current_turn)),
         )
 
     async def read_initial_config(self, event: Event[bytearray]) -> None:
@@ -374,7 +377,7 @@ class GameClient(NetworkEventComponent):
         current_turn = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
-            Event("game_initial_config", (board_size, current_turn))
+            Event("game_initial_config", (board_size, current_turn)),
         )
 
     async def handle_network_stop(self, event: Event[None]) -> None:

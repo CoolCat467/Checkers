@@ -52,7 +52,7 @@ def test_component_manager_property_error() -> None:
     component = Component("waffle")
     assert not component.manager_exists
     with pytest.raises(
-        AttributeError, match="^No component manager bound for"
+        AttributeError, match="^No component manager bound for",
     ):
         component.manager  # noqa: B018
 
@@ -97,7 +97,7 @@ def test_add_multiple() -> None:
         (
             Component("fish"),
             Component("waffle"),
-        )
+        ),
     )
     assert manager.component_exists("fish")
     assert manager.component_exists("waffle")
@@ -114,7 +114,7 @@ def test_component_not_exist_error() -> None:
         manager.get_component("darkness")
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_self_component_handler() -> None:
     event_called = False
 
@@ -132,7 +132,7 @@ async def test_self_component_handler() -> None:
     assert event_called
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_raise_event_register_handlers() -> None:
     event_called = False
 
@@ -163,7 +163,7 @@ async def test_raise_event_register_handlers() -> None:
     assert not event_called
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_raise_leveled_comes_back() -> None:
     event_called = False
 
@@ -193,7 +193,7 @@ async def test_raise_leveled_comes_back() -> None:
     assert event_called_two
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_raise_event_register_handler() -> None:
     event_called = False
 
@@ -211,7 +211,7 @@ async def test_raise_event_register_handler() -> None:
     assert event_called
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_raises_event_in_nursery() -> None:
     nursery_called = False
     event_called = False
@@ -238,7 +238,7 @@ async def test_raises_event_in_nursery() -> None:
     assert event_called
 
 
-@pytest.mark.trio
+@pytest.mark.trio()
 async def test_internal_does_not_raise_event_in_nursery() -> None:
     nursery_called = False
     event_called = False

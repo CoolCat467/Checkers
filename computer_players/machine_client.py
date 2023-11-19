@@ -30,7 +30,8 @@ class RemoteState(Component, metaclass=ABCMeta):
     """Remote State
 
     Keeps track of game state and call preform_action when it's this clients
-    turn."""
+    turn.
+    """
 
     __slots__ = ("state", "pieces", "has_initial", "playing_as")
 
@@ -50,7 +51,7 @@ class RemoteState(Component, metaclass=ABCMeta):
                 "game_winner": self.handle_game_over,
                 "game_initial_config": self.handle_initial_config,
                 "gameboard_create_piece": self.handle_create_piece,
-            }
+            },
         )
 
     async def preform_action(self, action: Action) -> None:
@@ -62,7 +63,7 @@ class RemoteState(Component, metaclass=ABCMeta):
                     action.from_pos,
                     self.state.pieces[action.from_pos],
                 ),
-            )
+            ),
         )
         await self.raise_event(Event("gameboard_tile_clicked", action.to_pos))
 
@@ -79,7 +80,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         await self.preform_action(action)
 
     async def handle_action_complete(
-        self, event: Event[tuple[Pos, Pos, int]]
+        self, event: Event[tuple[Pos, Pos, int]],
     ) -> None:
         """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
@@ -97,7 +98,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         self.pieces[pos] = type_
 
     async def handle_initial_config(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Set up initial state and perform our turn if possible."""
         board_size, turn = event.data
@@ -126,7 +127,7 @@ class MachineClient(ComponentManager):
 
     def bind_handlers(self) -> None:
         self.register_handlers(
-            {"client_disconnected": self.handle_client_disconnected}
+            {"client_disconnected": self.handle_client_disconnected},
         )
 
     ##    async def raise_event(self, event: Event) -> None:
@@ -141,12 +142,12 @@ class MachineClient(ComponentManager):
 
 
 async def run_client(
-    host: str, port: int, remote_state_class: type[RemoteState]
+    host: str, port: int, remote_state_class: type[RemoteState],
 ) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
-            "checkers", main_nursery, "client"
+            "checkers", main_nursery, "client",
         )
         client = MachineClient(remote_state_class)
         event_manager.add_component(client)
@@ -159,7 +160,7 @@ async def run_client(
 
 
 def run_client_sync(
-    host: int, port: int, remote_state_class: type[RemoteState]
+    host: int, port: int, remote_state_class: type[RemoteState],
 ) -> None:
     """Synchronous entry point."""
     trio.run(run_client, host, port, remote_state_class)

@@ -24,6 +24,7 @@ Machine = TypeVar("Machine", bound="BaseStateMachine", covariant=True)
 
 class BaseState(Generic[Machine]):
     "Base class for states."
+
     __slots__ = ("name", "machine_ref")
 
     def __init__(self, name: str) -> None:
@@ -46,7 +47,7 @@ class BaseState(Generic[Machine]):
 
     def add_actions(self) -> None:
         "Perform actions when this state added to a State Machine"
-        return None
+        return
 
 
 SyncMachine = TypeVar("SyncMachine", bound="StateMachine", covariant=True)
@@ -54,15 +55,16 @@ SyncMachine = TypeVar("SyncMachine", bound="StateMachine", covariant=True)
 
 class State(BaseState[SyncMachine]):
     "Base class for synchronous states."
+
     __slots__ = ()
 
     def entry_actions(self) -> None:
         "Perform entry actions for this State."
-        return None
+        return
 
     def do_actions(self) -> None:
         "Perform actions for this State."
-        return None
+        return
 
     def check_conditions(self) -> str | None:
         "Check state and return new state name or stay in current"
@@ -70,25 +72,26 @@ class State(BaseState[SyncMachine]):
 
     def exit_actions(self) -> None:
         "Perform exit actions for this State."
-        return None
+        return
 
 
 AsyncMachine = TypeVar(
-    "AsyncMachine", bound="AsyncStateMachine", covariant=True
+    "AsyncMachine", bound="AsyncStateMachine", covariant=True,
 )
 
 
 class AsyncState(BaseState[AsyncMachine]):
     "Base class for asynchronous states."
+
     __slots__ = ()
 
     async def entry_actions(self) -> None:
         "Perform entry actions for this State."
-        return None
+        return
 
     async def do_actions(self) -> None:
         "Perform actions for this State."
-        return None
+        return
 
     async def check_conditions(self) -> str | None:
         "Check state and return new state name or stay in current"
@@ -96,11 +99,12 @@ class AsyncState(BaseState[AsyncMachine]):
 
     async def exit_actions(self) -> None:
         "Perform exit actions for this State."
-        return None
+        return
 
 
 class BaseStateMachine:
     "State Machine base class"
+
     __slots__ = ("states", "active_state", "__weakref__")
 
     def __repr__(self) -> str:
@@ -113,6 +117,7 @@ class BaseStateMachine:
 
 class StateMachine(BaseStateMachine):
     "Synchronous State Machine base class"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -125,7 +130,7 @@ class StateMachine(BaseStateMachine):
         "Add a State instance to the internal dictionary."
         if not isinstance(state, State):
             raise TypeError(
-                f'"{type(state).__name__}" is not an instance of State!'
+                f'"{type(state).__name__}" is not an instance of State!',
             )
         state.machine_ref = ref(self)
         self.states[state.name] = state
@@ -146,7 +151,7 @@ class StateMachine(BaseStateMachine):
         "Change states and perform any exit / entry actions."
         if new_state_name not in self.states and new_state_name is not None:
             raise KeyError(
-                f'"{new_state_name}" not found in internal states dictionary!'
+                f'"{new_state_name}" not found in internal states dictionary!',
             )
 
         if self.active_state is not None:
@@ -162,18 +167,19 @@ class StateMachine(BaseStateMachine):
         "Perform actions check conditions and potentially change states"
         # Only continue if there is an active state
         if self.active_state is None:
-            return None
+            return
         # Perform the actions of the active state
         self.active_state.do_actions()
         # Check conditions and potentially change states.
         new_state_name = self.active_state.check_conditions()
         if new_state_name is not None:
             self.set_state(new_state_name)
-        return None
+        return
 
 
 class AsyncStateMachine(BaseStateMachine):
     "Asynchronous State Machine base class"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -184,7 +190,7 @@ class AsyncStateMachine(BaseStateMachine):
         "Add an AsyncState instance to the internal dictionary."
         if not isinstance(state, AsyncState):
             raise TypeError(
-                f'"{type(state).__name__}" is not an instance of AsyncState!'
+                f'"{type(state).__name__}" is not an instance of AsyncState!',
             )
         state.machine_ref = ref(self)
         self.states[state.name] = state
@@ -205,7 +211,7 @@ class AsyncStateMachine(BaseStateMachine):
         "Change states and perform any exit / entry actions."
         if new_state_name not in self.states and new_state_name is not None:
             raise KeyError(
-                f'"{new_state_name}" not found in internal states dictionary!'
+                f'"{new_state_name}" not found in internal states dictionary!',
             )
 
         if self.active_state is not None:
@@ -221,7 +227,7 @@ class AsyncStateMachine(BaseStateMachine):
         "Perform actions check conditions and potentially change states"
         # Only continue if there is an active state
         if self.active_state is None:
-            return None
+            return
         # Perform the actions of the active state
         await self.active_state.do_actions()
         # Check conditions and potentially change states.

@@ -127,7 +127,7 @@ class State:
 
     @staticmethod
     def get_pieces_from_tiles(
-        tiles: dict[str, dict[str, Any]]
+        tiles: dict[str, dict[str, Any]],
     ) -> dict[Pos, int]:
         """Convert board data from game to internal representation"""
         pieces: dict[Pos, int] = {}
@@ -257,7 +257,7 @@ class State:
         """Return if position is valid"""
         x, y = position
         w, h = self.size
-        return 0 <= x and 0 <= y and x < w and y < h
+        return x >= 0 and y >= 0 and x < w and y < h
 
     def does_piece_king(self, piece_type: int, position: Pos) -> bool:
         """Return if piece needs to be kinged given it's type and position"""
@@ -295,7 +295,8 @@ class State:
             given, position must point to a tile with a piece on it
 
         Returns dictionary that maps end positions to
-        jumped pieces to get there"""
+        jumped pieces to get there
+        """
         if piece_type is None:
             piece_type = self.pieces[position]
         if _pieces is None:
@@ -316,7 +317,7 @@ class State:
 
         # For each side tile in the jumpable tiles for this type of piece,
         for direction, side in pawn_modify(
-            tuple(enumerate(sides)), piece_type
+            tuple(enumerate(sides)), piece_type,
         ):
             # Make sure side exists
             if not self.valid_location(side):
@@ -386,7 +387,7 @@ class State:
                 m
                 for m in filter(self.valid_location, moves)
                 if m not in self.pieces
-            ]
+            ],
         )
 
     def get_actions(self, position: Pos) -> Generator[Action, None, None]:

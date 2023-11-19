@@ -83,7 +83,7 @@ Pos: TypeAlias = tuple[int, int]
 
 
 def render_text(
-    font_name: str, font_size: int, text: str, color: tuple[int, int, int]
+    font_name: str, font_size: int, text: str, color: tuple[int, int, int],
 ) -> Surface:
     "Render text with a given font at font_size with the text in the color of color"
     # Load the font at the size of font_size
@@ -95,6 +95,7 @@ def render_text(
 
 class Piece(sprite.Sprite):
     "Piece Sprite"
+
     __slots__ = (
         "piece_type",
         "board_position",
@@ -127,7 +128,7 @@ class Piece(sprite.Sprite):
                 sprite.DragClickEventComponent(),
                 sprite.MovementComponent(speed=120),
                 sprite.TargetingComponent(),
-            )
+            ),
         )
 
     def bind_handlers(self) -> None:
@@ -145,19 +146,19 @@ class Piece(sprite.Sprite):
                 f"piece_move_{self.position_name}": self.handle_move_event,
                 "reached_destination": self.handle_reached_destination_event,
                 f"piece_update_{self.position_name}": self.handle_update_event,
-            }
+            },
         )
 
     def set_outlined(self, state: bool) -> None:
         "Update image given new outline state"
         manager_image: sprite.ImageComponent = self.manager.get_component(
-            "image"
+            "image",
         )
         value = "_outlined" if state else ""
         self.image = manager_image.get_image(f"piece_{self.piece_type}{value}")
 
     async def handle_click_event(
-        self, event: Event[dict[str, Pos | int]]
+        self, event: Event[dict[str, Pos | int]],
     ) -> None:
         "Raise gameboard_piece_clicked events when clicked"
         await self.raise_event(
@@ -168,7 +169,7 @@ class Piece(sprite.Sprite):
                     self.piece_type,
                 ),
                 3,
-            )
+            ),
         )
 
     async def handle_set_outline_event(self, event: Event[bool]) -> None:
@@ -181,7 +182,7 @@ class Piece(sprite.Sprite):
         self.manager.remove_component(self.name)
 
     async def handle_tick_event(
-        self, event: Event[sprite.TickEventData]
+        self, event: Event[sprite.TickEventData],
     ) -> None:
         "Move toward destination"
         time_passed = event.data.time_passed
@@ -189,7 +190,7 @@ class Piece(sprite.Sprite):
         await targeting.move_destination_time(time_passed)
 
     async def handle_move_event(
-        self, event: Event[Iterable[tuple[Pos, Pos, Pos]]]
+        self, event: Event[Iterable[tuple[Pos, Pos, Pos]]],
     ) -> None:
         "Handle movement animation to event position"
         targeting: sprite.TargetingComponent = self.get_component("targeting")
@@ -206,14 +207,14 @@ class Piece(sprite.Sprite):
         group.move_to_front(self)  # type: ignore[attr-defined]
 
     async def handle_reached_destination_event(
-        self, event: Event[None]
+        self, event: Event[None],
     ) -> None:
         "Raise gameboard_piece_moved event"
         _, start_pos, end_pos = self.destination_tiles.pop(0)
 
         if self.destination_tiles:
             targeting: sprite.TargetingComponent = self.get_component(
-                "targeting"
+                "targeting",
             )
             targeting.destination = self.destination_tiles[0][0]
         await self.raise_event(
@@ -226,7 +227,7 @@ class Piece(sprite.Sprite):
                     not self.destination_tiles,
                 ),
                 1,
-            )
+            ),
         )
 
     async def handle_update_event(self, event: Event[int]) -> None:
@@ -239,6 +240,7 @@ class Piece(sprite.Sprite):
 
 class Tile(sprite.Sprite):
     "Outlined tile sprite - Only exists for selecting destination"
+
     __slots__ = ("color", "board_position", "position_name")
 
     def __init__(
@@ -271,19 +273,19 @@ class Tile(sprite.Sprite):
             {
                 "click": self.handle_click_event,
                 f"self_destruct_tile_{self.position_name}": self.handle_self_destruct_event,
-            }
+            },
         )
 
     def set_outlined(self, state: bool) -> None:
         "Update image given new outline state"
         manager_image: sprite.ImageComponent = self.manager.get_component(
-            "image"
+            "image",
         )
         value = "_outlined" if state else ""
         self.image = manager_image.get_image(f"tile_{self.color}{value}")
 
     async def handle_click_event(
-        self, event: Event[dict[str, Pos | int]]
+        self, event: Event[dict[str, Pos | int]],
     ) -> None:
         "Raise gameboard_tile_clicked events when clicked"
         await self.raise_event(
@@ -291,7 +293,7 @@ class Tile(sprite.Sprite):
                 "gameboard_tile_clicked",
                 self.board_position,
                 3,
-            )
+            ),
         )
 
     async def handle_self_destruct_event(self, event: Event[None]) -> None:
@@ -317,6 +319,7 @@ def generate_tile_image(
 
 class GameBoard(sprite.Sprite):
     "Entity that stores data about the game board and renders it"
+
     __slots__ = (
         "board_size",
         "tile_size",
@@ -386,11 +389,11 @@ class GameBoard(sprite.Sprite):
                 "game_winner": self.handle_game_winner,
                 "fire_next_animation": self.handle_fire_next_animation,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
-            }
+            },
         )
 
     async def handle_initial_config_event(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         "Start up game"
         self.board_size, _current_turn = event.data
@@ -400,23 +403,23 @@ class GameBoard(sprite.Sprite):
         self.visible = True
 
     async def handle_select_piece_event(
-        self, event: Event[tuple[Pos, bool]]
+        self, event: Event[tuple[Pos, bool]],
     ) -> None:
         """Send piece outline event"""
         piece_pos, outline_value = event.data
         piece_name = self.get_tile_name(*piece_pos)
         await self.raise_event(
-            Event(f"piece_outline_{piece_name}", outline_value)
+            Event(f"piece_outline_{piece_name}", outline_value),
         )
 
     async def handle_piece_moved_event(
-        self, event: Event[tuple[str, Pos, Pos, bool]]
+        self, event: Event[tuple[str, Pos, Pos, bool]],
     ) -> None:
         """Handle piece finishing one part of it's movement animation"""
         await self.raise_event(Event("fire_next_animation", None))
 
     async def handle_create_piece_event(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle create_piece event"""
         if not self.visible:
@@ -438,11 +441,11 @@ class GameBoard(sprite.Sprite):
         await self.raise_event(Event(f"self_destruct_tile_{tile_name}", None))
 
     async def handle_delete_piece_animation_event(
-        self, event: Event[Pos]
+        self, event: Event[Pos],
     ) -> None:
         """Handle delete_animation_piece event"""
         self.animation_queue.append(
-            Event(event.name.removesuffix("_animation"), event.data)
+            Event(event.name.removesuffix("_animation"), event.data),
         )
 
     async def handle_delete_piece_event(self, event: Event[Pos]) -> None:
@@ -454,15 +457,15 @@ class GameBoard(sprite.Sprite):
         await self.raise_event(Event("fire_next_animation", None))
 
     async def handle_update_piece_animation_event(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle update_piece_animation event"""
         self.animation_queue.append(
-            Event(event.name.removesuffix("_animation"), event.data)
+            Event(event.name.removesuffix("_animation"), event.data),
         )
 
     async def handle_update_piece_event(
-        self, event: Event[tuple[Pos, int]]
+        self, event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle update_piece event"""
         piece_pos, piece_type = event.data
@@ -471,15 +474,15 @@ class GameBoard(sprite.Sprite):
         await self.raise_event(Event(f"piece_update_{piece_name}", piece_type))
 
     async def handle_move_piece_animation_event(
-        self, event: Event[tuple[Pos, Pos]]
+        self, event: Event[tuple[Pos, Pos]],
     ) -> None:
         """Handle move_piece_animation event"""
         self.animation_queue.append(
-            Event(event.name.removesuffix("_animation"), event.data)
+            Event(event.name.removesuffix("_animation"), event.data),
         )
 
     async def handle_move_piece_event(
-        self, event: Event[tuple[Pos, Pos]]
+        self, event: Event[tuple[Pos, Pos]],
     ) -> None:
         """Handle move_piece event"""
         from_pos, to_pos = event.data
@@ -501,7 +504,7 @@ class GameBoard(sprite.Sprite):
             Event(
                 f"piece_move_{to_name}",
                 [(to_location, from_pos, to_pos)],
-            )
+            ),
         )
 
     async def new_animating_state(self, new_state: bool) -> None:
@@ -529,7 +532,7 @@ class GameBoard(sprite.Sprite):
         await self.new_animating_state(False)
 
     async def handle_fire_next_animation(
-        self, _: Event[None] | None = None
+        self, _: Event[None] | None = None,
     ) -> None:
         """Start next animation."""
         assert self.processing_animations
@@ -586,7 +589,7 @@ class GameBoard(sprite.Sprite):
         for index, color in enumerate(self.tile_color_map):
             name = f"tile_{index}"
             surface = generate_tile_image(
-                color, (self.tile_size, self.tile_size)
+                color, (self.tile_size, self.tile_size),
             )
 
             if index == 0:
@@ -619,7 +622,7 @@ class GameBoard(sprite.Sprite):
                 image.add_image(name, surface)
             else:
                 image.add_image_and_mask(
-                    name, surface, f"piece_{piece_type-1}"
+                    name, surface, f"piece_{piece_type-1}",
                 )
 
             outline_color = YELLOW
@@ -710,6 +713,7 @@ class GameBoard(sprite.Sprite):
 
 class ClickDestinationComponent(Component):
     "Component that will use targeting to go to wherever you click on the screen"
+
     __slots__ = ("selected",)
     outline = pygame.color.Color(255, 220, 0)
 
@@ -728,7 +732,7 @@ class ClickDestinationComponent(Component):
                 "tick": self.move_towards_dest,
                 "init": self.cache_outline,
                 "test": self.test,
-            }
+            },
         )
 
     async def test(self, event: Event[Any]) -> None:
@@ -786,6 +790,7 @@ class ClickDestinationComponent(Component):
 
 class MrFloppy(sprite.Sprite):
     "Mr. Floppy test sprite"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -798,7 +803,7 @@ class MrFloppy(sprite.Sprite):
                 ClickDestinationComponent(),
                 sprite.ImageComponent(),
                 sprite.DragClickEventComponent(),
-            )
+            ),
         )
 
         movement = self.get_component("movement")
@@ -808,7 +813,7 @@ class MrFloppy(sprite.Sprite):
         movement.speed = 200
 
         floppy: pygame.surface.Surface = pygame.image.load(
-            path.join(path.dirname(__file__), "data", "mr_floppy.png")
+            path.join(path.dirname(__file__), "data", "mr_floppy.png"),
         )
 
         image.add_images(
@@ -818,7 +823,7 @@ class MrFloppy(sprite.Sprite):
                 1: pygame.transform.rotate(floppy, 270),
                 2: pygame.transform.flip(floppy, True, True),
                 3: pygame.transform.rotate(floppy, 90),
-            }
+            },
         )
 
         self.update_location_on_resize = True
@@ -835,7 +840,7 @@ class MrFloppy(sprite.Sprite):
         self.register_handler("drag", self.drag)
 
     def controller(
-        self, image_identifiers: list[str | int]
+        self, image_identifiers: list[str | int],
     ) -> Generator[str | int | None, None, None]:
         "Animation controller"
         cidx = 0
@@ -859,11 +864,12 @@ class MrFloppy(sprite.Sprite):
 
 class FPSCounter(objects.Text):
     "FPS counter"
+
     __slots__ = ()
 
     def __init__(self) -> None:
         font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28,
         )
         super().__init__("fps", font)
 
@@ -879,7 +885,7 @@ class FPSCounter(objects.Text):
         self.register_handlers(
             {
                 "tick": self.on_tick,
-            }
+            },
         )
 
 
@@ -915,6 +921,7 @@ async def find_ip() -> str:
 
 class HaltState(AsyncState["CheckersClient"]):
     "Halt state to set state to None so running becomes False"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -928,6 +935,7 @@ class HaltState(AsyncState["CheckersClient"]):
 
 class GameState(AsyncState["CheckersClient"]):
     "Checkers Game Asynchronous State base class"
+
     __slots__ = ("id", "manager")
 
     def __init__(self, name: str) -> None:
@@ -956,7 +964,7 @@ class GameState(AsyncState["CheckersClient"]):
         self.manager.unbind_components()
 
     def change_state(
-        self, new_state: str | None
+        self, new_state: str | None,
     ) -> Callable[[Event[Any]], Awaitable[None]]:
         """Return an async function that will change state to `new_state`"""
 
@@ -970,6 +978,7 @@ class GameState(AsyncState["CheckersClient"]):
 
 class InitializeState(AsyncState["CheckersClient"]):
     "Initialize Checkers"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -981,6 +990,7 @@ class InitializeState(AsyncState["CheckersClient"]):
 
 class TestState(GameState):
     "Test state"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -999,6 +1009,7 @@ class TestState(GameState):
 
 class TitleState(GameState):
     "Game Title State"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -1010,10 +1021,10 @@ class TitleState(GameState):
         self.id = self.machine.new_group("title")
 
         button_font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28,
         )
         title_font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 56
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 56,
         )
 
         title_text = OutlinedText("title_text", title_font)
@@ -1053,7 +1064,7 @@ class TitleState(GameState):
             hosting_button.rect.h + 10,
         )
         internal_button.handle_click = self.change_state(
-            "play_internal_hosting"
+            "play_internal_hosting",
         )
         self.group_add(internal_button)
 
@@ -1066,6 +1077,7 @@ class TitleState(GameState):
 
 class PlayHostingState(AsyncState["CheckersClient"]):
     "Start running server"
+
     __slots__ = ()
 
     internal_server = False
@@ -1081,7 +1093,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
             (
                 GameServer(self.internal_server),
                 GameClient("network"),
-            )
+            ),
         )
 
         await self.machine.raise_event(Event("server_start", None))
@@ -1090,7 +1102,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
         "Have client connect"
         assert self.machine is not None
         await self.machine.raise_event(
-            Event("client_connect", ("127.0.0.1", PORT))
+            Event("client_connect", ("127.0.0.1", PORT)),
         )
 
     async def check_conditions(self) -> str | None:
@@ -1101,6 +1113,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
 
 class PlayInternalHostingState(PlayHostingState):
     "Host server with internal server mode"
+
     __slots__ = ()
 
     internal_server = True
@@ -1120,6 +1133,7 @@ class JoinButton(Button):
 
 class PlayJoiningState(GameState):
     "Start running client"
+
     __slots__ = (
         "font",
         "buttons",
@@ -1133,7 +1147,7 @@ class PlayJoiningState(GameState):
         self.buttons = {}
 
         self.font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28,
         )
 
     async def entry_actions(self) -> None:
@@ -1149,7 +1163,7 @@ class PlayJoiningState(GameState):
         self.next_button = 0
 
         self.manager.register_handler(
-            "update_listing", self.handle_update_listing
+            "update_listing", self.handle_update_listing,
         )
 
         await self.manager.raise_event(Event("update_listing", None))
@@ -1169,7 +1183,7 @@ class PlayJoiningState(GameState):
                 self.next_button += 1
                 ####
                 await self.machine.raise_event(
-                    Event("client_connect", details, 1)
+                    Event("client_connect", details, 1),
                 )
                 return "play"
         print("click")
@@ -1182,6 +1196,7 @@ class PlayJoiningState(GameState):
 
 class PlayState(GameState):
     "Game Play State"
+
     __slots__ = ()
 
     def __init__(self) -> None:
@@ -1192,7 +1207,7 @@ class PlayState(GameState):
             {
                 "client_disconnected": self.handle_client_disconnected,
                 "game_winner": self.handle_game_over,
-            }
+            },
         )
 
     def add_actions(self) -> None:
@@ -1235,7 +1250,7 @@ class PlayState(GameState):
         # print(f"Player {PLAYERS[winner]} ({winner}) Won")
 
         font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28,
         )
 
         continue_button = Button("continue_button", font)
@@ -1256,7 +1271,7 @@ class PlayState(GameState):
         error = event.data
 
         font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28
+            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"), 28,
         )
 
         title_button = Button("title_button", font)
@@ -1302,7 +1317,7 @@ class CheckersClient(sprite.GroupProcessor):
                 PlayInternalHostingState(),
                 PlayJoiningState(),
                 PlayState(),
-            )
+            ),
         )
 
     @property
@@ -1334,7 +1349,7 @@ async def async_run() -> None:
         client = CheckersClient(event_manager)
 
         background = pygame.image.load(
-            path.join(path.dirname(__file__), "data", "background.png")
+            path.join(path.dirname(__file__), "data", "background.png"),
         ).convert()
         client.clear(screen, background)
 
@@ -1360,7 +1375,7 @@ async def async_run() -> None:
                     sprite_event = sprite.convert_pygame_event(event)
                     # print(sprite_event)
                     event_nursery.start_soon(
-                        event_manager.raise_event, sprite_event
+                        event_manager.raise_event, sprite_event,
                     )
                 event_nursery.start_soon(client.think)
                 event_nursery.start_soon(clock.tick, FPS)
@@ -1373,7 +1388,7 @@ async def async_run() -> None:
                         / 1e9,  # nanoseconds -> seconds
                         fps=clock.get_fps(),
                     ),
-                )
+                ),
             )
 
             if resized_window:
@@ -1389,7 +1404,6 @@ async def async_run() -> None:
 
 def run() -> None:
     "Run asynchronous side of everything"
-
     trio.run(async_run)
 
 

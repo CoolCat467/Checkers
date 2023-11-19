@@ -53,7 +53,7 @@ class SyncWriter(BaseSyncWriter):
             " - If you're writing a new test, did you forget to mock it?\n"
             " - If you're seeing this in an existing test, this method got called without the test expecting it,"
             " this probably means you changed something in the code leading to this call, but you haven't updated"
-            " the tests to mock this function."
+            " the tests to mock this function.",
         )
 
 
@@ -77,7 +77,7 @@ class SyncReader(BaseSyncReader):
             " - If you're writing a new test, did you forget to mock it?\n"
             " - If you're seeing this in an existing test, this method got called without the test expecting it,"
             " this probably means you changed something in the code leading to this call, but you haven't updated"
-            " the tests to mock this function."
+            " the tests to mock this function.",
         )
 
 
@@ -101,7 +101,7 @@ class AsyncWriter(BaseAsyncWriter):
             " - If you're writing a new test, did you forget to mock it?\n"
             " - If you're seeing this in an existing test, this method got called without the test expecting it,"
             " this probably means you changed something in the code leading to this call, but you haven't updated"
-            " the tests to mock this function."
+            " the tests to mock this function.",
         )
 
 
@@ -125,7 +125,7 @@ class AsyncReader(BaseAsyncReader):
             " - If you're writing a new test, did you forget to mock it?\n"
             " - If you're seeing this in an existing test, this method got called without the test expecting it,"
             " this probably means you changed something in the code leading to this call, but you haven't updated"
-            " the tests to mock this function."
+            " the tests to mock this function.",
         )
 
 
@@ -402,7 +402,7 @@ class WriterTests(ABC):
             self.writer.write_utf("a" * (32768))
 
     def test_write_optional_true(
-        self, method_mock: Mock | AsyncMock, write_mock: WriteFunctionMock
+        self, method_mock: Mock | AsyncMock, write_mock: WriteFunctionMock,
     ):
         """Test writing non-``None`` value writes ``True`` and runs the writer function."""
         mock_v = Mock()
@@ -412,7 +412,7 @@ class WriterTests(ABC):
         write_mock.assert_has_data(bytearray([1]))
 
     def test_write_optional_false(
-        self, method_mock: Mock | AsyncMock, write_mock: WriteFunctionMock
+        self, method_mock: Mock | AsyncMock, write_mock: WriteFunctionMock,
     ):
         """Test writing ``None`` value should write ``False`` and skip running the writer function."""
         mock_f = method_mock()
@@ -531,7 +531,7 @@ class ReaderTests(ABC):
         ],
     )
     def test_read_varuint_out_of_range(
-        self, read_bytes: list[int], max_bits: int, read_mock: ReadFunctionMock
+        self, read_bytes: list[int], max_bits: int, read_mock: ReadFunctionMock,
     ):
         """Test reading out-of-range varuints raises :exc:`IOError`."""
         read_mock.combined_data = bytearray(read_bytes)
@@ -650,7 +650,7 @@ class ReaderTests(ABC):
         ids=["a", "b"],
     )
     def test_read_utf_limit(
-        self, read_bytes: list[int], read_mock: ReadFunctionMock
+        self, read_bytes: list[int], read_mock: ReadFunctionMock,
     ):
         """Test reading a UTF string too big raises an IOError."""
         read_mock.combined_data = bytearray(read_bytes)
@@ -658,7 +658,7 @@ class ReaderTests(ABC):
             self.reader.read_utf()
 
     def test_read_optional_true(
-        self, method_mock: Mock | AsyncMock, read_mock: ReadFunctionMock
+        self, method_mock: Mock | AsyncMock, read_mock: ReadFunctionMock,
     ):
         """Test reading optional runs reader function when first bool is ``True``."""
         mock_f = method_mock()
@@ -667,7 +667,7 @@ class ReaderTests(ABC):
         mock_f.assert_called_once_with()
 
     def test_read_optional_false(
-        self, method_mock: Mock | AsyncMock, read_mock: ReadFunctionMock
+        self, method_mock: Mock | AsyncMock, read_mock: ReadFunctionMock,
     ):
         """Test reading optional doesn't run reader function when first bool is ``False``."""
         mock_f = method_mock()

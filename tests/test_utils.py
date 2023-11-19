@@ -22,7 +22,7 @@ from checkers.utils import from_twos_complement, to_twos_complement
     ],
 )
 def test_to_twos_complement_positive(
-    number: int, bits: int, expected_out: int
+    number: int, bits: int, expected_out: int,
 ):
     """Test conversion to two's complement format from positive numbers gives expected result."""
     assert to_twos_complement(number, bits) == expected_out
@@ -37,7 +37,7 @@ def test_to_twos_complement_positive(
     ],
 )
 def test_to_twos_complement_negative(
-    number: int, bits: int, expected_out: int
+    number: int, bits: int, expected_out: int,
 ):
     """Test conversion to two's complement format of negative numbers gives expected result."""
     assert to_twos_complement(number, bits) == expected_out
@@ -72,7 +72,7 @@ def test_to_twos_complement_range(number: int, bits: int):
     ],
 )
 def test_from_twos_complement_positive(
-    number: int, bits: int, expected_out: int
+    number: int, bits: int, expected_out: int,
 ):
     """Test conversion from two's complement format of positive numbers give expected result."""
     assert from_twos_complement(number, bits) == expected_out
@@ -87,7 +87,7 @@ def test_from_twos_complement_positive(
     ],
 )
 def test_from_twos_complement_negative(
-    number: int, bits: int, expected_out: int
+    number: int, bits: int, expected_out: int,
 ):
     """Test conversion from two's complement format of negative numbers give expected result."""
     assert from_twos_complement(number, bits) == expected_out

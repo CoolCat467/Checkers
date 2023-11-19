@@ -21,6 +21,7 @@ def get_ticks() -> nanoseconds:
 
 class Clock:
     "pygame.time.Clock but with asynchronous tick"
+
     __slots__ = (
         "fps_tick",
         "timepassed",

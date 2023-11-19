@@ -89,17 +89,28 @@ select = [
     "A",  # flake8-builtins
     "ASYNC",  # flake8-async
     "B",  # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "COM",  # flake8-commas
+    "D",  # pydocstyle
     "E",  # Error
+    "EXE",  # flake8-executable
     "F",  # pyflakes
+    "FA",  # flake8-future-annotations
     "I",  # isort
+    "N",  # pep8-naming
+    "PIE",  # flake8-pie
+    "PT",  # flake8-pytest-style
+    "PYI",  # flake8-pyi
+    "Q",  # flake8-quotes
+    "RET",  # flake8-return
     "RUF",  # Ruff-specific rules
     "S",  # flake8-bandit
+    "SIM",  # flake8-simplify
+    "SLOT",  # flake8-slots
+    "TCH",  # flake8-type-checking
     "UP",  # pyupgrade
     "W",  # Warning
     "YTT",  # flake8-2020
-    "TCH",  # flake8-type-checking
-    "PYI",  # flake8-pyi
-    "UP",  # pyupgrade
 ]
 extend-ignore = [
     'E501',  # line-too-long

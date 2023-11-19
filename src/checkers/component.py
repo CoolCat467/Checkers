@@ -17,6 +17,7 @@ T = TypeVar("T")
 
 class Event(Generic[T]):
     "Event with name and data"
+
     __slots__ = ("name", "data", "level")
 
     def __init__(self, name: str, data: T, levels: int = 0) -> None:
@@ -42,6 +43,7 @@ class Event(Generic[T]):
 
 class Component:
     "Component base class"
+
     __slots__ = ("name", "__manager")
 
     def __init__(self, name: str) -> None:
@@ -77,7 +79,7 @@ class Component:
     ) -> None:
         "Register handler with bound component manager"
         self.manager.register_component_handler(
-            event_name, handler_coro, self.name
+            event_name, handler_coro, self.name,
         )
 
     def register_handlers(
@@ -95,7 +97,7 @@ class Component:
         "Bind self to manager"
         if self.manager_exists:
             raise RuntimeError(
-                f"{self.name} component is already bound to {self.manager}"
+                f"{self.name} component is already bound to {self.manager}",
             )
         self.__manager = ref(manager)
         self.bind_handlers()
@@ -121,7 +123,7 @@ class Component:
         return self.manager.get_component(component_name)
 
     def get_components(
-        self, component_names: Iterable[str]
+        self, component_names: Iterable[str],
     ) -> list["Component"]:
         "Get Components from manager"
         return self.manager.get_components(component_names)
@@ -129,13 +131,14 @@ class Component:
 
 class ComponentManager(Component):
     "Component manager class"
+
     __slots__ = ("__event_handlers", "__components", "__weakref__")
 
     def __init__(self, name: str, own_name: str | None = None) -> None:
         "If own_name is set, add self to list of components as specified name"
         super().__init__(name)
         self.__event_handlers: dict[
-            str, set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]]
+            str, set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]],
         ] = {}
         self.__components: dict[str, Component] = {}
 
@@ -176,7 +179,7 @@ class ComponentManager(Component):
         return bool(self.__event_handlers.get(event_name))
 
     async def raise_event_in_nursery(
-        self, event: Event[Any], nursery: trio.Nursery
+        self, event: Event[Any], nursery: trio.Nursery,
     ) -> None:
         """Raise event in a particular trio nursery"""
         # Forward leveled events up; They'll come back to us soon enough.
@@ -210,7 +213,7 @@ class ComponentManager(Component):
         assert isinstance(component, Component), "Must be component instance"
         if self.component_exists(component.name):
             raise ValueError(
-                f'Component named "{component.name}" already exists!'
+                f'Component named "{component.name}" already exists!',
             )
         self.__components[component.name] = component
         component.bind(self)
@@ -294,7 +297,7 @@ class ExternalRaiseManager(ComponentManager):
     __slots__ = ("nursery",)
 
     def __init__(
-        self, name: str, nursery: trio.Nursery, own_name: str | None = None
+        self, name: str, nursery: trio.Nursery, own_name: str | None = None,
     ) -> None:
         super().__init__(name, own_name)
         self.nursery = nursery

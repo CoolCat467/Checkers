@@ -69,7 +69,7 @@ class CheckersMinimax(Minimax[State, Action]):
 
     @classmethod
     def adaptive_depth_minimax(
-        cls, state: State, minimum: int, maximum: int
+        cls, state: State, minimum: int, maximum: int,
     ) -> MinimaxResult[Action]:
         ##        types = state.pieces.values()
         ##        current = len(types)

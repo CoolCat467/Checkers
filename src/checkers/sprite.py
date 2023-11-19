@@ -38,6 +38,7 @@ class TickEventData(NamedTuple):
 
 class Sprite(ComponentManager, DirtySprite):
     "Client sprite component"
+
     __slots__ = ("rect", "__image", "mask", "update_location_on_resize")
 
     def __init__(self, name: str) -> None:
@@ -74,7 +75,7 @@ class Sprite(ComponentManager, DirtySprite):
             self.location = pre_loc
 
     image_dims = property(
-        _get_image_dims, _set_image_dims, doc="Image dimensions"
+        _get_image_dims, _set_image_dims, doc="Image dimensions",
     )
 
     def __get_image(self) -> Surface | None:
@@ -97,7 +98,6 @@ class Sprite(ComponentManager, DirtySprite):
     # Extra
     def is_selected(self, position: tuple[int, int]) -> bool:
         "Return True if visible and collision with point"
-
         if not self.visible:
             return False
         if not self.rect.collidepoint(position):
@@ -108,7 +108,7 @@ class Sprite(ComponentManager, DirtySprite):
         "Return True if topmost at point in any group this sprite is in"
         for group in self.groups():
             assert isinstance(
-                group, LayeredUpdates
+                group, LayeredUpdates,
             ), "Group must have get_sprites_at"
             sprites_at = group.get_sprites_at(position)
             if not sprites_at:
@@ -121,6 +121,7 @@ class Sprite(ComponentManager, DirtySprite):
 
 class ImageComponent(ComponentManager):
     "Allow sprite to use multiple images easily"
+
     __slots__ = ("__surfaces", "__masks", "set_surface", "mask_threshold")
 
     def __init__(self) -> None:
@@ -136,7 +137,7 @@ class ImageComponent(ComponentManager):
             (
                 AnimationComponent(),
                 OutlineComponent(),
-            )
+            ),
         )
 
     def add_image_and_mask(
@@ -149,7 +150,8 @@ class ImageComponent(ComponentManager):
 
         If mask is not a Mask object, it's expected
         to be a valid identifier for another surface so copy the
-        mask from"""
+        mask from
+        """
         if not isinstance(surface, Surface):
             if not self.image_exists(surface):
                 raise ValueError("Expected surface to be a valid identifier")
@@ -160,7 +162,7 @@ class ImageComponent(ComponentManager):
         self.__masks[identifier] = mask
 
     def add_image(
-        self, identifier: int | str, surface: Surface | int | str
+        self, identifier: int | str, surface: Surface | int | str,
     ) -> None:
         "Add image to internal database"
         mask: int | str | Mask
@@ -188,7 +190,7 @@ class ImageComponent(ComponentManager):
         while True:
             if not self.image_exists(identifier):
                 raise ValueError(
-                    f'No image saved for identifier "{identifier}"'
+                    f'No image saved for identifier "{identifier}"',
                 )
             surface = self.__surfaces[identifier]
             if isinstance(surface, Surface):
@@ -200,7 +202,7 @@ class ImageComponent(ComponentManager):
         while True:
             if not self.image_exists(identifier):
                 raise ValueError(
-                    f'No image saved for identifier "{identifier}"'
+                    f'No image saved for identifier "{identifier}"',
                 )
             mask = self.__masks[identifier]
             if isinstance(mask, Mask):
@@ -225,6 +227,7 @@ class ImageComponent(ComponentManager):
 
 class OutlineComponent(Component):
     "Add outline to sprite"
+
     __slots__ = ("__active", "__color", "size")
     mod = "_outlined_"
 
@@ -304,7 +307,7 @@ class OutlineComponent(Component):
         return self.get_outline_discriptor(identifier)
 
     def precalculate_outline(
-        self, identifier: str | int, color: Color | tuple[int, int, int]
+        self, identifier: str | int, color: Color | tuple[int, int, int],
     ) -> str:
         "Precalculate outline for image"
         prev, self.__color = self.__color, color
@@ -313,7 +316,7 @@ class OutlineComponent(Component):
         return outline
 
     def precalculate_all_outlined(
-        self, color: Color | tuple[int, int, int]
+        self, color: Color | tuple[int, int, int],
     ) -> None:
         "Precalculate all images outlined"
         manager = cast(ImageComponent, self.manager)
@@ -329,7 +332,8 @@ class AnimationComponent(Component):
     either None or the name of a state in self.states
 
     update_every is float of how many seconds controller
-    should be queried after. If zero, every tick."""
+    should be queried after. If zero, every tick.
+    """
 
     __slots__ = ("controller", "update_every", "update_mod")
 
@@ -358,7 +362,7 @@ class AnimationComponent(Component):
             new = self.fetch_controller_new_state()
         else:
             updates, self.update_mod = divmod(
-                self.update_mod + passed, self.update_every
+                self.update_mod + passed, self.update_every,
             )
             for _ in range(int(updates)):
                 new = self.fetch_controller_new_state()
@@ -373,6 +377,7 @@ class AnimationComponent(Component):
 
 class MovementComponent(Component):
     "Component that moves sprite in direction of heading with speed."
+
     __slots__ = ("heading", "speed")
 
     def __init__(self, heading: Vector2 | None = None, speed: int = 0) -> None:
@@ -388,7 +393,7 @@ class MovementComponent(Component):
         "Change self.heading to point toward a given position."
         sprite = cast(Sprite, self.get_component("sprite"))
         self.heading = Vector2.from_points(
-            sprite.location, position
+            sprite.location, position,
         ).normalized()
 
     def move_heading_distance(self, distance: float) -> None:
@@ -406,6 +411,7 @@ class MovementComponent(Component):
 
 class TargetingComponent(Component):
     "Sprite that moves toward a destination and then stops."
+
     __slots__ = ("__destination", "__reached", "event_raise_name")
 
     def __init__(self, event_raise_name: str = "reached_destination") -> None:
@@ -434,7 +440,7 @@ class TargetingComponent(Component):
         return self.__destination
 
     destination = property(
-        __get_destination, __set_destination, doc="Target Destination"
+        __get_destination, __set_destination, doc="Target Destination",
     )
 
     @property
@@ -459,7 +465,7 @@ class TargetingComponent(Component):
             return
 
         travel_distance = min(
-            self.to_destination.magnitude(), movement.speed * time_passed
+            self.to_destination.magnitude(), movement.speed * time_passed,
         )
 
         if travel_distance > 0:
@@ -469,6 +475,7 @@ class TargetingComponent(Component):
 
 class DragClickEventComponent(Component):
     "Raise drag events when motion and sprite visible."
+
     __slots__ = ("pressed",)
 
     def __init__(self) -> None:
@@ -477,7 +484,7 @@ class DragClickEventComponent(Component):
         self.pressed: dict[int, bool] = {}
 
     async def press_start(
-        self, event: Event[dict[str, tuple[int, int] | int]]
+        self, event: Event[dict[str, tuple[int, int] | int]],
     ) -> None:
         "Set pressed for event button if selected. Also raise Click events"
         if not self.manager_exists:
@@ -503,7 +510,7 @@ class DragClickEventComponent(Component):
         self.pressed[event.data["button"]] = False
 
     async def motion(
-        self, event: Event[dict[str, tuple[int, int] | int]]
+        self, event: Event[dict[str, tuple[int, int] | int]],
     ) -> None:
         "PygameMouseMotion event -> drag"
         if not self.manager_exists:
@@ -532,12 +539,13 @@ class DragClickEventComponent(Component):
                 "PygameMouseButtonDown": self.press_start,
                 "PygameMouseButtonUp": self.press_end,
                 "PygameMouseMotion": self.motion,
-            }
+            },
         )
 
 
 class GroupProcessor(AsyncStateMachine):
     "Layered Dirty Sprite group handler"
+
     __slots__ = ("groups", "group_names", "new_gid", "_timing", "_clear")
     sub_renderer_class: ClassVar = LayeredDirty
     groups: dict[int, sub_renderer_class]
@@ -552,7 +560,7 @@ class GroupProcessor(AsyncStateMachine):
         self._clear: tuple[Surface | None, Surface | None] = None, None
 
     def clear(self, screen: Surface, background: Surface) -> None:
-        "clear for all groups"
+        "Clear for all groups"
         self._clear = screen, background
         for group in self.groups.values():
             group.clear(*self._clear)
