@@ -1,20 +1,15 @@
-#!/usr/bin/env python3
-# Graphical Checkers Game
-
-"Graphical Checkers Game."
+"""Graphical Checkers Game."""
 
 # Programmed by CoolCat467
+
+from __future__ import annotations
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
 # .........
 # A1 ... H1
-
 # 0 = False = Red   = 0, 2
 # 1 = True  = Black = 1, 3
-
-from __future__ import annotations
-
 import contextlib
 import os
 import platform
@@ -37,6 +32,7 @@ from checkers.component import (
     Event,
     ExternalRaiseManager,
 )
+from checkers.network_shared import DEFAULT_PORT, find_ip
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
 from checkers.statemachine import AsyncState
@@ -61,7 +57,6 @@ SCREEN_SIZE = (640, 480)
 
 FPS: Final = 48
 VSYNC = True
-PORT: Final = 31613
 
 PLAYERS: Final = ["Red Player", "Black Player"]
 
@@ -89,7 +84,7 @@ def render_text(
     text: str,
     color: tuple[int, int, int],
 ) -> Surface:
-    "Render text with a given font at font_size with the text in the color of color."
+    """Render text with a given font at font_size with the text in the color of color."""
     # Load the font at the size of font_size
     font = pygame.font.Font(font_name, font_size)
     # Using the loaded font, render the text in the color of color
@@ -97,8 +92,7 @@ def render_text(
 
 
 class Piece(sprite.Sprite):
-
-    "Piece Sprite."
+    """Piece Sprite."""
 
     __slots__ = (
         "piece_type",
@@ -136,7 +130,7 @@ class Piece(sprite.Sprite):
         )
 
     def bind_handlers(self) -> None:
-        "Register handlers."
+        """Register handlers."""
         if not self.manager_exists:
             return
         self.set_outlined(False)
@@ -154,7 +148,7 @@ class Piece(sprite.Sprite):
         )
 
     def set_outlined(self, state: bool) -> None:
-        "Update image given new outline state."
+        """Update image given new outline state."""
         manager_image: sprite.ImageComponent = self.manager.get_component(
             "image",
         )
@@ -165,7 +159,7 @@ class Piece(sprite.Sprite):
         self,
         event: Event[dict[str, Pos | int]],
     ) -> None:
-        "Raise gameboard_piece_clicked events when clicked."
+        """Raise gameboard_piece_clicked events when clicked."""
         await self.raise_event(
             Event(
                 "gameboard_piece_clicked",
@@ -178,11 +172,11 @@ class Piece(sprite.Sprite):
         )
 
     async def handle_set_outline_event(self, event: Event[bool]) -> None:
-        "Update outlined state."
+        """Update outlined state."""
         self.set_outlined(event.data)
 
     async def handle_self_destruct_event(self, event: Event[None]) -> None:
-        "Remove self from play."
+        """Remove self from play."""
         self.kill()
         self.manager.remove_component(self.name)
 
@@ -190,7 +184,7 @@ class Piece(sprite.Sprite):
         self,
         event: Event[sprite.TickEventData],
     ) -> None:
-        "Move toward destination."
+        """Move toward destination."""
         time_passed = event.data.time_passed
         targeting: sprite.TargetingComponent = self.get_component("targeting")
         await targeting.move_destination_time(time_passed)
@@ -199,7 +193,7 @@ class Piece(sprite.Sprite):
         self,
         event: Event[Iterable[tuple[Pos, Pos, Pos]]],
     ) -> None:
-        "Handle movement animation to event position."
+        """Handle movement animation to event position."""
         targeting: sprite.TargetingComponent = self.get_component("targeting")
         self.destination_tiles.extend(event.data)
         targeting.destination = self.destination_tiles[0][0]
@@ -217,7 +211,7 @@ class Piece(sprite.Sprite):
         self,
         event: Event[None],
     ) -> None:
-        "Raise gameboard_piece_moved event."
+        """Raise gameboard_piece_moved event."""
         _, start_pos, end_pos = self.destination_tiles.pop(0)
 
         if self.destination_tiles:
@@ -247,8 +241,7 @@ class Piece(sprite.Sprite):
 
 
 class Tile(sprite.Sprite):
-
-    "Outlined tile sprite - Only exists for selecting destination."
+    """Outlined tile sprite - Only exists for selecting destination."""
 
     __slots__ = ("color", "board_position", "position_name")
 
@@ -271,7 +264,7 @@ class Tile(sprite.Sprite):
         self.add_component(sprite.DragClickEventComponent())
 
     def bind_handlers(self) -> None:
-        "Register handlers."
+        """Register handlers."""
         if not self.manager_exists:
             return
         self.set_outlined(True)
@@ -286,7 +279,7 @@ class Tile(sprite.Sprite):
         )
 
     def set_outlined(self, state: bool) -> None:
-        "Update image given new outline state."
+        """Update image given new outline state."""
         manager_image: sprite.ImageComponent = self.manager.get_component(
             "image",
         )
@@ -297,7 +290,7 @@ class Tile(sprite.Sprite):
         self,
         event: Event[dict[str, Pos | int]],
     ) -> None:
-        "Raise gameboard_tile_clicked events when clicked."
+        """Raise gameboard_tile_clicked events when clicked."""
         await self.raise_event(
             Event(
                 "gameboard_tile_clicked",
@@ -307,7 +300,7 @@ class Tile(sprite.Sprite):
         )
 
     async def handle_self_destruct_event(self, event: Event[None]) -> None:
-        "Remove from all groups and remove self component."
+        """Remove from all groups and remove self component."""
         self.kill()
         self.manager.remove_component(self.name)
 
@@ -321,15 +314,14 @@ def generate_tile_image(
     | Sequence[int],
     size: tuple[int, int],
 ) -> Surface:
-    "Generate the image used for a tile."
+    """Generate the image used for a tile."""
     surf = pygame.Surface(size)
     surf.fill(color)
     return surf
 
 
 class GameBoard(sprite.Sprite):
-
-    "Entity that stores data about the game board and renders it."
+    """Entity that stores data about the game board and renders it."""
 
     __slots__ = (
         "board_size",
@@ -382,7 +374,7 @@ class GameBoard(sprite.Sprite):
         return f"{x}_{y}"  # chr(65 + x) + str(self.board_size[1] - y)
 
     def bind_handlers(self) -> None:
-        "Register handlers."
+        """Register handlers."""
         self.register_handlers(
             {
                 "game_initial_config": self.handle_initial_config_event,
@@ -407,7 +399,7 @@ class GameBoard(sprite.Sprite):
         self,
         event: Event[tuple[Pos, int]],
     ) -> None:
-        "Start up game."
+        """Start up game."""
         self.board_size, _current_turn = event.data
 
         # Generate tile data
@@ -736,8 +728,7 @@ class GameBoard(sprite.Sprite):
 
 
 class ClickDestinationComponent(Component):
-
-    "Component that will use targeting to go to wherever you click on the screen."
+    """Component that will use targeting to go to wherever you click on the screen."""
 
     __slots__ = ("selected",)
     outline = pygame.color.Color(255, 220, 0)
@@ -764,13 +755,13 @@ class ClickDestinationComponent(Component):
         print(f"{event = }")
 
     async def cache_outline(self, _: Event[Any]) -> None:
-        "Precalculate outlined images."
+        """Precalculate outlined images."""
         image: sprite.ImageComponent = self.get_component("image")
         outline: sprite.OutlineComponent = image.get_component("outline")
         outline.precalculate_all_outlined(self.outline)
 
     async def update_selected(self) -> None:
-        "Update selected."
+        """Update selected."""
         image: sprite.ImageComponent = self.get_component("image")
         outline: sprite.OutlineComponent = image.get_component("outline")
 
@@ -782,14 +773,14 @@ class ClickDestinationComponent(Component):
             movement.speed = 0
 
     async def click(self, event: Event[dict[str, int]]) -> None:
-        "Toggle selected."
+        """Toggle selected."""
         if event.data["button"] == 1:
             self.selected = not self.selected
 
             await self.update_selected()
 
     async def drag(self, event: Event[Any]) -> None:
-        "Drag sprite."
+        """Drag sprite."""
         if not self.selected:
             self.selected = True
             await self.update_selected()
@@ -797,7 +788,7 @@ class ClickDestinationComponent(Component):
         movement.speed = 0
 
     async def mouse_down(self, event: Event[dict[str, int | Pos]]) -> None:
-        "Target click pos if selected."
+        """Target click pos if selected."""
         if not self.selected:
             return
         if event.data["button"] == 1:
@@ -808,14 +799,13 @@ class ClickDestinationComponent(Component):
             target.destination = Vector2.from_iter(event.data["pos"])
 
     async def move_towards_dest(self, event: Event[dict[str, float]]) -> None:
-        "Move closer to destination."
+        """Move closer to destination."""
         target: sprite.TargetingComponent = self.get_component("targeting")
         await target.move_destination_time(event.data["time_passed"])
 
 
 class MrFloppy(sprite.Sprite):
-
-    "Mr. Floppy test sprite."
+    """Mr. Floppy test sprite."""
 
     __slots__ = ()
 
@@ -869,7 +859,7 @@ class MrFloppy(sprite.Sprite):
         self,
         image_identifiers: list[str | int],
     ) -> Generator[str | int | None, None, None]:
-        "Animation controller."
+        """Animation controller."""
         cidx = 0
         while True:
             count = len(image_identifiers)
@@ -880,7 +870,7 @@ class MrFloppy(sprite.Sprite):
             yield image_identifiers[cidx]
 
     async def drag(self, event: Event[dict[str, int | Pos]]) -> None:
-        "Move by relative from drag."
+        """Move by relative from drag."""
         if event.data["button"] != 1:
             return
         sprite_component: sprite.Sprite = self.get_component("sprite")
@@ -890,8 +880,7 @@ class MrFloppy(sprite.Sprite):
 
 
 class FPSCounter(objects.Text):
-
-    "FPS counter."
+    """FPS counter."""
 
     __slots__ = ()
 
@@ -905,7 +894,7 @@ class FPSCounter(objects.Text):
         self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
 
     async def on_tick(self, event: Event[dict[str, float]]) -> None:
-        "Update text."
+        """Update text."""
         # self.text = f'FPS: {event.data["fps"]:.2f}'
         self.text = f'FPS: {event.data["fps"]:.0f}'
 
@@ -918,38 +907,7 @@ class FPSCounter(objects.Text):
         )
 
 
-# Stolen from WOOF (Web Offer One File), Copyright (C) 2004-2009 Simon Budig,
-# available at http://www.home.unix-ag.org/simon/woof
-# with modifications
-
-# Utility function to guess the IP (as a string) where the server can be
-# reached from the outside. Quite nasty problem actually.
-
-
-async def find_ip() -> str:
-    """Guess the IP where the server can be found from the network."""
-    # we get a UDP-socket for the TEST-networks reserved by IANA.
-    # It is highly unlikely, that there is special routing used
-    # for these networks, hence the socket later should give us
-    # the IP address of the default route.
-    # We're doing multiple tests, to guard against the computer being
-    # part of a test installation.
-
-    candidates: list[str] = []
-    for test_ip in ("192.0.2.0", "198.51.100.0", "203.0.113.0"):
-        sock = trio.socket.socket(trio.socket.AF_INET, trio.socket.SOCK_DGRAM)
-        await sock.connect((test_ip, 80))
-        ip_addr: str = sock.getsockname()[0]
-        sock.close()
-        if ip_addr in candidates:
-            return ip_addr
-        candidates.append(ip_addr)
-
-    return candidates[0]
-
-
 class HaltState(AsyncState["CheckersClient"]):
-
     "Halt state to set state to None so running becomes False."
 
     __slots__ = ()
@@ -964,8 +922,7 @@ class HaltState(AsyncState["CheckersClient"]):
 
 
 class GameState(AsyncState["CheckersClient"]):
-
-    "Checkers Game Asynchronous State base class."
+    """Checkers Game Asynchronous State base class."""
 
     __slots__ = ("id", "manager")
 
@@ -1009,8 +966,7 @@ class GameState(AsyncState["CheckersClient"]):
 
 
 class InitializeState(AsyncState["CheckersClient"]):
-
-    "Initialize Checkers."
+    """Initialize Checkers."""
 
     __slots__ = ()
 
@@ -1022,8 +978,7 @@ class InitializeState(AsyncState["CheckersClient"]):
 
 
 class TestState(GameState):
-
-    "Test state."
+    """Test state."""
 
     __slots__ = ()
 
@@ -1042,8 +997,7 @@ class TestState(GameState):
 
 
 class TitleState(GameState):
-
-    "Game Title State."
+    """Game Title State."""
 
     __slots__ = ()
 
@@ -1113,10 +1067,9 @@ class TitleState(GameState):
 
 
 class PlayHostingState(AsyncState["CheckersClient"]):
+    """Start running server."""
 
-    "Start running server."
-
-    __slots__ = ()
+    __slots__ = ("address",)
 
     internal_server = False
 
@@ -1125,7 +1078,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
         super().__init__(f"play{extra}_hosting")
 
     async def entry_actions(self) -> None:
-        "Start hosting server."
+        """Start hosting server."""
         assert self.machine is not None
         self.machine.manager.add_components(
             (
@@ -1134,13 +1087,18 @@ class PlayHostingState(AsyncState["CheckersClient"]):
             ),
         )
 
-        await self.machine.raise_event(Event("server_start", None))
+        host = "localhost" if self.internal_server else await find_ip()
+        port = DEFAULT_PORT
+
+        self.address = (host, port)
+
+        await self.machine.raise_event(Event("server_start", self.address))
 
     async def exit_actions(self) -> None:
-        "Have client connect."
+        """Have client connect."""
         assert self.machine is not None
         await self.machine.raise_event(
-            Event("client_connect", ("127.0.0.1", PORT)),
+            Event("client_connect", self.address),
         )
 
     async def check_conditions(self) -> str | None:
@@ -1150,8 +1108,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
 
 
 class PlayInternalHostingState(PlayHostingState):
-
-    "Host server with internal server mode."
+    """Host server with internal server mode."""
 
     __slots__ = ()
 
@@ -1159,6 +1116,8 @@ class PlayInternalHostingState(PlayHostingState):
 
 
 class JoinButton(Button):
+    """Join Button."""
+
     __slots__ = ()
 
     def __init__(self, id_: int, font: pygame.Font, motd: str) -> None:
@@ -1166,13 +1125,12 @@ class JoinButton(Button):
         self.text = motd
         self.location = [x // 2 for x in SCREEN_SIZE]
 
-    async def handle_click(self, _: object) -> None:
+    async def handle_click(self, _: sprite.PygameMouseButtonEventData) -> None:
         print(self.manager)
 
 
 class PlayJoiningState(GameState):
-
-    "Start running client."
+    """Start running client."""
 
     __slots__ = (
         "font",
@@ -1192,7 +1150,7 @@ class PlayJoiningState(GameState):
         )
 
     async def entry_actions(self) -> None:
-        "Add game client component."
+        """Add game client component."""
         await super().entry_actions()
         assert self.machine is not None
         self.id = self.machine.new_group("join")
@@ -1211,6 +1169,7 @@ class PlayJoiningState(GameState):
         await self.manager.raise_event(Event("update_listing", None))
 
     async def handle_update_listing(self, _: object) -> None:
+        """Update server listing."""
         assert self.machine is not None
         for advertisement in await read_advertisements():
             motd, details = advertisement
@@ -1238,8 +1197,7 @@ class PlayJoiningState(GameState):
 
 
 class PlayState(GameState):
-
-    "Game Play State."
+    """Game Play State."""
 
     __slots__ = ()
 
@@ -1270,6 +1228,11 @@ class PlayState(GameState):
         self.group_add(gameboard)
 
         await self.machine.raise_event(Event("init", None))
+
+    async def check_conditions(self) -> str | None:
+        if not self.machine.manager.component_exists("network"):
+            return "title"
+        return None
 
     async def exit_actions(self) -> None:
         assert self.machine is not None
@@ -1346,7 +1309,6 @@ class PlayState(GameState):
 
 
 class CheckersClient(sprite.GroupProcessor):
-
     """Checkers Game Client."""
 
     __slots__ = ("manager",)
@@ -1378,7 +1340,7 @@ class CheckersClient(sprite.GroupProcessor):
 
 
 async def async_run() -> None:
-    "Main loop of everything."
+    """Main event loop."""
     # Set up globals
     global SCREEN_SIZE
 
@@ -1451,12 +1413,12 @@ async def async_run() -> None:
 
 
 def run() -> None:
-    "Run asynchronous side of everything."
+    """Synchronous entry point."""
     trio.run(async_run)
 
 
 def cli_run() -> None:
-    "Start game."
+    """Start game."""
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
 
     # If we're not imported as a module, run.

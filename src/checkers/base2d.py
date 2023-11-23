@@ -207,7 +207,6 @@ def farthest(number: int | float, lst: list[L]) -> L:
 
 
 class GameEntity:
-
     "Base Class for all entities."
 
     def __init__(
@@ -311,7 +310,6 @@ class GameEntity:
 
 
 class BaseButton(GameEntity):
-
     "Base button, if entity self.trigger is over image and mouse down, call self.action(self)."
 
     def __init__(
@@ -365,7 +363,6 @@ class BaseButton(GameEntity):
 
 
 class WorldBase:
-
     "Base class of world objects."
 
     def __init__(self) -> None:

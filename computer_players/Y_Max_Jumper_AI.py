@@ -105,15 +105,14 @@ def turn(state: State) -> Action:
 
 class MaxYJumperPlayer(RemoteState):
 
-    """Max Y Jumper Player"""
+    """Max Y Jumper Player."""
 
     __slots__ = ()
 
     async def preform_turn(self) -> Action:
-        """Perform turn"""
+        """Perform turn."""
         print("preform_turn")
-        action = turn(self.state)
-        return action
+        return turn(self.state)
 
 
 def run() -> None:

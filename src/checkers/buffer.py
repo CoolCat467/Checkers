@@ -1,4 +1,6 @@
-# This is the buffer module from https://github.com/py-mine/mcproto v0.3.0,
+"""Buffer module."""
+
+# This is the buffer module from https://github.com/py-mine/mcproto v0.5.0,
 # which is licensed under the GNU LESSER GENERAL PUBLIC LICENSE v3.0
 
 from __future__ import annotations
@@ -14,9 +16,12 @@ __all__ = ["Buffer"]
 
 
 class Buffer(BaseSyncWriter, BaseSyncReader, bytearray):
+    """In-memory bytearray-like buffer supporting the common read/write operations."""
+
     __slots__ = ("pos",)
 
     def __init__(self, *args: Any, **kwargs: Any) -> None:
+        """Initialize starting at position zero."""
         super().__init__(*args, **kwargs)
         self.pos = 0
 

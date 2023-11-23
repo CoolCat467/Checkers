@@ -1,4 +1,9 @@
+"""Game Client."""
+
 from __future__ import annotations
+
+__title__ = "Game Client"
+__author__ = "CoolCat467"
 
 import struct
 import traceback
@@ -83,8 +88,8 @@ async def read_advertisements(
         with trio.move_on_after(timeout):
             buffer, address = await udp_socket.recvfrom(512)
             host, port = address
-            print(f"{buffer = }")
-            print(f"{address = }")
+        ##            print(f"{buffer = }")
+        ##            print(f"{address = }")
 
         response: list[tuple[str, tuple[str, int]]] = []
 
@@ -116,7 +121,6 @@ async def read_advertisements(
 
 
 class GameClient(NetworkEventComponent):
-
     """Game Client Network Event Component.
 
     This class handles connecting to the game server, transmitting events
@@ -152,6 +156,7 @@ class GameClient(NetworkEventComponent):
                 9: "server->game_over",
                 10: "server->action_complete",
                 11: "server->initial_config",
+                12: "server->playing_as",
             },
         )
 
@@ -175,6 +180,7 @@ class GameClient(NetworkEventComponent):
                 "server->game_over": self.read_game_over,
                 "server->action_complete": self.read_action_complete,
                 "server->initial_config": self.read_initial_config,
+                "server->playing_as": self.read_playing_as,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
                 f"client[{self.name}]_read_event": self.handle_read_event,
@@ -207,16 +213,18 @@ class GameClient(NetworkEventComponent):
     ) -> None:
         """Raise events from server."""
         ##        async with self.tick_lock:
-        ##        print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
+        ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
             return
         if self.not_connected:
             await self.raise_disconnect("Not connected to server.")
             return
         try:
+            print("handle_read_event start")
             event = await self.read_event()
         except trio.ClosedResourceError:
             assert self.not_connected
+            print("handle_read_event trio.ClosedResourceError")
             return
         except TimeoutException as exc:
             traceback.print_exception(exc)
@@ -389,6 +397,17 @@ class GameClient(NetworkEventComponent):
 
         await self.raise_event(
             Event("game_initial_config", (board_size, current_turn)),
+        )
+
+    async def read_playing_as(self, event: Event[bytearray]) -> None:
+        """Read playing_as event from server."""
+        print(f"read_playing_as {event = }")
+        buffer = Buffer(event.data)
+
+        playing_as = buffer.read_value(StructFormat.UBYTE)
+
+        await self.raise_event(
+            Event("game_playing_as", playing_as),
         )
 
     async def handle_network_stop(self, event: Event[None]) -> None:

@@ -15,7 +15,7 @@ from typing import Generic, NamedTuple, TypeVar
 
 class Player(IntEnum):
 
-    """Enum for player status"""
+    """Enum for player status."""
 
     __slots__ = ()
     MIN = auto()
@@ -28,7 +28,7 @@ Action = TypeVar("Action")
 
 class MinimaxResult(NamedTuple, Generic[Action]):
 
-    """Minimax Result"""
+    """Minimax Result."""
 
     value: int | float
     action: Action | None
@@ -36,24 +36,24 @@ class MinimaxResult(NamedTuple, Generic[Action]):
 
 class Minimax(ABC, Generic[State, Action]):
 
-    """Base class for Minimax AIs"""
+    """Base class for Minimax AIs."""
 
     __slots__ = ()
 
     @classmethod
     @abstractmethod
     def value(cls, state: State) -> int | float:
-        """Return the value of a given game state"""
+        """Return the value of a given game state."""
 
     @classmethod
     @abstractmethod
     def terminal(cls, state: State) -> bool:
-        """Return if given game state is terminal"""
+        """Return if given game state is terminal."""
 
     @classmethod
     @abstractmethod
     def player(cls, state: State) -> Player:
-        """Return player status given the state of the game
+        """Return player status given the state of the game.
 
         Must return either Player.MIN or Player.MAX
         """
@@ -61,12 +61,12 @@ class Minimax(ABC, Generic[State, Action]):
     @classmethod
     @abstractmethod
     def actions(cls, state: State) -> Iterable[Action]:
-        """Return a collection of all possible actions in a given game state"""
+        """Return a collection of all possible actions in a given game state."""
 
     @classmethod
     @abstractmethod
     def result(cls, state: State, action: Action) -> State:
-        """Return new game state after performing action on given state"""
+        """Return new game state after performing action on given state."""
 
     @classmethod
     def minimax(
@@ -104,24 +104,24 @@ class Minimax(ABC, Generic[State, Action]):
 
 class AsyncMinimax(ABC, Generic[State, Action]):
 
-    """Base class for Minimax AIs"""
+    """Base class for Minimax AIs."""
 
     __slots__ = ()
 
     @classmethod
     @abstractmethod
     async def value(cls, state: State) -> int | float:
-        """Return the value of a given game state"""
+        """Return the value of a given game state."""
 
     @classmethod
     @abstractmethod
     async def terminal(cls, state: State) -> bool:
-        """Return if given game state is terminal"""
+        """Return if given game state is terminal."""
 
     @classmethod
     @abstractmethod
     async def player(cls, state: State) -> Player:
-        """Return player status given the state of the game
+        """Return player status given the state of the game.
 
         Must return either Player.MIN or Player.MAX
         """
@@ -129,12 +129,12 @@ class AsyncMinimax(ABC, Generic[State, Action]):
     @classmethod
     @abstractmethod
     async def actions(cls, state: State) -> Iterable[Action]:
-        """Return a collection of all possible actions in a given game state"""
+        """Return a collection of all possible actions in a given game state."""
 
     @classmethod
     @abstractmethod
     async def result(cls, state: State, action: Action) -> State:
-        """Return new game state after performing action on given state"""
+        """Return new game state after performing action on given state."""
 
     @classmethod
     async def minimax(

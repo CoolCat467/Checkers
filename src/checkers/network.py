@@ -1,5 +1,7 @@
 "Network - Module for sending events over the network."
 
+from __future__ import annotations
+
 # Programmed by CoolCat467
 
 __title__ = "Network"
@@ -20,8 +22,8 @@ from typing import (
 
 import trio
 
-from .base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
-from .component import Component, ComponentManager, Event
+from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
+from checkers.component import Component, ComponentManager, Event
 
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
@@ -31,7 +33,6 @@ class TimeoutException(Exception):
 
 
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
-
     """Network Component (client)."""
 
     __slots__ = ("_stream", "timeout")
@@ -135,7 +136,6 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
 
 class NetworkEventComponent(NetworkComponent):
-
     """Network Event Component - Send events over the network."""
 
     __slots__ = (
@@ -228,7 +228,6 @@ class NetworkEventComponent(NetworkComponent):
 
 
 class Server(ComponentManager):
-
     """Asynchronous TCP Server."""
 
     __slots__ = ("cancel_scope",)

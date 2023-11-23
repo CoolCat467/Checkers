@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "checkers"
 dynamic = ["version"]
 authors = [
-  { name="CoolCat467" },
+  { name="CoolCat467", email="CoolCat467@duck.com" },
 ]
 description = "Graphical Checkers Game with AI support"
 readme = {file = "README.md", content-type = "text/markdown"}
@@ -14,12 +14,22 @@ license = {file = "LICENSE"}
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
+    "Natural Language :: English",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Games/Entertainment",
+    "Topic :: Games/Entertainment :: Board Games",
+    "Topic :: Games/Entertainment :: Turn Based Strategy",
+    "Topic :: Internet",
+    "Topic :: Software Development :: Libraries :: pygame",
     "Operating System :: OS Independent",
+    "Framework :: Trio",
     "Typing :: Typed",
 ]
 keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "ai-support", "networked-game"]
@@ -37,17 +47,11 @@ version = {attr = "checkers.game.__version__"}
 "Source" = "https://github.com/CoolCat467/Checkers"
 "Bug Tracker" = "https://github.com/CoolCat467/Checkers/issues"
 
-[tool.setuptools.package-data]
-checkers = ["py.typed", "data/*"]
-
 [project.scripts]
 checkers_game = "checkers.game:cli_run"
 
-[tool.pytest.ini_options]
-addopts = "--cov-report term-missing --cov=checkers"
-testpaths = [
-    "tests",
-]
+[tool.setuptools.package-data]
+checkers = ["py.typed", "data/*"]
 
 [tool.mypy]
 mypy_path = "src"
@@ -86,35 +90,37 @@ fix = true
 
 include = ["*.py", "*.pyi", "**/pyproject.toml"]
 select = [
-    "A",  # flake8-builtins
-    "ASYNC",  # flake8-async
-    "B",  # flake8-bugbear
-    "C4",  # flake8-comprehensions
-    "COM",  # flake8-commas
-    "D",  # pydocstyle
-    "E",  # Error
-    "EXE",  # flake8-executable
-    "F",  # pyflakes
-    "FA",  # flake8-future-annotations
-    "I",  # isort
-    "N",  # pep8-naming
-    "PIE",  # flake8-pie
-    "PT",  # flake8-pytest-style
-    "PYI",  # flake8-pyi
-    "Q",  # flake8-quotes
-    "RET",  # flake8-return
-    "RUF",  # Ruff-specific rules
-    "S",  # flake8-bandit
-    "SIM",  # flake8-simplify
+    "A",     # flake8-builtins
+    "ASYNC", # flake8-async
+    "B",     # flake8-bugbear
+    "C4",    # flake8-comprehensions
+    "COM",   # flake8-commas
+    "D",     # pydocstyle
+    "E",     # Error
+    "EXE",   # flake8-executable
+    "F",     # pyflakes
+    "FA",    # flake8-future-annotations
+    "I",     # isort
+    "N",     # pep8-naming
+    "PIE",   # flake8-pie
+    "PT",    # flake8-pytest-style
+    "PYI",   # flake8-pyi
+    "Q",     # flake8-quotes
+    "RET",   # flake8-return
+    "RUF",   # Ruff-specific rules
+    "S",     # flake8-bandit
+    "SIM",   # flake8-simplify
     "SLOT",  # flake8-slots
-    "TCH",  # flake8-type-checking
-    "UP",  # pyupgrade
-    "W",  # Warning
-    "YTT",  # flake8-2020
+    "TCH",   # flake8-type-checking
+    "UP",    # pyupgrade
+    "W",     # Warning
+    "YTT",   # flake8-2020
 ]
 extend-ignore = [
     'E501',  # line-too-long
     "S101",  # use of assert for tests and type narrowing
+    "D203",  # blank line thing
+    "D204",  # blank line thing
     "D211",  # no-blank-line-before-class
     "D213",  # multi-line-summary-second-line
 ]
@@ -123,6 +129,20 @@ extend-ignore = [
 "tests/*" = [
     "D100",  # undocumented-public-module
     "D103",  # undocumented-public-function
+    "D107",  # Missing docstring
+]
+
+[tool.pytest.ini_options]
+addopts = "--cov-report term-missing --cov=checkers"
+testpaths = [
+    "tests",
+]
+
+[tool.coverage.run]
+branch = true
+source = ["src"]
+omit = [
+    "__init__.py",
 ]
 
 [tool.tox]

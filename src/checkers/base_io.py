@@ -35,7 +35,6 @@ R = TypeVar("R")
 
 
 class StructFormat(str, Enum):
-
     """All possible write/read struct types.
 
     .. seealso:
@@ -84,14 +83,16 @@ FLOAT_FORMATS_TYPE: TypeAlias = Literal[
 
 
 class BaseAsyncWriter(ABC):
-
     """Base class holding asynchronous write buffer/connection interactions."""
 
     __slots__ = ()
 
     @abstractmethod
     async def write(self, data: bytes, /) -> None:
-        ...
+        """Underlying write method, sending/storing the data.
+
+        All of the writer functions will eventually call this method.
+        """
 
     @overload
     async def write_value(self, fmt: INT_FORMATS_TYPE, value: int, /) -> None:
@@ -235,7 +236,6 @@ class BaseAsyncWriter(ABC):
 
 
 class BaseSyncWriter(ABC):
-
     """Base class holding synchronous write buffer/connection interactions."""
 
     __slots__ = ()
@@ -385,14 +385,16 @@ class BaseSyncWriter(ABC):
 
 
 class BaseAsyncReader(ABC):
-
     """Base class holding asynchronous read buffer/connection interactions."""
 
     __slots__ = ()
 
     @abstractmethod
     async def read(self, length: int, /) -> bytearray:
-        ...
+        """Underlying read method, obtaining the raw data.
+
+        All of the reader functions will eventually call this method.
+        """
 
     @overload
     async def read_value(self, fmt: INT_FORMATS_TYPE, /) -> int:
@@ -537,7 +539,6 @@ class BaseAsyncReader(ABC):
 
 
 class BaseSyncReader(ABC):
-
     """Base class holding synchronous read buffer/connection interactions."""
 
     __slots__ = ()

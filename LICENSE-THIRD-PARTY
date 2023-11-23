@@ -5,7 +5,13 @@ Applies to:
       All rights reserved.
         - src/checkers/base_io.py: Entire file
         - src/checkers/buffer.py: Entire file
+        - src/checkers/encryption.py: Entire file
         - src/checkers/utils.py: Entire file
+        - tests/helpers.py: Entire file
+        - tests/protocol_helpers.py: Entire file
+        - tests/test_base_io.py: Entire file
+        - tests/test_encryption.py: Entire file
+        - tests/test_utils.py: Entire file
 ---------------------------------------------------------------------------------------------------
                    GNU LESSER GENERAL PUBLIC LICENSE
                        Version 3, 29 June 2007

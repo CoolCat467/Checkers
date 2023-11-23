@@ -1,4 +1,4 @@
-"Objects - Common objects that are useful."
+"""Objects - Common objects that are useful."""
 
 from __future__ import annotations
 
@@ -14,21 +14,28 @@ from pygame.color import Color
 from pygame.draw import rect
 from pygame.surface import Surface
 
-from . import sprite
+from checkers import sprite
 
 if TYPE_CHECKING:
     from pygame.font import Font
 
-    from .component import Event
+    from checkers.component import Event
 
 
 class Text(sprite.Sprite):
+    """Text element.
 
-    "Text element."
+    Attributes
+    ----------
+        color: pygame.Color or something pygame.Font.render accepts. Text color.
+        font: pygame.font.Font, font used for rendering text.
+        text: str, text to display.
+    """
 
     __slots__ = ("__text", "font")
 
     def __init__(self, name: str, font: Font) -> None:
+        """Initialize with font. Defaults to white text."""
         super().__init__(name)
 
         self.__text = "None"
@@ -40,15 +47,15 @@ class Text(sprite.Sprite):
         return self.font.render(self.__text, True, self.color)
 
     def update_image(self) -> None:
-        "Update image."
+        """Update image."""
         self.image = self.render()
 
     def __get_text(self) -> str:
-        "Get text."
+        """Return current text."""
         return self.__text
 
     def __set_text(self, value: str) -> None:
-        "Set text."
+        """Set current text."""
         if value == self.__text:
             return
         self.__text = value
@@ -58,8 +65,18 @@ class Text(sprite.Sprite):
 
 
 class OutlinedText(Text):
+    """Outlined Text element.
 
-    "Outlined Text element."
+    Attributes
+    ----------
+        font: pygame.font.Font, font used for rendering text.
+        text: str, text to display.
+        color: tuple[int, int, int], Text color.
+        border_width: int, controls width of border. If <= 0, no border.
+        border_radius: int, controls radius of border rounded rect.
+        outline: tuple[int, int, int], border outline color.
+        inside: tuple[int, int, int], outline interior color.
+    """
 
     __slots__ = ("outline", "inside")
 
@@ -67,6 +84,7 @@ class OutlinedText(Text):
     border_radius = 8
 
     def __init__(self, name: str, font: Font) -> None:
+        """Initialize with name and font."""
         super().__init__(name, font)
 
         self.outline = (0, 0, 0)
@@ -74,6 +92,7 @@ class OutlinedText(Text):
         self.color = (0, 0, 0)
 
     def render(self) -> Surface:
+        """Render text and draw outline behind it."""
         text_surf = self.font.render(f" {self.text} ", True, self.color)
 
         text_rect = text_surf.get_rect()
@@ -102,22 +121,40 @@ class OutlinedText(Text):
 
 
 class Button(OutlinedText):
+    """Button element.
 
-    "Button element."
+    Attributes
+    ----------
+        font: pygame.font.Font, font used for rendering text.
+        text: str, text to display.
+        color: tuple[int, int, int], Text color.
+        border_width: int, controls width of border. If <= 0, no border.
+        border_radius: int, controls radius of border rounded rect.
+        outline: tuple[int, int, int], border outline color.
+        inside: tuple[int, int, int], outline interior color.
+
+    Components:
+        DragClickEventComponent
+
+    Events Used:
+        click
+    """
 
     __slots__ = ()
 
     def __init__(self, name: str, font: Font) -> None:
+        """Initialize with name and font."""
         super().__init__(name, font)
 
         self.add_component(sprite.DragClickEventComponent())
 
     async def handle_click(
         self,
-        event: Event[dict[str, tuple[int, int] | int]],
+        event: Event[sprite.PygameMouseButtonEventData],
     ) -> None:
-        """Handle ckick events."""
+        """Handle click events."""
 
     def bind_handlers(self) -> None:
+        """Register click handler."""
         super().bind_handlers()
         self.register_handler("click", self.handle_click)

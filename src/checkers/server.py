@@ -8,7 +8,7 @@ import traceback
 from collections import deque
 from collections.abc import Awaitable, Callable, Iterable
 from functools import partial
-from typing import Final, cast
+from typing import cast
 
 import trio
 
@@ -20,14 +20,14 @@ from checkers.network import NetworkEventComponent, Server, TimeoutException
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
+    DEFAULT_PORT,
     Pos,
     TickEventData,
+    find_ip,
     read_position,
     write_position,
 )
 from checkers.state import ActionSet, State
-
-PORT: Final = 31613
 
 
 def generate_pieces(
@@ -55,7 +55,6 @@ def generate_pieces(
 
 
 class ServerClient(NetworkEventComponent):
-
     """Server Client Network Event Component.
 
     When clients connect to server, this class handles the incoming
@@ -85,6 +84,7 @@ class ServerClient(NetworkEventComponent):
                 "server[write]->game_over": 9,
                 "server[write]->action_complete": 10,
                 "server[write]->initial_config": 11,
+                "server[write]->playing_as": 12,
             },
         )
         self.register_read_network_events(
@@ -111,6 +111,7 @@ class ServerClient(NetworkEventComponent):
                 "game_over->network": self.handle_game_over,
                 "action_complete->network": self.handle_action_complete,
                 "initial_config->network": self.handle_initial_config,
+                f"playing_as->network[{self.client_id}]": self.handle_playing_as,
             },
         )
 
@@ -272,6 +273,17 @@ class ServerClient(NetworkEventComponent):
 
         await self.write_event(Event("server[write]->initial_config", buffer))
 
+    async def handle_playing_as(
+        self,
+        event: Event[int],
+    ) -> None:
+        """Read playing as event and reraise as server[write]->playing_as."""
+        playing_as = event.data
+
+        buffer = Buffer()
+        buffer.write_value(StructFormat.UBYTE, playing_as)
+        await self.write_event(Event("server[write]->playing_as", buffer))
+
 
 class CheckersState(State):
 
@@ -316,7 +328,6 @@ class CheckersState(State):
 
 
 class GameServer(Server):
-
     """Checkers server.
 
     Handles accepting incoming connections from clients and handles
@@ -441,7 +452,8 @@ class GameServer(Server):
                         break
                     await trio.sleep(1.5)
 
-    def setup_teams_internal(self, client_ids: list[int]) -> dict[int, int]:
+    @staticmethod
+    def setup_teams_internal(client_ids: list[int]) -> dict[int, int]:
         """Setup teams for internal server mode from sorted client ids."""
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
@@ -451,7 +463,8 @@ class GameServer(Server):
                 players[client_id] = -1
         return players
 
-    def setup_teams(self, client_ids: list[int]) -> dict[int, int]:
+    @staticmethod
+    def setup_teams(client_ids: list[int]) -> dict[int, int]:
         """Setup teams from sorted client ids."""
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
@@ -484,19 +497,33 @@ class GameServer(Server):
 
         self.players_can_interact = True
 
-    async def start_server(self, event: Event[None] | None = None) -> None:
+    async def start_server(
+        self,
+        event: Event[tuple[str | None, int]] | None = None,
+    ) -> None:
         """Serve clients."""
         print(f"{self.__class__.__name__}: Closing old server clients")
         await self.stop_server()
         print(f"{self.__class__.__name__}: Starting Server")
         self.client_count = 0
-        port = PORT
+
+        host, port = event.data
+
         self.running = True
         async with trio.open_nursery() as nursery:
             # Do not post advertisements when using internal singleplayer mode
             if not self.internal_singleplayer_mode:
                 nursery.start_soon(self.post_advertisements, port)
-            nursery.start_soon(partial(self.serve, port, backlog=0))
+            nursery.start_soon(partial(self.serve, port, host, backlog=0))
+
+    async def transmit_playing_as(self) -> None:
+        """Transmit playing as."""
+        async with trio.open_nursery() as nursery:
+            for client_id, team in self.client_players.items():
+                nursery.start_soon(
+                    self.raise_event,
+                    Event(f"playing_as->network[{client_id}]", team),
+                )
 
     async def handle_server_start_new_game(self, event: Event[None]) -> None:
         """Handle game start."""
@@ -520,6 +547,8 @@ class GameServer(Server):
                     Event("create_piece->network", (piece_pos, piece_type)),
                 )
 
+        await self.transmit_playing_as()
+
         # Raise initial config event with board size and initial turn.
         await self.raise_event(
             Event(
@@ -530,6 +559,10 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
+        while not self.can_start and not client.not_connected:
+            await client.write_event(
+                Event("server[write]->no_actions", bytearray()),
+            )
         while not client.not_connected:
             print(f"{client.name} client_network_loop tick")
             try:
@@ -805,7 +838,11 @@ class GameServer(Server):
         super().__del__()
 
 
-async def run_server(server_class: type[GameServer]) -> None:
+async def run_server(
+    server_class: type[GameServer],
+    host: str,
+    port: int,
+) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
         event_manager = ExternalRaiseManager(
@@ -816,7 +853,7 @@ async def run_server(server_class: type[GameServer]) -> None:
         server = server_class()
         event_manager.add_component(server)
 
-        await event_manager.raise_event(Event("server_start", None))
+        await event_manager.raise_event(Event("server_start", (host, port)))
         while not server.running:
             print("Server starting...")
             await trio.sleep(1)
@@ -841,14 +878,28 @@ async def run_server(server_class: type[GameServer]) -> None:
         server.unbind_components()
 
 
-def run_server_sync(server_class: type[GameServer]) -> None:
+def run_server_sync(
+    server_class: type[GameServer],
+    host: str,
+    port: int,
+) -> None:
     """Synchronous entry point."""
-    trio.run(run_server, server_class)
+    trio.run(run_server, server_class, host, port)
+
+
+async def cli_run_async() -> None:
+    """Run game server."""
+    host = await find_ip()
+    port = DEFAULT_PORT
+    try:
+        await run_server(GameServer, host, port)
+    except KeyboardInterrupt:
+        print("Closing from keyboard interrupt")
 
 
 def cli_run() -> None:
     """Run game server."""
-    run_server_sync(GameServer)
+    trio.run(cli_run_async)
 
 
 ##if __name__ == "__main__":

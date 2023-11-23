@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # AI that plays checkers.
 
+"""Minimax Checkers AI."""
+
 from __future__ import annotations
+
+# Programmed by CoolCat467
 
 __title__ = "Minimax AI"
 __author__ = "CoolCat467"
@@ -11,10 +15,8 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, TypeVar
 
-import trio
-from checkers.client import read_advertisements
 from checkers.state import Action, State
-from machine_client import RemoteState, run_client
+from machine_client import RemoteState, run_clients_in_local_servers_sync
 from minimax import Minimax, MinimaxResult, Player
 
 if TYPE_CHECKING:
@@ -30,8 +32,7 @@ PORT = 31613
 
 
 class CheckersMinimax(Minimax[State, Action]):
-
-    """Minimax Algorithm for Checkers"""
+    """Minimax Algorithm for Checkers."""
 
     __slots__ = ()
 
@@ -90,13 +91,12 @@ class CheckersMinimax(Minimax[State, Action]):
 
 
 class MinimaxPlayer(RemoteState):
-
-    """Minimax Player"""
+    """Minimax Player."""
 
     __slots__ = ()
 
     async def preform_turn(self) -> Action:
-        """Perform turn"""
+        """Perform turn."""
         print("preform_turn")
         ##        value, action = CheckersMinimax.adaptive_depth_minimax(
         ##            self.state, 4, 5
@@ -106,24 +106,9 @@ class MinimaxPlayer(RemoteState):
         return action
 
 
-async def run_async() -> None:
-    details: tuple[str, int] | None = None
-    while details is None:
-        print("Watching for advertisements...")
-        for advertisement in await read_advertisements():
-            motd, details = advertisement
-            print(f"{motd = } {details = }")
-            break
-
-    ##    host = "127.0.0.1"
-    ##    port = PORT
-    host, port = details
-    await run_client(host, port, MinimaxPlayer)
-
-
 def run() -> None:
     """Synchronous entry point."""
-    trio.run(run_async)
+    run_clients_in_local_servers_sync(MinimaxPlayer)
 
 
 print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")

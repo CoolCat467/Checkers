@@ -1,3 +1,5 @@
+"""Two's Complement Utilities."""
+
 # This is the base_io module from https://github.com/py-mine/mcproto v0.3.0,
 # which is licensed under the GNU LESSER GENERAL PUBLIC LICENSE v3.0
 

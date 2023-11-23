@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 # AI that plays checkers.
 
-# This is an example AI, and is no way perfect, except maybe the
-# jumping part of it lol.
+"""Example Checkers AI."""
+
+from __future__ import annotations
+
+# Programmed by CoolCat467
 
 __title__ = "Super Simple AI Example"
 __author__ = "CoolCat467"
@@ -12,13 +15,16 @@ __ver_minor__ = 0
 __ver_patch__ = 0
 
 import random
+from typing import TYPE_CHECKING
 
-from checkers.state import Action, State
-from machine_client import RemoteState, run_client_sync
+from machine_client import RemoteState, run_clients_in_local_servers_sync
+
+if TYPE_CHECKING:
+    from checkers.state import Action, State
 
 
 def turn(state: State) -> Action:
-    """This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."""
+    """Return the piece it wants to move and the tile id the target piece should be moved to."""
     # We have no idea what jumps we can make nor tiles we can select
     jump_tiles = {}
     select_tiles = {}
@@ -70,20 +76,19 @@ def turn(state: State) -> Action:
 
 
 class ComputerPlayer(RemoteState):
-
-    """Computer player"""
+    """Computer player."""
 
     __slots__ = ()
 
     async def preform_turn(self) -> Action:
-        """Perform turn"""
+        """Perform turn."""
         print("preform_turn")
         return turn(self.state)
 
 
 def run() -> None:
-    """Synchronous entry point."""
-    run_client_sync(ComputerPlayer)
+    """Main synchronous entrypoint."""
+    run_clients_in_local_servers_sync(ComputerPlayer)
 
 
 print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")

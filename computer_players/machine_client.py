@@ -1,4 +1,4 @@
-"""Machine Client - Checkers game client that can be controlled mechanically"""
+"""Machine Client - Checkers game client that can be controlled mechanically."""
 
 from __future__ import annotations
 
@@ -6,10 +6,11 @@ __title__ = "Machine Client"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import sys
 from abc import ABCMeta, abstractmethod
 
 import trio
-from checkers.client import GameClient
+from checkers.client import GameClient, read_advertisements
 from checkers.component import (
     Component,
     ComponentManager,
@@ -17,6 +18,11 @@ from checkers.component import (
     ExternalRaiseManager,
 )
 from checkers.state import Action, Pos, State
+
+if sys.version_info >= (3, 11):
+    BaseExceptionGroup_ = BaseExceptionGroup
+else:
+    BaseExceptionGroup_ = trio.MultiError
 
 PORT = 31613
 
@@ -27,8 +33,7 @@ PORT = 31613
 
 
 class RemoteState(Component, metaclass=ABCMeta):
-
-    """Remote State
+    """Remote State.
 
     Keeps track of game state and call preform_action when it's this clients
     turn.
@@ -51,6 +56,7 @@ class RemoteState(Component, metaclass=ABCMeta):
                 "game_action_complete": self.handle_action_complete,
                 "game_winner": self.handle_game_over,
                 "game_initial_config": self.handle_initial_config,
+                "game_playing_as": self.handle_playing_as,
                 "gameboard_create_piece": self.handle_create_piece,
             },
         )
@@ -70,10 +76,10 @@ class RemoteState(Component, metaclass=ABCMeta):
 
     @abstractmethod
     async def preform_turn(self) -> Action:
-        """Perform turn, return action to perform"""
+        """Perform turn, return action to perform."""
 
     async def base_preform_turn(self) -> None:
-        """Perform turn"""
+        """Perform turn."""
         if self.state.check_for_win() is not None:
             print("Terminal state, not performing turn")
             return
@@ -99,6 +105,10 @@ class RemoteState(Component, metaclass=ABCMeta):
         pos, type_ = event.data
         self.pieces[pos] = type_
 
+    async def handle_playing_as(self, event: Event[int]) -> None:
+        """Handle playing as event."""
+        self.playing_as = event.data
+
     async def handle_initial_config(
         self,
         event: Event[tuple[Pos, int]],
@@ -117,7 +127,6 @@ class RemoteState(Component, metaclass=ABCMeta):
 
 
 class MachineClient(ComponentManager):
-
     """Manager that runs until client_disconnected event fires."""
 
     __slots__ = ("running",)
@@ -160,7 +169,7 @@ async def run_client(
         client = MachineClient(remote_state_class)
         event_manager.add_component(client)
         await event_manager.raise_event(Event("client_connect", (host, port)))
-        print("Connected to server")
+        print(f"Connected to server {host}:{port}")
         while client.running:
             # Wait so backlog things happen
             await trio.sleep(1)
@@ -168,9 +177,43 @@ async def run_client(
 
 
 def run_client_sync(
-    host: int,
+    host: str,
     port: int,
     remote_state_class: type[RemoteState],
 ) -> None:
     """Synchronous entry point."""
     trio.run(run_client, host, port, remote_state_class)
+
+
+async def run_clients_in_local_servers(
+    remote_state_class: type[RemoteState],
+) -> None:
+    """Run clients in local servers."""
+    connected: set[tuple[str, int]] = set()
+    print("Watching for advertisements...\n(CTRL + C to quit)")
+    try:
+        async with trio.open_nursery(strict_exception_groups=True) as nursery:
+            while True:
+                advertisements = set(await read_advertisements())
+                servers = {server for _motd, server in advertisements}
+                servers -= connected
+                for server in servers:
+                    nursery.start_soon(run_client, *server, remote_state_class)
+                    connected.add(server)
+                await trio.sleep(1)
+    except BaseExceptionGroup_ as exc:
+        caught = False
+        for ex in exc.exceptions:
+            if isinstance(ex, KeyboardInterrupt):
+                print("Shutting down from keyboard interrupt.")
+                caught = True
+                break
+        if not caught:
+            raise
+
+
+def run_clients_in_local_servers_sync(
+    remote_state_class: type[RemoteState],
+) -> None:
+    """Run clients in local servers."""
+    trio.run(run_clients_in_local_servers, remote_state_class)
