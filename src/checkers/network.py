@@ -1,4 +1,4 @@
-"Network - Module for sending events over the network."
+"""Network - Module for sending events over the network."""
 
 from __future__ import annotations
 
@@ -28,7 +28,9 @@ from checkers.component import Component, ComponentManager, Event
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
 
-class TimeoutException(Exception):
+class NetworkTimeoutError(Exception):
+    """Network Timeout Error."""
+
     __slots__ = ()
 
 
@@ -38,6 +40,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     __slots__ = ("_stream", "timeout")
 
     def __init__(self, name: str) -> None:
+        """Initialize Network Component."""
         super().__init__(name)
 
         self.timeout: int | float = 3
@@ -50,6 +53,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     @property
     def stream(self) -> trio.SocketStream:
+        """Trio SocketStream or raise RuntimeError."""
         if self._stream is None:
             raise RuntimeError("Stream not connected!")
         return self._stream
@@ -93,7 +97,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
-                    raise TimeoutException(
+                    raise NetworkTimeoutError(
                         "Server did not respond with any information. "
                         "This may be from a connection timeout.",
                     )
@@ -148,6 +152,7 @@ class NetworkEventComponent(NetworkComponent):
     packet_id_format: Literal[StructFormat.USHORT] = StructFormat.USHORT
 
     def __init__(self, name: str) -> None:
+        """Initialize Network Event Component."""
         super().__init__(name)
         self._read_packet_id_to_event_name: dict[int, str] = {}
         self._write_event_name_to_packet_id: dict[str, int] = {}
@@ -233,11 +238,12 @@ class Server(ComponentManager):
     __slots__ = ("cancel_scope",)
 
     def __init__(self, name: str, own_name: str | None = None) -> None:
+        """Initialize Server."""
         super().__init__(name, own_name)
         self.cancel_scope: trio.CancelScope | None = None
 
     def stop_serving(self) -> None:
-        """Cancels serve scope immediately.
+        """Cancel serve scope immediately.
 
         This method is idempotent, i.e., if the scope was already
         cancelled then this method silently does nothing.
@@ -282,7 +288,7 @@ class Server(ComponentManager):
             await nursery.start(handle_serve)
 
     async def handler(self, stream: trio.SocketStream) -> None:
-        """Main handler for new clients.
+        """Handle new client streams.
 
         Override in a subclass - Default only closes the stream
         """
@@ -293,7 +299,7 @@ class Server(ComponentManager):
 
 
 def run() -> None:
-    "Run test of module."
+    """Run test of module."""
 
     async def client_connect(
         port: int,
@@ -324,7 +330,7 @@ def run() -> None:
         stop_server()
 
     async def run_async() -> None:
-        "Run asynchronous test."
+        """Run asynchronous test."""
 
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:

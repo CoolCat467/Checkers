@@ -87,7 +87,7 @@ class ComputerPlayer(RemoteState):
 
 
 def run() -> None:
-    """Main synchronous entrypoint."""
+    """Run ComputerPlayer clients in local servers."""
     run_clients_in_local_servers_sync(ComputerPlayer)
 
 

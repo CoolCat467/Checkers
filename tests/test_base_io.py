@@ -296,7 +296,10 @@ class WriterTests(ABC):
     )
     def test_write_varuint_out_of_range(self, write_value: int, max_bits: int):
         """Test writing out of range varuints raises :exc:`ValueError`."""
-        with pytest.raises(ValueError):
+        with pytest.raises(
+            ValueError,
+            match="^Tried to write varint outside of the range of",
+        ):
             self.writer._write_varuint(write_value, max_bits=max_bits)
 
     @pytest.mark.parametrize(
@@ -550,7 +553,10 @@ class ReaderTests(ABC):
     ):
         """Test reading out-of-range varuints raises :exc:`IOError`."""
         read_mock.combined_data = bytearray(read_bytes)
-        with pytest.raises(IOError):
+        with pytest.raises(
+            IOError,
+            match="^Received varint was outside the range of",
+        ):
             self.reader._read_varuint(max_bits=max_bits)
 
     @pytest.mark.parametrize(
@@ -671,7 +677,10 @@ class ReaderTests(ABC):
     ):
         """Test reading a UTF string too big raises an IOError."""
         read_mock.combined_data = bytearray(read_bytes)
-        with pytest.raises(IOError):
+        with pytest.raises(
+            IOError,
+            match="^Maximum read limit for utf strings is ",
+        ):
             self.reader.read_utf()
 
     def test_read_optional_true(

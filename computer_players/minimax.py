@@ -74,6 +74,7 @@ class Minimax(ABC, Generic[State, Action]):
         state: State,
         depth: int | None = 5,
     ) -> MinimaxResult[Action]:
+        """Return minimax result best action for a given state for the current player."""
         if cls.terminal(state):
             return MinimaxResult(cls.value(state), None)
         if depth is not None and depth <= 0:
@@ -103,7 +104,6 @@ class Minimax(ABC, Generic[State, Action]):
 
 
 class AsyncMinimax(ABC, Generic[State, Action]):
-
     """Base class for Minimax AIs."""
 
     __slots__ = ()
@@ -142,6 +142,7 @@ class AsyncMinimax(ABC, Generic[State, Action]):
         state: State,
         depth: int | None = 5,
     ) -> MinimaxResult[Action]:
+        """Return minimax result best action for a given state for the current player."""
         if await cls.terminal(state):
             return MinimaxResult(await cls.value(state), None)
         if depth is not None and depth <= 0:

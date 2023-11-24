@@ -109,6 +109,7 @@ class Piece(sprite.Sprite):
         position_name: str,
         location: tuple[int, int] | Vector2,
     ) -> None:
+        """Initialize Piece Sprite."""
         super().__init__(f"piece_{position_name}")
 
         self.piece_type = piece_type
@@ -252,6 +253,7 @@ class Tile(sprite.Sprite):
         position_name: str,
         location: tuple[int, int] | Vector2,
     ) -> None:
+        """Initialize Tile Sprite."""
         super().__init__(f"tile_{position_name}")
 
         self.color = color
@@ -352,6 +354,7 @@ class GameBoard(sprite.Sprite):
         self,
         tile_size: int,
     ) -> None:
+        """Initialize Game Board."""
         super().__init__("board")
 
         self.add_component(sprite.ImageComponent())
@@ -734,12 +737,13 @@ class ClickDestinationComponent(Component):
     outline = pygame.color.Color(255, 220, 0)
 
     def __init__(self) -> None:
+        """Initialize Click Destination Component."""
         super().__init__("click_dest")
 
         self.selected = False
 
     def bind_handlers(self) -> None:
-        "Register PygameMouseButtonDown and tick handlers."
+        """Register PygameMouseButtonDown and tick event handlers."""
         self.register_handlers(
             {
                 "click": self.click,
@@ -747,12 +751,8 @@ class ClickDestinationComponent(Component):
                 "PygameMouseButtonDown": self.mouse_down,
                 "tick": self.move_towards_dest,
                 "init": self.cache_outline,
-                "test": self.test,
             },
         )
-
-    async def test(self, event: Event[Any]) -> None:
-        print(f"{event = }")
 
     async def cache_outline(self, _: Event[Any]) -> None:
         """Precalculate outlined images."""
@@ -810,6 +810,7 @@ class MrFloppy(sprite.Sprite):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize MrFloppy Sprite."""
         super().__init__("MrFloppy")
 
         self.add_components(
@@ -885,6 +886,7 @@ class FPSCounter(objects.Text):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize FPS counter."""
         font = pygame.font.Font(
             trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
             28,
@@ -899,6 +901,7 @@ class FPSCounter(objects.Text):
         self.text = f'FPS: {event.data["fps"]:.0f}'
 
     def bind_handlers(self) -> None:
+        """Register tick event handler."""
         super().bind_handlers()
         self.register_handlers(
             {
@@ -908,15 +911,16 @@ class FPSCounter(objects.Text):
 
 
 class HaltState(AsyncState["CheckersClient"]):
-    "Halt state to set state to None so running becomes False."
+    """Halt state to set state to None so running becomes False."""
 
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize Hault State."""
         super().__init__("Halt")
 
     async def check_conditions(self) -> None:
-        "Set active state to None."
+        """Set active state to None."""
         assert self.machine is not None
         await self.machine.set_state(None)
 
@@ -927,6 +931,7 @@ class GameState(AsyncState["CheckersClient"]):
     __slots__ = ("id", "manager")
 
     def __init__(self, name: str) -> None:
+        """Initialize Game State."""
         super().__init__(name)
 
         self.id: int = 0
@@ -958,8 +963,6 @@ class GameState(AsyncState["CheckersClient"]):
         """Return an async function that will change state to `new_state`."""
 
         async def set_state(*args: object, **kwargs: object) -> None:
-            if self.machine is None:
-                return
             await self.machine.set_state(new_state)
 
         return set_state
@@ -971,9 +974,11 @@ class InitializeState(AsyncState["CheckersClient"]):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize the Initialize State."""
         super().__init__("initialize")
 
     async def check_conditions(self) -> str:
+        """Go to title."""
         return "title"
 
 
@@ -983,9 +988,11 @@ class TestState(GameState):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize Test State."""
         super().__init__("test")
 
     async def entry_actions(self) -> None:
+        """Add MrFloppy and FPSCounter objects and raise init event."""
         assert self.machine is not None
         self.id = self.machine.new_group("test")
 
@@ -1002,6 +1009,7 @@ class TitleState(GameState):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize Title State."""
         super().__init__("title")
 
     async def entry_actions(self) -> None:
@@ -1039,7 +1047,7 @@ class TitleState(GameState):
         join_button.visible = True
         join_button.color = Color(0, 0, 0)
         join_button.text = "Join Networked Game"
-        join_button.location = hosting_button.location + (  # noqa: RUF005
+        join_button.location = hosting_button.location + Vector2(
             0,
             hosting_button.rect.h + 10,
         )
@@ -1050,7 +1058,7 @@ class TitleState(GameState):
         internal_button.visible = True
         internal_button.color = Color(0, 0, 0)
         internal_button.text = "Singleplayer Game"
-        internal_button.location = hosting_button.location - (
+        internal_button.location = hosting_button.location - Vector2(
             0,
             hosting_button.rect.h + 10,
         )
@@ -1074,6 +1082,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
     internal_server = False
 
     def __init__(self) -> None:
+        """Initialize Play internal hosting / hosting State."""
         extra = "_internal" if self.internal_server else ""
         super().__init__(f"play{extra}_hosting")
 
@@ -1102,7 +1111,7 @@ class PlayHostingState(AsyncState["CheckersClient"]):
         )
 
     async def check_conditions(self) -> str | None:
-        assert self.machine is not None
+        """Return to Play state when server is up and running."""
         server: GameServer = self.machine.manager.get_component("GameServer")
         return "play" if server.running else None
 
@@ -1120,13 +1129,18 @@ class JoinButton(Button):
 
     __slots__ = ()
 
-    def __init__(self, id_: int, font: pygame.Font, motd: str) -> None:
+    def __init__(self, id_: int, font: pygame.font.Font, motd: str) -> None:
+        """Initialize Join Button."""
         super().__init__(f"join_button_{id_}", font)
         self.text = motd
         self.location = [x // 2 for x in SCREEN_SIZE]
 
-    async def handle_click(self, _: sprite.PygameMouseButtonEventData) -> None:
-        print(self.manager)
+    async def handle_click(
+        self,
+        _: Event[sprite.PygameMouseButtonEventData],
+    ) -> None:
+        """Handle Click Event."""
+        print(f"{self!r} handle_click")
 
 
 class PlayJoiningState(GameState):
@@ -1139,10 +1153,11 @@ class PlayJoiningState(GameState):
     )
 
     def __init__(self) -> None:
+        """Initialize Joining State."""
         super().__init__("play_joining")
 
         self.next_button = 0
-        self.buttons = {}
+        self.buttons: dict[tuple[str, tuple[str, int]], int] = {}
 
         self.font = pygame.font.Font(
             trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
@@ -1168,7 +1183,7 @@ class PlayJoiningState(GameState):
 
         await self.manager.raise_event(Event("update_listing", None))
 
-    async def handle_update_listing(self, _: object) -> None:
+    async def handle_update_listing(self, _: object) -> str | None:
         """Update server listing."""
         assert self.machine is not None
         for advertisement in await read_advertisements():
@@ -1178,8 +1193,8 @@ class PlayJoiningState(GameState):
                 self.buttons[details] = self.next_button
 
                 print(f"{motd = }  {details = }")
-                ##                button = JoinButton(self.next_button, self.font, motd, details)
-                ##                self.group_add(button)
+                ##button = JoinButton(self.next_button, self.font, motd, details)
+                ##self.group_add(button)
 
                 self.next_button += 1
                 ####
@@ -1202,9 +1217,11 @@ class PlayState(GameState):
     __slots__ = ()
 
     def __init__(self) -> None:
+        """Initialize Play State."""
         super().__init__("play")
 
     def register_handlers(self) -> None:
+        """Register event handlers."""
         self.manager.register_handlers(
             {
                 "client_disconnected": self.handle_client_disconnected,
@@ -1213,10 +1230,12 @@ class PlayState(GameState):
         )
 
     def add_actions(self) -> None:
+        """Register handlers."""
         super().add_actions()
         self.register_handlers()
 
     async def entry_actions(self) -> None:
+        """Add GameBoard and raise init event."""
         assert self.machine is not None
         self.id = self.machine.new_group("play")
 
@@ -1230,12 +1249,13 @@ class PlayState(GameState):
         await self.machine.raise_event(Event("init", None))
 
     async def check_conditions(self) -> str | None:
+        """Return to title if client component doesn't exist."""
         if not self.machine.manager.component_exists("network"):
             return "title"
         return None
 
     async def exit_actions(self) -> None:
-        assert self.machine is not None
+        """Raise network stop event and remove components."""
         # Fire server stop event so server shuts down if it exists
         await self.machine.raise_event(Event("network_stop", None))
 
@@ -1287,7 +1307,9 @@ class PlayState(GameState):
         title_button.visible = True
         title_button.color = Color(0, 0, 0)
         title_button.text = "Client Disconnected - Return to Title"
-        title_button.location = [x // 2 for x in SCREEN_SIZE]
+        title_button.location = Vector2.from_iter(
+            [x // 2 for x in SCREEN_SIZE],
+        )
         title_button.handle_click = self.change_state("title")
         self.group_add(title_button)
 
@@ -1296,7 +1318,7 @@ class PlayState(GameState):
         error_text.color = Color(255, 0, 0)
         error_text.border_width = 1
         error_text.text = error
-        error_text.location = title_button.location + (  # noqa: RUF005
+        error_text.location = title_button.location + Vector2(
             0,
             title_button.rect.h + 10,
         )
@@ -1314,6 +1336,7 @@ class CheckersClient(sprite.GroupProcessor):
     __slots__ = ("manager",)
 
     def __init__(self, manager: ComponentManager) -> None:
+        """Initialize Checkers Client."""
         super().__init__()
         self.manager = manager
 
@@ -1331,16 +1354,16 @@ class CheckersClient(sprite.GroupProcessor):
 
     @property
     def running(self) -> bool:
-        "Boolean of if state machine is running."
+        """Boolean of if state machine is running."""
         return self.active_state is not None
 
     async def raise_event(self, event: Event[Any]) -> None:
-        "Raise component event in all groups."
+        """Raise component event in all groups."""
         await self.manager.raise_event(event)
 
 
 async def async_run() -> None:
-    """Main event loop."""
+    """Handle main event loop."""
     # Set up globals
     global SCREEN_SIZE
 
@@ -1413,7 +1436,7 @@ async def async_run() -> None:
 
 
 def run() -> None:
-    """Synchronous entry point."""
+    """Start asynchronous run."""
     trio.run(async_run)
 
 

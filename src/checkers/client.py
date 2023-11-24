@@ -13,7 +13,7 @@ import trio
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import Event
-from checkers.network import NetworkEventComponent, TimeoutException
+from checkers.network import NetworkEventComponent, NetworkTimeoutError
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -83,11 +83,11 @@ async def read_advertisements(
                 mreq,
             )
 
+        host = ""
         buffer = b""
-        address = ""
         with trio.move_on_after(timeout):
             buffer, address = await udp_socket.recvfrom(512)
-            host, port = address
+            host, _port = address
         ##            print(f"{buffer = }")
         ##            print(f"{address = }")
 
@@ -130,6 +130,7 @@ class GameClient(NetworkEventComponent):
     __slots__ = ()  # "tick_lock",
 
     def __init__(self, name: str) -> None:
+        """Initialize GameClient."""
         super().__init__(name)
 
         # Five seconds until timeout is generous, but it gives server end wiggle
@@ -163,6 +164,7 @@ class GameClient(NetworkEventComponent):
     ##        self.tick_lock = trio.Lock()
 
     def bind_handlers(self) -> None:
+        """Register event handlers."""
         super().bind_handlers()
         self.register_handlers(
             {
@@ -226,7 +228,7 @@ class GameClient(NetworkEventComponent):
             assert self.not_connected
             print("handle_read_event trio.ClosedResourceError")
             return
-        except TimeoutException as exc:
+        except NetworkTimeoutError as exc:
             traceback.print_exception(exc)
             await self.raise_disconnect("Failed to read event from server.")
             return
@@ -414,10 +416,12 @@ class GameClient(NetworkEventComponent):
         """Send EOF if connected and close socket."""
         if self.not_connected:
             return
-        else:
+        try:
             await self.send_eof()
-        await self.close()
+        finally:
+            await self.close()
         assert self.not_connected
 
     def __del__(self) -> None:
+        """Print debug message."""
         print(f"del {self.__class__.__name__}")

@@ -71,7 +71,7 @@ class OutlinedText(Text):
     ----------
         font: pygame.font.Font, font used for rendering text.
         text: str, text to display.
-        color: tuple[int, int, int], Text color.
+        color: pygame.color.Color, Text color.
         border_width: int, controls width of border. If <= 0, no border.
         border_radius: int, controls radius of border rounded rect.
         outline: tuple[int, int, int], border outline color.
@@ -89,7 +89,7 @@ class OutlinedText(Text):
 
         self.outline = (0, 0, 0)
         self.inside = (0xFF, 0xFF, 0xFF)
-        self.color = (0, 0, 0)
+        self.color = Color(0, 0, 0)
 
     def render(self) -> Surface:
         """Render text and draw outline behind it."""

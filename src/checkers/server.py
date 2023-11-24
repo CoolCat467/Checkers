@@ -16,7 +16,7 @@ from checkers.async_clock import Clock
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import Event, ExternalRaiseManager
-from checkers.network import NetworkEventComponent, Server, TimeoutException
+from checkers.network import NetworkEventComponent, NetworkTimeoutError, Server
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -65,6 +65,7 @@ class ServerClient(NetworkEventComponent):
     __slots__ = ("client_id",)
 
     def __init__(self, client_id: int) -> None:
+        """Initialize Server Client."""
         self.client_id = client_id
         super().__init__(f"client_{client_id}")
 
@@ -95,6 +96,7 @@ class ServerClient(NetworkEventComponent):
         )
 
     def bind_handlers(self) -> None:
+        """Bind event handlers."""
         super().bind_handlers()
         self.register_handlers(
             {
@@ -286,7 +288,6 @@ class ServerClient(NetworkEventComponent):
 
 
 class CheckersState(State):
-
     """Subclass of State that keeps track of actions in `action_queue`."""
 
     __slots__ = ("action_queue",)
@@ -299,14 +300,17 @@ class CheckersState(State):
         /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
+        """Initialize Checkers State."""
         super().__init__(size, turn, pieces, pre_calculated_actions)
         self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
 
     def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
+        """Add king event to action queue."""
         super().piece_kinged(piece_pos, new_type)
         self.action_queue.append(("king", (piece_pos, new_type)))
 
     def piece_moved(self, start_pos: Pos, end_pos: Pos) -> None:
+        """Add move event to action queue."""
         super().piece_moved(start_pos, end_pos)
         self.action_queue.append(
             (
@@ -319,6 +323,7 @@ class CheckersState(State):
         )
 
     def piece_jumped(self, jumped_piece_pos: Pos) -> None:
+        """Add jump event to action queue."""
         super().piece_jumped(jumped_piece_pos)
         self.action_queue.append(("jump", (jumped_piece_pos,)))
 
@@ -350,6 +355,7 @@ class GameServer(Server):
     max_clients = 4
 
     def __init__(self, internal_singleplayer_mode: bool = False) -> None:
+        """Initialize server."""
         super().__init__("GameServer")
 
         self.client_count: int
@@ -393,7 +399,7 @@ class GameServer(Server):
 
     async def post_advertisement(
         self,
-        udp_socket: trio._socket._SocketType,
+        udp_socket: trio.socket.SocketType,
         send_to_ip: str,
         hosting_port: int,
     ) -> None:
@@ -454,7 +460,7 @@ class GameServer(Server):
 
     @staticmethod
     def setup_teams_internal(client_ids: list[int]) -> dict[int, int]:
-        """Setup teams for internal server mode from sorted client ids."""
+        """Return teams for internal server mode given sorted client ids."""
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
             if idx == 0:
@@ -465,7 +471,7 @@ class GameServer(Server):
 
     @staticmethod
     def setup_teams(client_ids: list[int]) -> dict[int, int]:
-        """Setup teams from sorted client ids."""
+        """Return teams given sorted client ids."""
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
             if idx < 2:
@@ -499,7 +505,7 @@ class GameServer(Server):
 
     async def start_server(
         self,
-        event: Event[tuple[str | None, int]] | None = None,
+        event: Event[tuple[str | None, int]],
     ) -> None:
         """Serve clients."""
         print(f"{self.__class__.__name__}: Closing old server clients")
@@ -559,7 +565,7 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
-        while not self.can_start and not client.not_connected:
+        while not self.can_start() and not client.not_connected:
             await client.write_event(
                 Event("server[write]->no_actions", bytearray()),
             )
@@ -570,7 +576,7 @@ class GameServer(Server):
                     Event("server[write]->no_actions", bytearray()),
                 )
                 event = await client.read_event()
-            except TimeoutException:
+            except NetworkTimeoutError:
                 continue
             except (
                 trio.BrokenResourceError,
@@ -834,6 +840,7 @@ class GameServer(Server):
         await self.raise_event(Event("animation_state->network", False))
 
     def __del__(self) -> None:
+        """Debug print."""
         print(f"del {self.__class__.__name__}")
         super().__del__()
 
@@ -862,20 +869,22 @@ async def run_server(
 
         clock = Clock()
 
-        while server.running:
-            await clock.tick()
-            await event_manager.raise_event(
-                Event(
-                    "tick",
-                    TickEventData(
-                        time_passed=clock.get_time()
-                        / 1e9,  # nanoseconds -> seconds
-                        fps=clock.get_fps(),
+        try:
+            while server.running:
+                await clock.tick()
+                await event_manager.raise_event(
+                    Event(
+                        "tick",
+                        TickEventData(
+                            time_passed=clock.get_time()
+                            / 1e9,  # nanoseconds -> seconds
+                            fps=clock.get_fps(),
+                        ),
                     ),
-                ),
-            )
-            await trio.sleep(0.01)
-        server.unbind_components()
+                )
+                await trio.sleep(0.01)
+        finally:
+            server.unbind_components()
 
 
 def run_server_sync(
@@ -883,7 +892,7 @@ def run_server_sync(
     host: str,
     port: int,
 ) -> None:
-    """Synchronous entry point."""
+    """Run server given server class and address to host at."""
     trio.run(run_server, server_class, host, port)
 
 
@@ -902,5 +911,5 @@ def cli_run() -> None:
     trio.run(cli_run_async)
 
 
-##if __name__ == "__main__":
-##    cli_run()
+if __name__ == "__main__":
+    cli_run()

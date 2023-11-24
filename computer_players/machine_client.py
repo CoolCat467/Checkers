@@ -24,8 +24,6 @@ if sys.version_info >= (3, 11):
 else:
     BaseExceptionGroup_ = trio.MultiError
 
-PORT = 31613
-
 
 # Player:
 # 0 = False = Person  = MIN = 0, 2
@@ -42,6 +40,7 @@ class RemoteState(Component, metaclass=ABCMeta):
     __slots__ = ("state", "pieces", "has_initial", "playing_as")
 
     def __init__(self) -> None:
+        """Initialize remote state."""
         super().__init__("remote_state")
 
         self.state = State((8, 8), False, {})
@@ -51,6 +50,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         self.playing_as = 1
 
     def bind_handlers(self) -> None:
+        """Register game event handlers."""
         self.register_handlers(
             {
                 "game_action_complete": self.handle_action_complete,
@@ -132,6 +132,7 @@ class MachineClient(ComponentManager):
     __slots__ = ("running",)
 
     def __init__(self, remote_state_class: type[RemoteState]) -> None:
+        """Initialize machine client."""
         super().__init__("machine_client")
 
         self.running = True
@@ -139,6 +140,7 @@ class MachineClient(ComponentManager):
         self.add_components((remote_state_class(), GameClient("game_client")))
 
     def bind_handlers(self) -> None:
+        """Register client event handlers."""
         self.register_handlers(
             {"client_disconnected": self.handle_client_disconnected},
         )
@@ -181,7 +183,7 @@ def run_client_sync(
     port: int,
     remote_state_class: type[RemoteState],
 ) -> None:
-    """Synchronous entry point."""
+    """Run client and connect to server at host:port."""
     trio.run(run_client, host, port, remote_state_class)
 
 

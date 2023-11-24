@@ -38,6 +38,7 @@ class CheckersMinimax(Minimax[State, Action]):
 
     @staticmethod
     def value(state: State) -> int | float:
+        """Return value of given game state."""
         # Return winner if possible
         win = state.check_for_win()
         # If no winner, we have to predict the value
@@ -55,18 +56,22 @@ class CheckersMinimax(Minimax[State, Action]):
 
     @staticmethod
     def terminal(state: State) -> bool:
+        """Return if game state is terminal."""
         return state.check_for_win() is not None
 
     @staticmethod
     def player(state: State) -> Player:
+        """Return Player enum from current state's turn."""
         return Player.MAX if state.get_turn() else Player.MIN
 
     @staticmethod
     def actions(state: State) -> Iterable[Action]:
+        """Return all actions that are able to be performed for the current player in the given state."""
         return state.get_all_actions(int(state.get_turn()))
 
     @staticmethod
     def result(state: State, action: Action) -> State:
+        """Return new state after performing given action on given current state."""
         return state.preform_action(action)
 
     @classmethod
@@ -76,6 +81,7 @@ class CheckersMinimax(Minimax[State, Action]):
         minimum: int,
         maximum: int,
     ) -> MinimaxResult[Action]:
+        """Return minimax result from adaptive max depth."""
         ##        types = state.pieces.values()
         ##        current = len(types)
         ##        w, h = state.size
@@ -107,7 +113,7 @@ class MinimaxPlayer(RemoteState):
 
 
 def run() -> None:
-    """Synchronous entry point."""
+    """Run MinimaxPlayer clients in local server."""
     run_clients_in_local_servers_sync(MinimaxPlayer)
 
 

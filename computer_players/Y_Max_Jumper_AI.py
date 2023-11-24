@@ -1,7 +1,11 @@
 #!/usr/bin/env python3
 # AI that plays checkers.
 
+"""Get to other side + best jump AI Checkers AI."""
+
 from __future__ import annotations
+
+# Programmed by CoolCat467
 
 __title__ = "Get to other side + best jump AI"
 __author__ = "CoolCat467"
@@ -14,18 +18,16 @@ __ver_patch__ = 0
 import random
 from typing import TYPE_CHECKING, TypeVar
 
-from machine_client import RemoteState, run_client_sync
+from machine_client import RemoteState, run_clients_in_local_servers_sync
 
 if TYPE_CHECKING:
     from checkers.state import Action, State
 
 T = TypeVar("T")
 
-PORT = 31613
-
 
 def turn(state: State) -> Action:
-    """This function is called when the game requests the AI to return the piece it wants to move's id and the tile id the target piece should be moved to."""
+    """Return the piece it wants to move and the tile id the target piece should be moved to."""
     # We have no idea what jumps we can make nor tiles we can select
     jump_tiles = {}
     select_tiles = {}
@@ -91,14 +93,13 @@ def turn(state: State) -> Action:
                 best_y,
             ),
         )
-    else:
-        # If we can make jumps,
-        # Get the jump with the most jumps possible
-        select = max(jump_tiles.keys())
-        # Set our target to that jump's starting tile id
-        target = jump_tiles[select][0]
-        # Set our destination to that jump's end tile id
-        destination = jump_tiles[select][1]
+    # If we can make jumps,
+    # Get the jump with the most jumps possible
+    select = max(jump_tiles.keys())
+    # Set our target to that jump's starting tile id
+    target = jump_tiles[select][0]
+    # Set our destination to that jump's end tile id
+    destination = jump_tiles[select][1]
     # Tell the game about our decision
     return state.action_from_points(target, destination)
 
@@ -116,8 +117,8 @@ class MaxYJumperPlayer(RemoteState):
 
 
 def run() -> None:
-    """Synchronous entry point."""
-    run_client_sync(MaxYJumperPlayer)
+    """Run MaxYJumperPlayer clients in local servers."""
+    run_clients_in_local_servers_sync(MaxYJumperPlayer)
 
 
 if __name__ == "__main__":

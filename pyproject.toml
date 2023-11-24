@@ -32,11 +32,15 @@ classifiers = [
     "Framework :: Trio",
     "Typing :: Typed",
 ]
-keywords = ["ai", "two-player", "checkers", "single-player", "checkers-game", "ai-support", "networked-game"]
+keywords = [
+    "ai", "two-player", "checkers", "single-player",
+    "checkers-game", "ai-support", "networked-game"
+]
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
     "trio>=0.23.1",
+    "cryptography",
 ]
 
 [tool.setuptools.dynamic]
@@ -117,12 +121,13 @@ select = [
     "YTT",   # flake8-2020
 ]
 extend-ignore = [
-    'E501',  # line-too-long
-    "S101",  # use of assert for tests and type narrowing
-    "D203",  # blank line thing
-    "D204",  # blank line thing
-    "D211",  # no-blank-line-before-class
-    "D213",  # multi-line-summary-second-line
+    'E501',   # line-too-long
+    "S101",   # use of assert for tests and type narrowing
+    "D203",   # blank line thing
+    "D204",   # blank line thing
+    "D211",   # no-blank-line-before-class
+    "D213",   # multi-line-summary-second-line
+    "SIM117", # Use multiple with statements at the same time
 ]
 
 [tool.ruff.per-file-ignores]

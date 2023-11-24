@@ -1,3 +1,5 @@
+"""Base IO classes."""
+
 # This is the base_io module from https://github.com/py-mine/mcproto v0.3.0,
 # which is licensed under the GNU LESSER GENERAL PUBLIC LICENSE v3.0
 
@@ -221,7 +223,7 @@ class BaseAsyncWriter(ABC):
         /,
         writer: Callable[[T], Awaitable[R]],
     ) -> R | None:
-        """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
+        """Write a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
         * When ``value`` is ``None``, a bool of ``False`` will be written, and ``None`` is returned.
         * When ``value`` is not ``None``, a bool of ``True`` is written, after which the ``writer`` function is called,
@@ -242,6 +244,7 @@ class BaseSyncWriter(ABC):
 
     @abstractmethod
     def write(self, data: bytes, /) -> None:
+        """Write data."""
         ...
 
     @overload
@@ -366,7 +369,7 @@ class BaseSyncWriter(ABC):
         /,
         writer: Callable[[T], R],
     ) -> R | None:
-        """Writes a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
+        """Write a bool showing if a ``value`` is present, if so, also writes this value with ``writer`` function.
 
         * When ``value`` is ``None``, a bool of ``False`` will be written, and ``None`` is returned.
         * When ``value`` is not ``None``, a bool of ``True`` is written, after which the ``writer`` function is called,
@@ -527,7 +530,7 @@ class BaseAsyncReader(ABC):
         self,
         reader: Callable[[], Awaitable[R]],
     ) -> R | None:
-        """Reads a bool showing if a value is present, if so, also reads this value with ``reader`` function.
+        """Read a bool showing if a value is present, if so, also reads this value with ``reader`` function.
 
         * When ``False`` is read, the function will not read anything and ``None`` is returned.
         * When ``True`` is read, the ``reader`` function is called, and it's return value is forwarded.
@@ -545,6 +548,7 @@ class BaseSyncReader(ABC):
 
     @abstractmethod
     def read(self, length: int, /) -> bytearray:
+        """Read ``length`` bytes and return in a bytearray."""
         ...
 
     @overload
@@ -675,7 +679,7 @@ class BaseSyncReader(ABC):
         return chars
 
     def read_optional(self, reader: Callable[[], R]) -> R | None:
-        """Reads a bool showing if a value is present, if so, also reads this value with ``reader`` function.
+        """Read a bool showing if a value is present, if so, also reads this value with ``reader`` function.
 
         * When ``False`` is read, the function will not read anything and ``None`` is returned.
         * When ``True`` is read, the ``reader`` function is called, and it's return value is forwarded.

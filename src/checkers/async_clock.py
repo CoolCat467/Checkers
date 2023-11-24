@@ -33,9 +33,9 @@ class Clock:
 
     def __init__(self) -> None:
         """Initialize variables."""
-        self.fps_tick: nanoseconds = 0
-        self.timepassed: nanoseconds = 0
-        self.rawpassed: nanoseconds = 0
+        self.fps_tick = nanoseconds(0)
+        self.timepassed = nanoseconds(0)
+        self.rawpassed = nanoseconds(0)
         self.last_tick: nanoseconds = get_ticks()
         self.fps = 0.0
         self.fps_count = 0
@@ -58,14 +58,14 @@ class Clock:
 
     async def tick(self, framerate: int = 0) -> int:
         """Tick the clock. Return time passed in nanoseconds, same as get_time (original was milliseconds)."""
-        endtime = 1000000000.0 // framerate if framerate > 0 else 0
-        self.rawpassed: nanoseconds = get_ticks() - self.last_tick
-        delay: nanoseconds = endtime - self.rawpassed
+        endtime = 1000000000 // framerate if framerate > 0 else 0
+        self.rawpassed = nanoseconds(get_ticks() - self.last_tick)
+        delay = endtime - self.rawpassed
         if delay > 0:
             await trio.sleep(delay / 1e9)  # nanoseconds -> seconds
 
         nowtime: nanoseconds = get_ticks()
-        self.timepassed: nanoseconds = nowtime - self.last_tick
+        self.timepassed = nanoseconds(nowtime - self.last_tick)
         self.fps_count += 1
         self.last_tick = nowtime
 

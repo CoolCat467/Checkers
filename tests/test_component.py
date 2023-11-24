@@ -33,10 +33,7 @@ def test_event_pop_level() -> None:
 
 
 def test_event_repr() -> None:
-    assert (
-        repr(Event("cat_moved", (3, 3)))
-        == "<Event {'name': 'cat_moved', 'data': (3, 3), 'level': 0}>"
-    )
+    assert repr(Event("cat_moved", (3, 3))) == "Event('cat_moved', (3, 3), 0)"
 
 
 def test_component_init() -> None:
