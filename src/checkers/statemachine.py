@@ -11,11 +11,13 @@ __ver_major__ = 0
 __ver_minor__ = 1
 __ver_patch__ = 9
 
-from typing import TYPE_CHECKING, Generic, Self, TypeVar
+from typing import TYPE_CHECKING, Generic, TypeVar
 from weakref import ref
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
+
+    from typing_extensions import Self
 
 __all__ = ["State", "AsyncState", "StateMachine", "AsyncStateMachine"]
 
