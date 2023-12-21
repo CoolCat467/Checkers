@@ -2,7 +2,27 @@
 
 # Programmed by CoolCat467
 
+# Copyright (C) 2023  CoolCat467
+# 
+#     This program is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+# 
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+# 
+#     You should have received a copy of the GNU General Public License
+#     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from __future__ import annotations
+
+__title__ = "Checkers"
+__author__ = "CoolCat467"
+__license__ = "GNU General Public License Version 3"
+__version__ = "2.0.1"
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
@@ -10,11 +30,13 @@ from __future__ import annotations
 # A1 ... H1
 # 0 = False = Red   = 0, 2
 # 1 = True  = Black = 1, 3
+
 import contextlib
 import os
 import platform
 from collections import deque
 from os import path
+from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, TypeAlias, TypeVar
 
 import pygame
@@ -49,10 +71,6 @@ if TYPE_CHECKING:
 
     from pygame.surface import Surface
 
-__title__ = "Checkers"
-__version__ = "2.0.1"
-__author__ = "CoolCat467"
-
 SCREEN_SIZE = (640, 480)
 
 FPS: Final = 48
@@ -72,6 +90,8 @@ WHITE: Final = (255, 255, 255)
 
 
 T = TypeVar("T")
+
+DATA_FOLDER: Final = Path(__file__).parent / "data"
 
 IS_WINDOWS: Final = platform.system() == "Windows"
 
@@ -830,7 +850,7 @@ class MrFloppy(sprite.Sprite):
         movement.speed = 200
 
         floppy: pygame.surface.Surface = pygame.image.load(
-            path.join(path.dirname(__file__), "data", "mr_floppy.png"),
+            DATA_FOLDER / "mr_floppy.png"
         )
 
         image.add_images(
@@ -1392,9 +1412,8 @@ async def async_run() -> None:
         # clock = pygame.time.Clock()
         clock = Clock()
 
+        resized_window = False
         while client.running:
-            resized_window = False
-
             async with trio.open_nursery() as event_nursery:
                 for event in pygame.event.get():
                     if event.type == QUIT:
@@ -1425,6 +1444,7 @@ async def async_run() -> None:
             )
 
             if resized_window:
+                resized_window = False
                 screen.fill((0xFF, 0xFF, 0xFF))
                 rects = [Rect((0, 0), SCREEN_SIZE)]
                 client.repaint_rect(rects[0])

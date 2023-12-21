@@ -2,10 +2,26 @@
 
 # Programmed by CoolCat467
 
+# Copyright (C) 2023  CoolCat467
+# 
+#     This program is free software: you can redistribute it and/or modify
+#     it under the terms of the GNU General Public License as published by
+#     the Free Software Foundation, either version 3 of the License, or
+#     (at your option) any later version.
+# 
+#     This program is distributed in the hope that it will be useful,
+#     but WITHOUT ANY WARRANTY; without even the implied warranty of
+#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+#     GNU General Public License for more details.
+# 
+#     You should have received a copy of the GNU General Public License
+#     along with this program.  If not, see <https://www.gnu.org/licenses/>.
+
 from __future__ import annotations
 
 __title__ = "Client Sprite"
 __author__ = "CoolCat467"
+__license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, TypedDict, cast
@@ -15,7 +31,7 @@ from pygame.color import Color
 from pygame.event import Event as PygameEvent, event_name
 from pygame.mask import Mask, from_surface as mask_from_surface
 from pygame.rect import Rect
-from pygame.sprite import DirtySprite, LayeredDirty, LayeredUpdates
+from pygame.sprite import WeakDirtySprite, LayeredDirty, LayeredUpdates
 from pygame.surface import Surface
 
 from checkers.component import Component, ComponentManager, Event
@@ -54,7 +70,7 @@ class PygameMouseMotion(PygameMouseEventData):
     buttons: tuple[int, int, int]
 
 
-class Sprite(ComponentManager, DirtySprite):
+class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
     __slots__ = ("rect", "__image", "mask", "update_location_on_resize")
@@ -62,7 +78,7 @@ class Sprite(ComponentManager, DirtySprite):
     def __init__(self, name: str) -> None:
         """Initialize with name."""
         ComponentManager.__init__(self, name, "sprite")
-        DirtySprite.__init__(self)
+        WeakDirtySprite.__init__(self)
 
         self.__image: Surface | None = None
         self.visible = False
