@@ -31,12 +31,12 @@ from typing import (
     AnyStr,
     Literal,
     NoReturn,
-    Self,
     SupportsIndex,
     TypeAlias,
 )
 
 import trio
+from typing_extensions import Self
 
 from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
 from checkers.component import Component, ComponentManager, Event

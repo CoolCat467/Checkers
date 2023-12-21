@@ -54,6 +54,8 @@ class State(BaseState, Generic[SyncMachine]):
     @property
     def machine(self) -> SyncMachine:
         """Get machine from internal weak reference."""
+        if not hasattr(self, "machine_ref"):
+            raise RuntimeError("State has no statemachine bound")
         machine = self.machine_ref()
         if machine is None:
             raise RuntimeError("State has no statemachine bound")
@@ -96,6 +98,8 @@ class AsyncState(BaseState, Generic[AsyncMachine]):
     @property
     def machine(self) -> AsyncMachine:
         """Get machine from internal weak reference."""
+        if not hasattr(self, "machine_ref"):
+            raise RuntimeError("State has no statemachine bound")
         machine = self.machine_ref()
         if machine is None:
             raise RuntimeError("State has no statemachine bound")
