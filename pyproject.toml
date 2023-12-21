@@ -39,7 +39,7 @@ keywords = [
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
-    "trio>=0.23.1",
+    "trio>=0.23.2",
     "cryptography",
 ]
 
@@ -121,9 +121,9 @@ select = [
     "YTT",   # flake8-2020
 ]
 extend-ignore = [
-    'E501',   # line-too-long
+    "E501",   # line-too-long
     "S101",   # use of assert for tests and type narrowing
-    "D203",   # blank line thing
+    "D203",   # One blank line before class
     "D204",   # blank line thing
     "D211",   # no-blank-line-before-class
     "D213",   # multi-line-summary-second-line
