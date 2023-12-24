@@ -1234,11 +1234,14 @@ class PlayJoiningState(GameState):
 class PlayState(GameState):
     """Game Play State."""
 
-    __slots__ = ()
+    __slots__ = ("exit_data",)
 
     def __init__(self) -> None:
         """Initialize Play State."""
         super().__init__("play")
+
+        # (0: normal | 1: error) <error message> <? handled>
+        self.exit_data: tuple[int, str, bool] | None = None
 
     def register_handlers(self) -> None:
         """Register event handlers."""
@@ -1256,8 +1259,11 @@ class PlayState(GameState):
 
     async def entry_actions(self) -> None:
         """Add GameBoard and raise init event."""
+        self.exit_data = None
+
         assert self.machine is not None
-        self.id = self.machine.new_group("play")
+        if self.id == 0:
+            self.id = self.machine.new_group("play")
 
         # self.group_add(())
         gameboard = GameBoard(
@@ -1294,60 +1300,58 @@ class PlayState(GameState):
     async def handle_game_over(self, event: Event[int]) -> None:
         """Handle game over event."""
         winner = event.data
-        # print(f"Player {PLAYERS[winner]} ({winner}) Won")
+        self.exit_data = (0, f"{PLAYERS[winner]} Won", False)
+
+    async def handle_client_disconnected(self, event: Event[str]) -> None:
+        """Handle client disconnected error."""
+        error = event.data
+        print(f"handle_client_disconnected  {error = }")
+
+        self.exit_data = (1, f"Client Disconnected$${error}", False)
+
+    async def do_actions(self) -> None:
+        """Perform actions for this State."""
+        if self.exit_data is None:
+            return
+
+        exit_status, message, handled = self.exit_data
+
+        if handled:
+            return
+        self.exit_data = (exit_status, message, True)
 
         font = pygame.font.Font(
             trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
             28,
         )
+
+        error_message = ""
+        if exit_status == 1:
+            message, error_message = message.split("$$")
 
         continue_button = Button("continue_button", font)
         continue_button.visible = True
         continue_button.color = Color(0, 0, 0)
-        continue_button.text = f"{PLAYERS[winner]} Won - Return to Title"
-        continue_button.location = [x // 2 for x in SCREEN_SIZE]
-        continue_button.handle_click = self.change_state("title")
-        self.group_add(continue_button)
-
-        # Fire server stop event so server shuts down if it exists
-        assert self.machine is not None
-        await self.machine.raise_event(Event("network_stop", None))
-
-    async def handle_client_disconnected(self, event: Event[str]) -> None:
-        """Handle client disconnected error."""
-        print("handle_client_disconnected")
-        error = event.data
-
-        font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
-            28,
-        )
-
-        title_button = Button("title_button", font)
-        title_button.visible = True
-        title_button.color = Color(0, 0, 0)
-        title_button.text = "Client Disconnected - Return to Title"
-        title_button.location = Vector2.from_iter(
+        continue_button.text = f"{message} - Return to Title"
+        continue_button.location = Vector2.from_iter(
             [x // 2 for x in SCREEN_SIZE],
         )
-        title_button.handle_click = self.change_state("title")
-        self.group_add(title_button)
+        continue_button.handle_click = self.change_state("title")
 
-        error_text = OutlinedText("error_text", font)
-        error_text.visible = True
-        error_text.color = Color(255, 0, 0)
-        error_text.border_width = 1
-        error_text.text = error
-        error_text.location = title_button.location + Vector2(
-            0,
-            title_button.rect.h + 10,
-        )
+        self.group_add(continue_button)
 
-        self.group_add(error_text)
+        if exit_status == 1:
+            error_text = OutlinedText("error_text", font)
+            error_text.visible = True
+            error_text.color = Color(255, 0, 0)
+            error_text.border_width = 1
+            error_text.text = error_message
+            error_text.location = continue_button.location + Vector2(
+                0,
+                continue_button.rect.h + 10,
+            )
 
-        # Fire server stop event so server shuts down if it exists
-        assert self.machine is not None
-        await self.machine.raise_event(Event("network_stop", None))
+            self.group_add(error_text)
 
 
 class CheckersClient(sprite.GroupProcessor):
@@ -1405,7 +1409,7 @@ async def async_run() -> None:
         ).convert()
         client.clear(screen, background)
 
-        client.set_timing_threshold(1000 / FPS)
+        client.set_timing_threshold(1000 / 80)
 
         await client.set_state("initialize")
 
@@ -1457,7 +1461,7 @@ async def async_run() -> None:
 
 def run() -> None:
     """Start asynchronous run."""
-    trio.run(async_run)
+    trio.run(async_run, strict_exception_groups=True)
 
 
 def cli_run() -> None:

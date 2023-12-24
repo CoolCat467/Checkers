@@ -416,7 +416,7 @@ class GameServer(Server):
         for component in self.get_all_components():
             if isinstance(component, NetworkEventComponent):
                 close_methods.append(component.close)
-            print(f"{component.name = }")
+            print(f"stop_server {component.name = }")
             self.remove_component(component.name)
         async with trio.open_nursery() as nursery:
             while close_methods:

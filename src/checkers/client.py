@@ -146,7 +146,7 @@ class GameClient(NetworkEventComponent):
     to the server, and reading and raising incoming events from the server.
     """
 
-    __slots__ = ()  # "tick_lock",
+    __slots__ = ("read_event_lock",)
 
     def __init__(self, name: str) -> None:
         """Initialize GameClient."""
@@ -180,7 +180,7 @@ class GameClient(NetworkEventComponent):
             },
         )
 
-    ##        self.tick_lock = trio.Lock()
+        self.read_event_lock = trio.Lock()
 
     def bind_handlers(self) -> None:
         """Register event handlers."""
@@ -233,27 +233,31 @@ class GameClient(NetworkEventComponent):
         tick_event: Event[TickEventData],
     ) -> None:
         """Raise events from server."""
-        ##        async with self.tick_lock:
         ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
-        if not self.manager_exists:
-            return
-        if self.not_connected:
-            await self.raise_disconnect("Not connected to server.")
-            return
-        try:
-            print("handle_read_event start")
-            event = await self.read_event()
-        except trio.ClosedResourceError:
-            assert self.not_connected
-            print("handle_read_event trio.ClosedResourceError")
-            return
-        except NetworkTimeoutError as exc:
-            traceback.print_exception(exc)
-            await self.raise_disconnect("Failed to read event from server.")
-            return
-        else:
-            await self.raise_event(event)
-        await self.raise_event(Event(f"client[{self.name}]_read_event", None))
+        async with self.read_event_lock:
+            if not self.manager_exists:
+                return
+            if self.not_connected:
+                await self.raise_disconnect("Not connected to server.")
+                return
+            try:
+                # print("handle_read_event start")
+                event = await self.read_event()
+            except trio.ClosedResourceError:
+                assert self.not_connected
+                print("handle_read_event trio.ClosedResourceError")
+                return
+            except NetworkTimeoutError as exc:
+                traceback.print_exception(exc)
+                await self.raise_disconnect(
+                    "Failed to read event from server.",
+                )
+                return
+            else:
+                await self.raise_event(event)
+            await self.raise_event(
+                Event(f"client[{self.name}]_read_event", None),
+            )
 
     async def handle_client_connect(
         self,
