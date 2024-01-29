@@ -97,8 +97,12 @@ class BaseAsyncWriter(ABC):
         """
 
     @overload
-    async def write_value(self, fmt: INT_FORMATS_TYPE, value: int, /) -> None:
-        ...
+    async def write_value(
+        self,
+        fmt: INT_FORMATS_TYPE,
+        value: int,
+        /,
+    ) -> None: ...
 
     @overload
     async def write_value(
@@ -106,8 +110,7 @@ class BaseAsyncWriter(ABC):
         fmt: FLOAT_FORMATS_TYPE,
         value: float,
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def write_value(
@@ -115,8 +118,7 @@ class BaseAsyncWriter(ABC):
         fmt: Literal[StructFormat.BOOL],
         value: bool,
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     async def write_value(
@@ -124,8 +126,7 @@ class BaseAsyncWriter(ABC):
         fmt: Literal[StructFormat.CHAR],
         value: str,
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     async def write_value(self, fmt: StructFormat, value: object, /) -> None:
         """Write a given ``value`` as given struct format (``fmt``) in big-endian mode."""
@@ -248,12 +249,15 @@ class BaseSyncWriter(ABC):
         ...
 
     @overload
-    def write_value(self, fmt: INT_FORMATS_TYPE, value: int, /) -> None:
-        ...
+    def write_value(self, fmt: INT_FORMATS_TYPE, value: int, /) -> None: ...
 
     @overload
-    def write_value(self, fmt: FLOAT_FORMATS_TYPE, value: float, /) -> None:
-        ...
+    def write_value(
+        self,
+        fmt: FLOAT_FORMATS_TYPE,
+        value: float,
+        /,
+    ) -> None: ...
 
     @overload
     def write_value(
@@ -261,8 +265,7 @@ class BaseSyncWriter(ABC):
         fmt: Literal[StructFormat.BOOL],
         value: bool,
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     @overload
     def write_value(
@@ -270,8 +273,7 @@ class BaseSyncWriter(ABC):
         fmt: Literal[StructFormat.CHAR],
         value: str,
         /,
-    ) -> None:
-        ...
+    ) -> None: ...
 
     def write_value(self, fmt: StructFormat, value: object, /) -> None:
         """Write a given ``value`` as given struct format (``fmt``) in big-endian mode."""
@@ -400,20 +402,16 @@ class BaseAsyncReader(ABC):
         """
 
     @overload
-    async def read_value(self, fmt: INT_FORMATS_TYPE, /) -> int:
-        ...
+    async def read_value(self, fmt: INT_FORMATS_TYPE, /) -> int: ...
 
     @overload
-    async def read_value(self, fmt: FLOAT_FORMATS_TYPE, /) -> float:
-        ...
+    async def read_value(self, fmt: FLOAT_FORMATS_TYPE, /) -> float: ...
 
     @overload
-    async def read_value(self, fmt: Literal[StructFormat.BOOL], /) -> bool:
-        ...
+    async def read_value(self, fmt: Literal[StructFormat.BOOL], /) -> bool: ...
 
     @overload
-    async def read_value(self, fmt: Literal[StructFormat.CHAR], /) -> str:
-        ...
+    async def read_value(self, fmt: Literal[StructFormat.CHAR], /) -> str: ...
 
     async def read_value(self, fmt: StructFormat, /) -> object:
         """Read a value as given struct format (``fmt``) in big-endian mode.
@@ -552,20 +550,16 @@ class BaseSyncReader(ABC):
         ...
 
     @overload
-    def read_value(self, fmt: INT_FORMATS_TYPE, /) -> int:
-        ...
+    def read_value(self, fmt: INT_FORMATS_TYPE, /) -> int: ...
 
     @overload
-    def read_value(self, fmt: FLOAT_FORMATS_TYPE, /) -> float:
-        ...
+    def read_value(self, fmt: FLOAT_FORMATS_TYPE, /) -> float: ...
 
     @overload
-    def read_value(self, fmt: Literal[StructFormat.BOOL], /) -> bool:
-        ...
+    def read_value(self, fmt: Literal[StructFormat.BOOL], /) -> bool: ...
 
     @overload
-    def read_value(self, fmt: Literal[StructFormat.CHAR], /) -> str:
-        ...
+    def read_value(self, fmt: Literal[StructFormat.CHAR], /) -> str: ...
 
     def read_value(self, fmt: StructFormat, /) -> object:
         """Read a value into given struct format in big-endian mode.

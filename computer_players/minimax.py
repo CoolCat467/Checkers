@@ -14,7 +14,6 @@ from typing import Generic, NamedTuple, TypeVar
 
 
 class Player(IntEnum):
-
     """Enum for player status."""
 
     __slots__ = ()
@@ -27,7 +26,6 @@ Action = TypeVar("Action")
 
 
 class MinimaxResult(NamedTuple, Generic[Action]):
-
     """Minimax Result."""
 
     value: int | float
@@ -35,7 +33,6 @@ class MinimaxResult(NamedTuple, Generic[Action]):
 
 
 class Minimax(ABC, Generic[State, Action]):
-
     """Base class for Minimax AIs."""
 
     __slots__ = ()

@@ -145,9 +145,9 @@ class StateMachine(BaseStateMachine):
     def __init__(self) -> None:
         """Initialize synchronous state machine."""
         self.states: dict[str, State[Self]] = {}  # Stores the states
-        self.active_state: State[
-            Self
-        ] | None = None  # The currently active state
+        self.active_state: State[Self] | None = (
+            None  # The currently active state
+        )
 
     def add_state(self, state: State[Self]) -> None:
         """Add a State instance to the internal dictionary."""

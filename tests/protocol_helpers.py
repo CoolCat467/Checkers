@@ -10,7 +10,6 @@ from unittest.mock import AsyncMock, Mock
 
 
 class WriteFunctionMock(Mock):
-
     """Mock write function, storing the written data."""
 
     def __init__(self, *a, **kw):
@@ -46,12 +45,10 @@ class WriteFunctionMock(Mock):
 
 
 class WriteFunctionAsyncMock(WriteFunctionMock, AsyncMock):
-
     """Asynchronous mock write function, storing the written data."""
 
 
 class ReadFunctionMock(Mock):
-
     """Mock read function, giving pre-defined data."""
 
     def __init__(self, *a, combined_data: bytearray | None = None, **kw):
@@ -87,5 +84,4 @@ class ReadFunctionMock(Mock):
 
 
 class ReadFunctionAsyncMock(ReadFunctionMock, AsyncMock):
-
     """Asynchronous mock read function, giving pre-defined data."""

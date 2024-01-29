@@ -328,12 +328,14 @@ class Tile(sprite.Sprite):
 
 
 def generate_tile_image(
-    color: Color
-    | int
-    | str
-    | tuple[int, int, int]
-    | tuple[int, int, int, int]
-    | Sequence[int],
+    color: (
+        Color
+        | int
+        | str
+        | tuple[int, int, int]
+        | tuple[int, int, int, int]
+        | Sequence[int]
+    ),
     size: tuple[int, int],
 ) -> Surface:
     """Generate the image used for a tile."""

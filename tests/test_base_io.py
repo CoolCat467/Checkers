@@ -34,7 +34,6 @@ from protocol_helpers import (
 
 
 class SyncWriter(BaseSyncWriter):
-
     """Initializable concrete implementation of :class:`~mcproto.protocol.base_io.BaseSyncWriter` ABC."""
 
     def write(self, data: bytes) -> None:
@@ -59,7 +58,6 @@ class SyncWriter(BaseSyncWriter):
 
 
 class SyncReader(BaseSyncReader):
-
     """Testable concrete implementation of :class:`~mcproto.protocol.base_io.BaseSyncReader` ABC."""
 
     def read(self, length: int) -> bytearray:
@@ -84,7 +82,6 @@ class SyncReader(BaseSyncReader):
 
 
 class AsyncWriter(BaseAsyncWriter):
-
     """Initializable concrete implementation of :class:`~mcproto.protocol.base_io.BaseAsyncWriter` ABC."""
 
     async def write(self, data: bytes) -> None:
@@ -109,7 +106,6 @@ class AsyncWriter(BaseAsyncWriter):
 
 
 class AsyncReader(BaseAsyncReader):
-
     """Testable concrete implementation of BaseAsyncReader ABC."""
 
     async def read(self, length: int) -> bytearray:
@@ -138,7 +134,6 @@ class AsyncReader(BaseAsyncReader):
 
 
 class WrappedAsyncReader(SynchronizedMixin):
-
     """Wrapped synchronous implementation of asynchronous :class:`.AsyncReader` class.
 
     This essentially mimics :class:`~mcproto.protocol.base_io.BaseSyncReader`.
@@ -151,7 +146,6 @@ class WrappedAsyncReader(SynchronizedMixin):
 
 
 class WrappedAsyncWriter(SynchronizedMixin):
-
     """Wrapped synchronous implementation of asynchronous :class:`.AsyncWriter` class.
 
     This essentially mimics :class:`~mcproto.protocol.base_io.BaseSyncWriter`.
@@ -168,7 +162,6 @@ class WrappedAsyncWriter(SynchronizedMixin):
 
 
 class WriterTests(ABC):
-
     """Collection of tests for both sync and async versions of the writer."""
 
     writer: BaseSyncWriter | BaseAsyncWriter
@@ -436,7 +429,6 @@ class WriterTests(ABC):
 
 
 class ReaderTests(ABC):
-
     """Collection of tests for both sync and async versions of the reader."""
 
     reader: BaseSyncReader | BaseAsyncReader
@@ -711,7 +703,6 @@ class ReaderTests(ABC):
 
 
 class TestBaseSyncWriter(WriterTests):
-
     """Tests for individual write methods implemented in :class:`~mcproto.protocol.base_io.BaseSyncWriter`."""
 
     @classmethod
@@ -721,7 +712,6 @@ class TestBaseSyncWriter(WriterTests):
 
 
 class TestBaseSyncReader(ReaderTests):
-
     """Tests for individual write methods implemented in :class:`~mcproto.protocol.base_io.BaseSyncReader`."""
 
     @classmethod
@@ -731,7 +721,6 @@ class TestBaseSyncReader(ReaderTests):
 
 
 class TestBaseAsyncWriter(WriterTests):
-
     """Tests for individual write methods implemented in :class:`~mcproto.protocol.base_io.BaseSyncReader`."""
 
     writer: WrappedAsyncWriter
@@ -743,7 +732,6 @@ class TestBaseAsyncWriter(WriterTests):
 
 
 class TestBaseAsyncReader(ReaderTests):
-
     """Tests for individual write methods implemented in :class:`~mcproto.protocol.base_io.BaseSyncReader`."""
 
     reader: WrappedAsyncReader
