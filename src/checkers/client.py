@@ -244,8 +244,10 @@ class GameClient(NetworkEventComponent):
                 # print("handle_read_event start")
                 event = await self.read_event()
             except trio.ClosedResourceError:
-                assert self.not_connected
-                print("handle_read_event trio.ClosedResourceError")
+                # assert self.not_connected
+                print(
+                    f"{self.not_connected = }\nhandle_read_event trio.ClosedResourceError",
+                )
                 return
             except NetworkTimeoutError as exc:
                 traceback.print_exception(exc)

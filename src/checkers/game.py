@@ -1025,6 +1025,42 @@ class TestState(GameState):
         await self.machine.raise_event(Event("init", None))
 
 
+class KwargOutlineText(OutlinedText):
+    """Outlined Text with attributes settable via keyword arguments."""
+
+    __slots__ = ()
+
+    def __init__(
+        self,
+        name: str,
+        font: pygame.font.Font,
+        **kwargs: object,
+    ) -> None:
+        """Initialize attributes via keyword arguments."""
+        super().__init__(name, font)
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
+class KwargButton(Button):
+    """Button with attributes settable via keyword arguments."""
+
+    __slots__ = ()
+
+    def __init__(
+        self,
+        name: str,
+        font: pygame.font.Font,
+        **kwargs: object,
+    ) -> None:
+        """Initialize attributes via keyword arguments."""
+        super().__init__(name, font)
+
+        for key, value in kwargs.items():
+            setattr(self, key, value)
+
+
 class TitleState(GameState):
     """Game Title State."""
 
@@ -1048,44 +1084,56 @@ class TitleState(GameState):
             56,
         )
 
-        title_text = OutlinedText("title_text", title_font)
-        title_text.visible = True
-        title_text.color = Color(0, 0, 0)
-        title_text.outline = (255, 0, 0)
-        title_text.border_width = 4
-        title_text.text = "CHECKERS"
+        title_text = KwargOutlineText(
+            "title_text",
+            title_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            outline=(255, 0, 0),
+            border_width=4,
+            text="CHECKERS",
+        )
         title_text.location = (SCREEN_SIZE[0] // 2, title_text.rect.h)
         self.group_add(title_text)
 
-        hosting_button = Button("hosting_button", button_font)
-        hosting_button.visible = True
-        hosting_button.color = Color(0, 0, 0)
-        hosting_button.text = "Host Networked Game"
-        hosting_button.location = [x // 2 for x in SCREEN_SIZE]
-        hosting_button.handle_click = self.change_state("play_hosting")
+        hosting_button = KwargButton(
+            "hosting_button",
+            button_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text="Host Networked Game",
+            location=[x // 2 for x in SCREEN_SIZE],
+            handle_click=self.change_state("play_hosting"),
+        )
         self.group_add(hosting_button)
 
-        join_button = Button("join_button", button_font)
-        join_button.visible = True
-        join_button.color = Color(0, 0, 0)
-        join_button.text = "Join Networked Game"
-        join_button.location = hosting_button.location + Vector2(
-            0,
-            hosting_button.rect.h + 10,
+        join_button = KwargButton(
+            "join_button",
+            button_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text="Join Networked Game",
+            location=hosting_button.location
+            + Vector2(
+                0,
+                hosting_button.rect.h + 10,
+            ),
+            handle_click=self.change_state("play_joining"),
         )
-        join_button.handle_click = self.change_state("play_joining")
         self.group_add(join_button)
 
-        internal_button = Button("internal_hosting", button_font)
-        internal_button.visible = True
-        internal_button.color = Color(0, 0, 0)
-        internal_button.text = "Singleplayer Game"
-        internal_button.location = hosting_button.location - Vector2(
-            0,
-            hosting_button.rect.h + 10,
-        )
-        internal_button.handle_click = self.change_state(
-            "play_internal_hosting",
+        internal_button = KwargButton(
+            "internal_hosting",
+            button_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text="Singleplayer Game",
+            location=hosting_button.location
+            - Vector2(
+                0,
+                hosting_button.rect.h + 10,
+            ),
+            handle_click=self.change_state("play_internal_hosting"),
         )
         self.group_add(internal_button)
 
@@ -1179,7 +1227,7 @@ class PlayJoiningState(GameState):
         super().__init__("play_joining")
 
         self.next_button = 0
-        self.buttons: dict[tuple[str, tuple[str, int]], int] = {}
+        self.buttons: dict[tuple[str, int], int] = {}
 
         self.font = pygame.font.Font(
             trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
@@ -1205,7 +1253,7 @@ class PlayJoiningState(GameState):
 
         await self.manager.raise_event(Event("update_listing", None))
 
-    async def handle_update_listing(self, _: object) -> str | None:
+    async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
         assert self.machine is not None
         for advertisement in await read_advertisements():
@@ -1223,10 +1271,11 @@ class PlayJoiningState(GameState):
                 await self.machine.raise_event(
                     Event("client_connect", details, 1),
                 )
-                return "play"
+                return
+                # return "play"
         print("click")
         await self.manager.raise_event(Event("update_listing", None))
-        return None
+        # return None
 
 
 ##    async def check_conditions(self) -> str | None:
@@ -1331,15 +1380,15 @@ class PlayState(GameState):
         if exit_status == 1:
             message, error_message = message.split("$$")
 
-        continue_button = Button("continue_button", font)
-        continue_button.visible = True
-        continue_button.color = Color(0, 0, 0)
-        continue_button.text = f"{message} - Return to Title"
-        continue_button.location = Vector2.from_iter(
-            [x // 2 for x in SCREEN_SIZE],
+        continue_button = KwargButton(
+            "continue_button",
+            font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text=f"{message} - Return to Title",
+            location=[x // 2 for x in SCREEN_SIZE],
+            handle_click=self.change_state("title"),
         )
-        continue_button.handle_click = self.change_state("title")
-
         self.group_add(continue_button)
 
         if exit_status == 1:
