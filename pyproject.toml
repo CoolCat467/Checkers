@@ -39,7 +39,7 @@ keywords = [
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
-    "trio>=0.23.2",
+    "trio~=0.24.0",
     "cryptography",
 ]
 
@@ -77,16 +77,16 @@ warn_unreachable = true
 warn_unused_configs = true
 warn_unused_ignores = true
 
-[tool.black]
-line-length = 79
-target-version = ['py312']
-
 [tool.ruff.isort]
 combine-as-imports = true
 
 [tool.pycln]
 all = true
 disable_all_dunder_policy = true
+
+[tool.black]
+line-length = 79
+target-version = ['py312']
 
 [tool.ruff]
 line-length = 79
@@ -116,17 +116,19 @@ select = [
     "SIM",   # flake8-simplify
     "SLOT",  # flake8-slots
     "TCH",   # flake8-type-checking
+    "TRIO",  # flake8-trio
     "UP",    # pyupgrade
     "W",     # Warning
     "YTT",   # flake8-2020
 ]
 extend-ignore = [
-    "E501",   # line-too-long
-    "S101",   # use of assert for tests and type narrowing
     "D203",   # One blank line before class
     "D204",   # blank line thing
     "D211",   # no-blank-line-before-class
     "D213",   # multi-line-summary-second-line
+    "D417",   # "Missing argument descriptions"
+    "E501",   # line-too-long
+    "S101",   # use of assert for tests and type narrowing
     "SIM117", # Use multiple with statements at the same time
 ]
 
