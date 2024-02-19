@@ -611,7 +611,7 @@ class GameBoard(sprite.Sprite):
             # if ran through queue, still reading animations from
             # server.
             self.animation_queue.appendleft(queue_event)
-            await trio.sleep(0)
+            await trio.lowlevel.checkpoint()
             await self.handle_fire_next_animation()
             return
         await self.raise_event(queue_event)

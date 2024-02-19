@@ -177,6 +177,7 @@ class ImageComponent(ComponentManager):
     Attributes
     ----------
         mask_threshold: Threshold value used in pygame.mask.from_surface
+
     """
 
     __slots__ = ("__surfaces", "__masks", "set_surface", "mask_threshold")
@@ -294,6 +295,7 @@ class OutlineComponent(Component):
         size: controls width of the outline.
         active: Is outline currently active (settable with set_color)
         mod: String to separate original identifier from outline data.
+
     """
 
     __slots__ = ("__active", "__color", "size")
@@ -462,6 +464,7 @@ class MovementComponent(Component):
     ----------
         heading: Unit Vector2 of direction to move in.
         speed: Number of units to move per time_passed unit.
+
     """
 
     __slots__ = ("heading", "speed")
@@ -512,6 +515,7 @@ class TargetingComponent(Component):
     ----------
         destination: Target destination.
         event_raise_name: Name of event to raise when reached destination.
+
     """
 
     __slots__ = ("__destination", "__reached", "event_raise_name")

@@ -54,7 +54,7 @@ def generate_rsa_key() -> RSAPrivateKey:  # pragma: no cover
     """
     return generate_private_key(
         public_exponent=65537,
-        key_size=1024,
+        key_size=2048,
         backend=default_backend(),
     )
 

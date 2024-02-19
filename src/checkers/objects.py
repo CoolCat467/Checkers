@@ -46,6 +46,7 @@ class Text(sprite.Sprite):
         color: pygame.Color or something pygame.Font.render accepts. Text color.
         font: pygame.font.Font, font used for rendering text.
         text: str, text to display.
+
     """
 
     __slots__ = ("__text", "font")
@@ -92,6 +93,7 @@ class OutlinedText(Text):
         border_radius: int, controls radius of border rounded rect.
         outline: tuple[int, int, int], border outline color.
         inside: tuple[int, int, int], outline interior color.
+
     """
 
     __slots__ = ("outline", "inside")
@@ -154,6 +156,7 @@ class Button(OutlinedText):
 
     Events Used:
         click
+
     """
 
     __slots__ = ()
