@@ -50,34 +50,10 @@ from checkers.network_shared import (
     read_position,
     write_position,
 )
-from checkers.state import ActionSet, State
+from checkers.state import ActionSet, State, generate_pieces
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
-
-
-def generate_pieces(
-    board_width: int,
-    board_height: int,
-    colors: int = 2,
-) -> dict[Pos, int]:
-    """Generate data about each piece."""
-    pieces: dict[Pos, int] = {}
-    # Get where pieces should be placed
-    z_to_1 = round(board_height / 3)  # White
-    z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
-    # For each xy position in the area of where tiles should be,
-    for y in range(board_height):
-        # Reset the x pos to 0
-        for x in range(board_width):
-            # Get the color of that spot by adding x and y mod the number of different colors
-            color = (x + y) % colors
-            # If a piece should be placed on that tile and the tile is not Red,
-            if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
-                # Set the piece to White Pawn or Black Pawn depending on the current y pos
-                piece_type = int(y <= z_to_1)
-                pieces[(x, y)] = piece_type
-    return pieces
 
 
 class ServerClient(NetworkEventComponent):
@@ -635,26 +611,28 @@ class GameServer(Server):
         can_start = self.can_start()
         if can_start:
             self.stop_serving()
+
         if self.client_count > self.max_clients:
             print(
                 f"{self.__class__.__name__}: client disconnected, too many clients",
             )
             await stream.aclose()
+            return
 
-        client = ServerClient.from_stream(new_client_id, stream=stream)
-        self.add_component(client)
-
-        if can_start:
-            await self.raise_event(Event("server_send_game_start", None))
-
-        try:
-            await self.client_network_loop(client)
-        finally:
-            await client.close()
-            if self.component_exists(client.name):
-                self.remove_component(client.name)
-            print(f"{self.__class__.__name__}: client disconnected")
-            self.client_count -= 1
+        async with ServerClient.from_stream(
+            new_client_id,
+            stream=stream,
+        ) as client:
+            with self.temporary_component(client):
+                if can_start:
+                    await self.raise_event(
+                        Event("server_send_game_start", None),
+                    )
+                try:
+                    await self.client_network_loop(client)
+                finally:
+                    print(f"{self.__class__.__name__}: client disconnected")
+                    self.client_count -= 1
 
     async def handle_network_select_piece(
         self,

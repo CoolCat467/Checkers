@@ -169,12 +169,14 @@ async def run_client(
             "client",
         )
         client = MachineClient(remote_state_class)
-        event_manager.add_component(client)
-        await event_manager.raise_event(Event("client_connect", (host, port)))
-        print(f"Connected to server {host}:{port}")
-        while client.running:
-            # Wait so backlog things happen
-            await trio.sleep(1)
+        with event_manager.temporary_component(client):
+            await event_manager.raise_event(
+                Event("client_connect", (host, port)),
+            )
+            print(f"Connected to server {host}:{port}")
+            while client.running:  # noqa: TRIO110
+                # Wait so backlog things happen
+                await trio.sleep(1)
         client.unbind_components()
 
 

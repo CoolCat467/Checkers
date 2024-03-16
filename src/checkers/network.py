@@ -27,6 +27,7 @@ __version__ = "0.0.0"
 
 from collections.abc import Callable, Iterable
 from typing import (
+    TYPE_CHECKING,
     Any,
     AnyStr,
     Literal,
@@ -40,6 +41,9 @@ from typing_extensions import Self
 
 from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
 from checkers.component import Component, ComponentManager, Event
+
+if TYPE_CHECKING:
+    from types import TracebackType
 
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
@@ -103,12 +107,12 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         content = bytearray()
         while max_read_count := length - len(content):
             received = b""
-            try:
-                with trio.move_on_after(self.timeout):
-                    received = await self.stream.receive_some(max_read_count)
-            except (trio.BrokenResourceError, trio.ClosedResourceError):
-                await self.close()
-                raise
+            ##            try:
+            with trio.move_on_after(self.timeout):
+                received = await self.stream.receive_some(max_read_count)
+            ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
+            ##                await self.close()
+            ##                raise
             content.extend(received)
             if len(received) == 0:
                 # No information at all
@@ -127,11 +131,13 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     async def write(self, data: bytes) -> None:
         """Write data to stream."""
-        try:
-            await self.stream.send_all(data)
-        except (trio.BrokenResourceError, trio.ClosedResourceError):
-            await self.close()
-            raise
+        await self.stream.send_all(data)
+
+    ##        try:
+    ##            await self.stream.send_all(data)
+    ##        except (trio.BrokenResourceError, trio.ClosedResourceError):
+    ##            await self.close()
+    ##            raise
 
     async def close(self) -> None:
         """Close the stream."""
@@ -147,6 +153,19 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     async def wait_write_might_not_block(self) -> None:
         """stream.wait_send_all_might_not_block."""
         return await self.stream.wait_send_all_might_not_block()
+
+    async def __aenter__(self) -> Self:
+        """Async context manager enter."""
+        return self
+
+    async def __aexit__(
+        self,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: TracebackType | None,
+    ) -> None:
+        """Async context manager exit."""
+        await self.close()
 
 
 ##    async def send_eof_and_close(self) -> None:
@@ -350,16 +369,14 @@ def run() -> None:
 
         class TestServer(Server):
             async def handler(self, stream: trio.SocketStream) -> None:
-                client = NetworkEventComponent.from_stream(
+                async with NetworkEventComponent.from_stream(
                     "client",
                     stream=stream,
-                )
+                ) as client:
+                    client.register_read_network_event(0, "repost_event")
+                    client.register_network_write_event("repost_event", 1)
 
-                client.register_read_network_event(0, "repost_event")
-                client.register_network_write_event("repost_event", 1)
-
-                await client.write_event(await client.read_event())
-                await stream.aclose()
+                    await client.write_event(await client.read_event())
 
         server = TestServer("server")
         port = 3004

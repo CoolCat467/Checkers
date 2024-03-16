@@ -265,7 +265,8 @@ class State:
         y = self.size[1] - int(name[1:])
         return (x, y)
 
-    def action_from_points(self, start: Pos, end: Pos) -> Action:
+    @staticmethod
+    def action_from_points(start: Pos, end: Pos) -> Action:
         """Return action from given start and end coordinates."""
         ##        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
         return Action(start, end)
@@ -453,3 +454,27 @@ class State:
     def get_pieces(self) -> tuple[tuple[Pos, int], ...]:
         """Return all pieces."""
         return tuple((pos, type_) for pos, type_ in self.pieces.items())
+
+
+def generate_pieces(
+    board_width: int,
+    board_height: int,
+    colors: int = 2,
+) -> dict[Pos, int]:
+    """Generate data about each piece."""
+    pieces: dict[Pos, int] = {}
+    # Get where pieces should be placed
+    z_to_1 = round(board_height / 3)  # White
+    z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
+    # For each xy position in the area of where tiles should be,
+    for y in range(board_height):
+        # Reset the x pos to 0
+        for x in range(board_width):
+            # Get the color of that spot by adding x and y mod the number of different colors
+            color = (x + y) % colors
+            # If a piece should be placed on that tile and the tile is not Red,
+            if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
+                # Set the piece to White Pawn or Black Pawn depending on the current y pos
+                piece_type = int(y <= z_to_1)
+                pieces[(x, y)] = piece_type
+    return pieces

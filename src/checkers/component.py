@@ -24,13 +24,14 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
+from contextlib import contextmanager
 from typing import TYPE_CHECKING, Any, Generic, TypeVar
 from weakref import ref
 
 import trio
 
 if TYPE_CHECKING:
-    from collections.abc import Awaitable, Callable, Iterable
+    from collections.abc import Awaitable, Callable, Generator, Iterable
 
 T = TypeVar("T")
 
@@ -273,6 +274,20 @@ class ComponentManager(Component):
     def component_exists(self, component_name: str) -> bool:
         """Return if component exists in this manager."""
         return component_name in self.__components
+
+    @contextmanager
+    def temporary_component(
+        self,
+        component: Component,
+    ) -> Generator[None, None, None]:
+        """Temporarily add given component but then remove after exit."""
+        name = component.name
+        self.add_component(component)
+        try:
+            yield
+        finally:
+            if self.component_exists(name):
+                self.remove_component(name)
 
     def components_exist(self, component_names: Iterable[str]) -> bool:
         """Return if all component names given exist in this manager."""
