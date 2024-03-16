@@ -44,7 +44,7 @@ from checkers.network_shared import (
 
 
 async def read_advertisements(
-    timeout: int = 3,
+    timeout: int = 3,  # noqa: TRIO109
 ) -> list[tuple[str, tuple[str, int]]]:
     """Read server advertisements from network. Return tuples of (motd, (host, port))."""
     # Look up multicast group address in name server and find out IP version

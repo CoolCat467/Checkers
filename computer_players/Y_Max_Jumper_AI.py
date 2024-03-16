@@ -21,7 +21,7 @@ from typing import TYPE_CHECKING, TypeVar
 from machine_client import RemoteState, run_clients_in_local_servers_sync
 
 if TYPE_CHECKING:
-    from checkers.state import Action, State
+    from checkers.state import Action, Pos, State
 
 T = TypeVar("T")
 
@@ -56,7 +56,7 @@ def turn(state: State) -> Action:
     if not jump_tiles:
         # Get a list of selectable target tiles
         selectable = list(select_tiles.keys())
-        y_pos = {}
+        y_pos: dict[int, list[tuple[Pos, Pos]]] = {}
         for target in selectable:
             possible_moves = select_tiles[target]
             ##                print(target)
@@ -65,7 +65,7 @@ def turn(state: State) -> Action:
                 _x, y = move
                 if y not in y_pos:
                     y_pos[y] = []
-                y_pos[y].append([target, move])
+                y_pos[y].append((target, move))
         max_y = max(y_pos)
         best_y = y_pos[max_y]
         for target, _dest in best_y:
@@ -76,7 +76,7 @@ def turn(state: State) -> Action:
                     _x, y = move
                     if y not in y_pos:
                         y_pos[y] = []
-                    y_pos[y].append([target, move])
+                    y_pos[y].append((target, move))
                 min_y = min(y_pos)
                 return state.action_from_points(
                     *random.choice(  # noqa: S311  # Not important to be cryptographically safe

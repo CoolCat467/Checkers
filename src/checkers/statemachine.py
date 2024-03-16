@@ -7,9 +7,6 @@ from __future__ import annotations
 __title__ = "State Machine"
 __author__ = "CoolCat467"
 __version__ = "0.1.9"
-__ver_major__ = 0
-__ver_minor__ = 1
-__ver_patch__ = 9
 
 from typing import TYPE_CHECKING, Generic, TypeVar
 from weakref import ref

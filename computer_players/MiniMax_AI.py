@@ -108,6 +108,8 @@ class MinimaxPlayer(RemoteState):
         ##            self.state, 4, 5
         ##        )
         value, action = CheckersMinimax.minimax(self.state, 4)
+        if action is None:
+            raise ValueError("action is None")
         print(f"{value = }")
         return action
 
