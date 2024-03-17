@@ -50,7 +50,7 @@ def generate_rsa_key() -> RSAPrivateKey:  # pragma: no cover
     shared secret (and verification token) sent in :class:`~mcproto.packets.login.login.LoginEncryptionResponse`
     packet. The server will then use the private part of this key pair to decrypt that.
 
-    This will be a 1024-bit RSA key pair.
+    This will be a 2048-bit RSA key pair.
     """
     return generate_private_key(
         public_exponent=65537,
