@@ -39,7 +39,7 @@ keywords = [
 dependencies = [
     "pygame~=2.5.2",
     "typing_extensions",
-    "trio~=0.24.0",
+    "trio~=0.25.0",
     "cryptography",
 ]
 
