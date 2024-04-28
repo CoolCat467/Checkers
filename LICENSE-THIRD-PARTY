@@ -10,6 +10,7 @@ Applies to:
         - tests/helpers.py: Entire file
         - tests/protocol_helpers.py: Entire file
         - tests/test_base_io.py: Entire file
+        - tests/test_buffer.py: Entire file
         - tests/test_encryption.py: Entire file
         - tests/test_utils.py: Entire file
 ---------------------------------------------------------------------------------------------------
