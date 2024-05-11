@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -207,6 +207,8 @@ class ComponentManager(Component):
         nursery: trio.Nursery,
     ) -> None:
         """Raise event in a particular trio nursery."""
+        await trio.lowlevel.checkpoint()
+
         # Forward leveled events up; They'll come back to us soon enough.
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
@@ -279,12 +281,12 @@ class ComponentManager(Component):
     def temporary_component(
         self,
         component: Component,
-    ) -> Generator[None, None, None]:
+    ) -> Generator[Component, None, None]:
         """Temporarily add given component but then remove after exit."""
         name = component.name
         self.add_component(component)
         try:
-            yield
+            yield component
         finally:
             if self.component_exists(name):
                 self.remove_component(name)

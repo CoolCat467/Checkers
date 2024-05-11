@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -25,11 +25,11 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 
-from collections.abc import Callable, Iterable
 from typing import (
     TYPE_CHECKING,
     Any,
     AnyStr,
+    Generic,
     Literal,
     NoReturn,
     SupportsIndex,
@@ -38,15 +38,26 @@ from typing import (
 
 import trio
 
-from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
-from checkers.component import Component, ComponentManager, Event
+from checkers.base_io import (
+    BaseAsyncReader,
+    BaseAsyncWriter,
+    StructFormat,
+)
+from checkers.component import (
+    Component,
+    ComponentManager,
+    Event,
+)
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable
     from types import TracebackType
 
     from typing_extensions import Self
 
-BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
+    BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
+else:
+    BytesConvertable = Generic
 
 
 class NetworkTimeoutError(Exception):
@@ -96,11 +107,10 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     async def connect(self, host: str, port: int) -> None:
         """Connect to host:port on TCP."""
         if not self.not_connected:
-            print("[network] Already connected, disconnecting from current")
-            await self.close()
+            raise RuntimeError("Already connected!")
         try:
             self._stream = await trio.open_tcp_stream(host, port)
-        except OSError:
+        except OSError:  # pragma: nocover
             await self.close()
             raise
 
@@ -215,7 +225,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(f"{event_name!r} event already registered!")
         if self._read_packet_id_to_event_name.get(packet_id) == event_name:
             raise ValueError(
-                f"{event_name!r} events are also being received"
+                f"{event_name!r} events are also being received "
                 f"from server with packet id {packet_id!r}, "
                 "which will would lead to infinite looping over network",
             )
@@ -335,61 +345,5 @@ class Server(ComponentManager):
             await stream.aclose()
 
 
-def run() -> None:
-    """Run test of module."""
-
-    async def client_connect(
-        port: int,
-        stop_server: Callable[[], None],
-    ) -> None:
-        await trio.sleep(0.05)
-        # manager = ComponentManager("manager")
-
-        client = NetworkEventComponent("client")
-        # manager.add_component(client)
-
-        await client.connect("127.0.0.1", port)
-
-        client.register_network_write_event("echo_event", 0)
-        client.register_read_network_event(1, "reposted_event")
-
-        event = Event(
-            "echo_event",
-            bytearray("I will give my cat food to bob", "utf-8"),
-            3,
-        )
-
-        # await client.raise_event(event)
-        await client.write_event(event)
-        print(f"{await client.read_event() = }")
-
-        await client.close()
-        stop_server()
-
-    async def run_async() -> None:
-        """Run asynchronous test."""
-
-        class TestServer(Server):
-            async def handler(self, stream: trio.SocketStream) -> None:
-                async with NetworkEventComponent.from_stream(
-                    "client",
-                    stream=stream,
-                ) as client:
-                    client.register_read_network_event(0, "repost_event")
-                    client.register_network_write_event("repost_event", 1)
-
-                    await client.write_event(await client.read_event())
-
-        server = TestServer("server")
-        port = 3004
-        async with trio.open_nursery() as nursery:
-            nursery.start_soon(server.serve, port)
-            nursery.start_soon(client_connect, port, server.stop_serving)
-            nursery.start_soon(client_connect, port, server.stop_serving)
-
-    trio.run(run_async)
-
-
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__}\nProgrammed by {__author__}.\n")
-    run()

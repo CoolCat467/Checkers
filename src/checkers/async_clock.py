@@ -80,6 +80,8 @@ class Clock:
         delay = endtime - self.rawpassed
         if delay > 0:
             await trio.sleep(delay / 1e9)  # nanoseconds -> seconds
+        else:
+            await trio.lowlevel.checkpoint()
 
         nowtime: nanoseconds = get_ticks()
         self.timepassed = nanoseconds(nowtime - self.last_tick)

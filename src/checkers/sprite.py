@@ -105,33 +105,23 @@ class Sprite(ComponentManager, WeakDirtySprite):
         doc="Location (Center of image)",
     )
 
-    def _get_image_size(self) -> tuple[int, int]:
-        """Return size of internal rectangle."""
-        return self.rect.size
-
-    def _set_image_size(self, value: tuple[int, int]) -> None:
-        """Set internal rectangle size while keeping self.location intact."""
-        pre_loc = self.location
-        self.rect.size = value
-        if self.update_location_on_resize:
-            self.location = pre_loc
-
-    image_size = property(
-        _get_image_size,
-        _set_image_size,
-        doc="Image Size (Automattically updates location if self.update_location_on_resize is set)",
-    )
-
     def __get_image(self) -> Surface | None:
         """Return the surface of this sprite."""
         return self.__image
 
     def __set_image(self, image: Surface | None) -> None:
-        """Set surface, update image dimensions, and set dirty bit."""
+        """Set surface, update image dimensions, and set dirty bit.
+
+        Automatically updates location if self.update_location_on_resize is set.
+        """
         self.__image = image
         if image is not None:
-            self.image_size = image.get_size()
-        self.dirty = 1
+            pre_loc = self.location
+            self.rect.size = image.get_size()
+            if self.update_location_on_resize:
+                self.location = pre_loc
+        if self.dirty == 0:
+            self.dirty = 1
 
     image = property(
         __get_image,
@@ -144,9 +134,7 @@ class Sprite(ComponentManager, WeakDirtySprite):
         """Return True if visible and collision with point."""
         if not self.visible:
             return False
-        if not self.rect.collidepoint(position):
-            return False
-        return True
+        return self.rect.collidepoint(position)
 
     def is_topmost(self, position: tuple[int, int]) -> bool:
         """Return True if topmost at point in any group this sprite is in."""
@@ -158,9 +146,9 @@ class Sprite(ComponentManager, WeakDirtySprite):
             sprites_at = group.get_sprites_at(position)
             if not sprites_at:
                 continue
-            top = sprites_at[-1]
-            if top != self:
-                return False
+            for top in reversed(sprites_at):
+                if top != self and top.visible:
+                    return False
         return True
 
 
@@ -434,6 +422,8 @@ class AnimationComponent(Component):
 
     async def tick(self, tick_event: Event[TickEventData]) -> None:
         """Update controller if it's time to and update sprite image."""
+        await trio.lowlevel.checkpoint()
+
         passed = tick_event.data.time_passed
         new = None
         if self.update_every == 0:
@@ -572,6 +562,7 @@ class TargetingComponent(Component):
             self.__reached = True
             await self.raise_event(Event(self.event_raise_name, None))
             return
+        await trio.lowlevel.checkpoint()
 
         travel_distance = min(
             self.to_destination.magnitude(),
@@ -621,6 +612,8 @@ class DragClickEventComponent(Component):
         event: Event[PygameMouseButtonEventData],
     ) -> None:
         """Set pressed for event button if selected. Also raise Click events."""
+        await trio.lowlevel.checkpoint()
+
         if not self.manager_exists:
             return
         sprite = cast(Sprite, self.get_component("sprite"))
@@ -648,6 +641,8 @@ class DragClickEventComponent(Component):
         event: Event[PygameMouseMotion],
     ) -> None:
         """PygameMouseMotion event -> drag."""
+        await trio.lowlevel.checkpoint()
+
         if not self.manager_exists:
             return
         async with trio.open_nursery() as nursery:
@@ -765,5 +760,5 @@ def convert_pygame_event(event: PygameEvent) -> Event[Any]:
     return Event(f"Pygame{event_name(event.type)}", event.dict)
 
 
-if __name__ == "__main__":
+if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__}\nProgrammed by {__author__}.")
