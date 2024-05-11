@@ -37,13 +37,14 @@ from typing import (
 )
 
 import trio
-from typing_extensions import Self
 
 from checkers.base_io import BaseAsyncReader, BaseAsyncWriter, StructFormat
 from checkers.component import Component, ComponentManager, Event
 
 if TYPE_CHECKING:
     from types import TracebackType
+
+    from typing_extensions import Self
 
 BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
 
@@ -95,6 +96,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     async def connect(self, host: str, port: int) -> None:
         """Connect to host:port on TCP."""
         if not self.not_connected:
+            print("[network] Already connected, disconnecting from current")
             await self.close()
         try:
             self._stream = await trio.open_tcp_stream(host, port)
@@ -108,8 +110,8 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         while max_read_count := length - len(content):
             received = b""
             ##            try:
-            with trio.move_on_after(self.timeout):
-                received = await self.stream.receive_some(max_read_count)
+            ##            with trio.move_on_after(self.timeout):
+            received = await self.stream.receive_some(max_read_count)
             ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
             ##                await self.close()
             ##                raise

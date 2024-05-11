@@ -76,7 +76,7 @@ SCREEN_SIZE = (640, 480)
 FPS: Final = 48
 VSYNC = True
 
-PLAYERS: Final = ["Red Player", "Black Player"]
+PLAYERS: Final = ("Red Player", "Black Player")
 
 
 BLACK: Final = (0, 0, 0)
@@ -1271,11 +1271,11 @@ class PlayJoiningState(GameState):
                 await self.machine.raise_event(
                     Event("client_connect", details, 1),
                 )
-                return
-                # return "play"
+                ##                return
+                return "play"
         print("click")
         await self.manager.raise_event(Event("update_listing", None))
-        # return None
+        return None
 
 
 ##    async def check_conditions(self) -> str | None:
@@ -1360,8 +1360,11 @@ class PlayState(GameState):
 
         self.exit_data = (1, f"Client Disconnected$${error}", False)
 
+    ##        await self.do_actions()
+
     async def do_actions(self) -> None:
         """Perform actions for this State."""
+        print(f"{self.__class__.__name__} do_actions tick")
         if self.exit_data is None:
             return
 
