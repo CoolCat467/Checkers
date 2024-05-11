@@ -1253,7 +1253,7 @@ class PlayJoiningState(GameState):
 
         await self.manager.raise_event(Event("update_listing", None))
 
-    async def handle_update_listing(self, _: Event[None]) -> None:
+    async def handle_update_listing(self, _: Event[None]) -> str | None:
         """Update server listing."""
         assert self.machine is not None
         for advertisement in await read_advertisements():
@@ -1273,7 +1273,7 @@ class PlayJoiningState(GameState):
                 )
                 ##                return
                 return "play"
-        print("click")
+        print("handle_update_listing click")
         await self.manager.raise_event(Event("update_listing", None))
         return None
 
