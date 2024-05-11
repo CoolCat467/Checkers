@@ -1253,7 +1253,7 @@ class PlayJoiningState(GameState):
 
         await self.manager.raise_event(Event("update_listing", None))
 
-    async def handle_update_listing(self, _: Event[None]) -> str | None:
+    async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
         assert self.machine is not None
         for advertisement in await read_advertisements():
@@ -1262,7 +1262,7 @@ class PlayJoiningState(GameState):
             if details not in self.buttons:
                 self.buttons[details] = self.next_button
 
-                print(f"{motd = }  {details = }")
+                print(f"handle_update_listing {motd = }  {details = }")
                 ##button = JoinButton(self.next_button, self.font, motd, details)
                 ##self.group_add(button)
 
@@ -1271,11 +1271,9 @@ class PlayJoiningState(GameState):
                 await self.machine.raise_event(
                     Event("client_connect", details, 1),
                 )
-                ##                return
-                return "play"
+                return
         print("handle_update_listing click")
         await self.manager.raise_event(Event("update_listing", None))
-        return None
 
 
 ##    async def check_conditions(self) -> str | None:
