@@ -75,13 +75,9 @@ def encrypt_token_and_secret(
     # of the bytes class, not any subclass. This is needed since the cryptography
     # library calls some C code in the back, which relies on this being bytes. If
     # it's not a bytes instance, convert it.
-    if (
-        type(verification_token) is not bytes  # noqa: E721
-    ):  # we don't want isinstance
+    if type(verification_token) is not bytes:  # we don't want isinstance
         verification_token = bytes(verification_token)
-    if (
-        type(shared_secret) is not bytes  # noqa: E721
-    ):  # we don't want isinstance
+    if type(shared_secret) is not bytes:  # we don't want isinstance
         shared_secret = bytes(shared_secret)
 
     encrypted_token = public_key.encrypt(verification_token, PKCS1v15())
@@ -105,13 +101,9 @@ def decrypt_token_and_secret(
     # of the bytes class, not any subclass. This is needed since the cryptography
     # library calls some C code in the back, which relies on this being bytes. If
     # it's not a bytes instance, convert it.
-    if (
-        type(verification_token) is not bytes  # noqa: E721
-    ):  # we don't want isinstance
+    if type(verification_token) is not bytes:  # we don't want isinstance
         verification_token = bytes(verification_token)
-    if (
-        type(shared_secret) is not bytes  # noqa: E721
-    ):  # we don't want isinstance
+    if type(shared_secret) is not bytes:  # we don't want isinstance
         shared_secret = bytes(shared_secret)
 
     decrypted_token = private_key.decrypt(verification_token, PKCS1v15())
