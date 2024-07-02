@@ -37,7 +37,7 @@ keywords = [
     "checkers-game", "ai-support", "networked-game"
 ]
 dependencies = [
-    "pygame~=2.5.2",
+    "pygame~=2.6.0",
     "typing_extensions",
     "trio~=0.25.0",
     "cryptography",
