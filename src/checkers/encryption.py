@@ -76,11 +76,11 @@ def encrypt_token_and_secret(
     # library calls some C code in the back, which relies on this being bytes. If
     # it's not a bytes instance, convert it.
     if (
-        type(verification_token) is not bytes  # noqa: E721
+        type(verification_token) is not bytes
     ):  # we don't want isinstance
         verification_token = bytes(verification_token)
     if (
-        type(shared_secret) is not bytes  # noqa: E721
+        type(shared_secret) is not bytes
     ):  # we don't want isinstance
         shared_secret = bytes(shared_secret)
 
@@ -106,11 +106,11 @@ def decrypt_token_and_secret(
     # library calls some C code in the back, which relies on this being bytes. If
     # it's not a bytes instance, convert it.
     if (
-        type(verification_token) is not bytes  # noqa: E721
+        type(verification_token) is not bytes
     ):  # we don't want isinstance
         verification_token = bytes(verification_token)
     if (
-        type(shared_secret) is not bytes  # noqa: E721
+        type(shared_secret) is not bytes
     ):  # we don't want isinstance
         shared_secret = bytes(shared_secret)
 
