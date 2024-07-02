@@ -221,7 +221,7 @@ class Piece(sprite.Sprite):
 
         # Only register tick handler when we need to.
         # This is because, as a tick event is fired every frame,
-        # if we have like 30 things fireing every frame and they aren't
+        # if we have like 30 things firing every frame and they aren't
         # even moving, that's a lot of processing power wasted.
         if not self.has_handler("tick"):
             self.register_handler("tick", self.handle_tick_event)
