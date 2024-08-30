@@ -115,7 +115,6 @@ class RemoteState(Component, metaclass=ABCMeta):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Set up initial state and perform our turn if possible."""
-        print("handle_initial_config fired")
         board_size, turn = event.data
         self.state = State(board_size, bool(turn), self.pieces)
         self.has_initial = True
@@ -139,7 +138,12 @@ class MachineClient(ComponentManager):
 
         self.running = True
 
-        self.add_components((remote_state_class(), GameClient("game_client")))
+        self.add_components(
+            (
+                remote_state_class(),
+                GameClient("game_client"),
+            ),
+        )
 
     def bind_handlers(self) -> None:
         """Register client event handlers."""
@@ -162,6 +166,7 @@ async def run_client(
     host: str,
     port: int,
     remote_state_class: type[RemoteState],
+    connected: set[tuple[str, int]],
 ) -> None:
     """Run machine client and raise tick events."""
     async with trio.open_nursery() as main_nursery:
@@ -180,6 +185,7 @@ async def run_client(
                 # Wait so backlog things happen
                 await trio.sleep(1)
         client.unbind_components()
+    connected.remove((host, port))
 
 
 def run_client_sync(
@@ -204,8 +210,13 @@ async def run_clients_in_local_servers(
                 servers = {server for _motd, server in advertisements}
                 servers -= connected
                 for server in servers:
-                    nursery.start_soon(run_client, *server, remote_state_class)
                     connected.add(server)
+                    nursery.start_soon(
+                        run_client,
+                        *server,
+                        remote_state_class,
+                        connected,
+                    )
                 await trio.sleep(1)
     except BaseExceptionGroup_ as exc:
         caught = False
