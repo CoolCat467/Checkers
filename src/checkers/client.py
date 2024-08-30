@@ -234,50 +234,54 @@ class GameClient(NetworkEventComponent):
     ) -> None:
         """Raise events from server."""
         ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
-        async with self.read_event_lock:
-            if not self.manager_exists:
-                return
-            if self.not_connected:
-                await self.raise_disconnect("Not connected to server.")
-                return
-            try:
-                # print("handle_read_event start")
-                event = await self.read_event()
-            except trio.ClosedResourceError:
-                # assert self.not_connected
-                print(
-                    f"{self.not_connected = }\nhandle_read_event trio.ClosedResourceError",
-                )
-                return
-            except NetworkTimeoutError as exc:
-                traceback.print_exception(exc)
-                await self.raise_disconnect(
-                    "Failed to read event from server.",
-                )
-                return
-            else:
-                await self.raise_event(event)
-            await self.raise_event(
-                Event(f"client[{self.name}]_read_event", None),
+        if not self.manager_exists:
+            return
+        if self.not_connected:
+            await self.raise_disconnect("Not connected to server.")
+            return
+        try:
+            # print("handle_read_event start")
+            event = await self.read_event()
+        except trio.ClosedResourceError:
+            # assert self.not_connected
+            print(
+                f"{self.not_connected = }\nhandle_read_event trio.ClosedResourceError",
             )
+            return
+        except NetworkTimeoutError as exc:
+            traceback.print_exception(exc)
+            await self.raise_disconnect(
+                "Failed to read event from server.",
+            )
+            return
+        else:
+            await self.raise_event(event)
+        ##    await self.raise_event(
+        ##        Event(f"client[{self.name}]_read_event", None),
+        ##    )
 
     async def handle_client_connect(
         self,
         event: Event[tuple[str, int]],
     ) -> None:
         """Have client connect to address specified in event."""
-        if not self.not_connected:
-            return
-        try:
-            await self.connect(*event.data)
-        except OSError as ex:
-            traceback.print_exception(ex)
-        else:
-            await self.raise_event(
-                Event(f"client[{self.name}]_read_event", None),
-            )
-            return
-        await self.raise_disconnect("Error connecting to server.")
+        print("handle_client_connect event fired")
+        if self.read_event_lock.locked():
+            raise RuntimeError("2nd client connect fired!")
+        async with self.read_event_lock:
+            if not self.not_connected:
+                return
+            try:
+                await self.connect(*event.data)
+            except OSError as ex:
+                traceback.print_exception(ex)
+            else:
+                while not self.not_connected:
+                    await self.raise_event(
+                        Event(f"client[{self.name}]_read_event", None),
+                    )
+                return
+            await self.raise_disconnect("Error connecting to server.")
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server."""
@@ -428,7 +432,6 @@ class GameClient(NetworkEventComponent):
 
     async def read_playing_as(self, event: Event[bytearray]) -> None:
         """Read playing_as event from server."""
-        print(f"read_playing_as {event = }")
         buffer = Buffer(event.data)
 
         playing_as = buffer.read_value(StructFormat.UBYTE)
