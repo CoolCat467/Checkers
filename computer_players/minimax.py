@@ -6,6 +6,7 @@ __title__ = "Minimax"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import random
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
 from enum import IntEnum, auto
@@ -75,9 +76,11 @@ class Minimax(ABC, Generic[State, Action]):
         if cls.terminal(state):
             return MinimaxResult(cls.value(state), None)
         if depth is not None and depth <= 0:
+            # Choose a random action
+            # No need for cryptographic secure random
             return MinimaxResult(
                 cls.value(state),
-                next(iter(cls.actions(state))),
+                random.choice(tuple(cls.actions(state))),  # noqa: S311
             )
         next_down = None if depth is None else depth - 1
 
