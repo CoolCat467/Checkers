@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -1269,8 +1269,9 @@ class PlayJoiningState(GameState):
                 self.next_button += 1
                 ####
                 await self.machine.raise_event(
-                    Event("client_connect", details, 1),
+                    Event("client_connect", details),
                 )
+                await self.machine.set_state("play")
                 return
         print("handle_update_listing click")
         await self.manager.raise_event(Event("update_listing", None))

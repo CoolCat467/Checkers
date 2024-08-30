@@ -213,6 +213,10 @@ class ComponentManager(Component):
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
             return
+        ### Make sure events not raised twice
+        ##if not self.manager_exists:
+        ##    while event.level > 0:
+        ##        event.pop_level()
 
         ##if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
         ##    print(f'''{self.__class__.__name__}({self.name!r}):\n{event = }''')
