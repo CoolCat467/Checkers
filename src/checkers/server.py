@@ -569,13 +569,13 @@ class GameServer(Server):
         """Network loop for given ServerClient."""
         while not self.can_start() and not client.not_connected:
             await client.write_event(
-                Event("server[write]->no_actions", b""),
+                Event("server[write]->no_actions", bytearray()),
             )
         while not client.not_connected:
             print(f"{client.name} client_network_loop tick")
             try:
                 await client.write_event(
-                    Event("server[write]->no_actions", b""),
+                    Event("server[write]->no_actions", bytearray()),
                 )
                 event = await client.read_event()
             except NetworkTimeoutError:
@@ -609,9 +609,10 @@ class GameServer(Server):
         """Send spectator start data."""
         print("send_spectator_join_packets")
 
-        with self.temporary_component(
-            ComponentManager(f"private_events_pocket for {client.client_id}"),
-        ) as private_events_pocket:
+        private_events_pocket = ComponentManager(
+            f"private_events_pocket for {client.client_id}",
+        )
+        with self.temporary_component(private_events_pocket):
             with private_events_pocket.temporary_component(client):
                 # Send create_piece events for all pieces
                 async with trio.open_nursery() as nursery:

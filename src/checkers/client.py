@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ __version__ = "0.0.0"
 
 import struct
 import traceback
+from typing import TYPE_CHECKING
 
 import trio
 
@@ -269,8 +270,10 @@ class GameClient(NetworkEventComponent):
         if self.read_event_lock.locked():
             raise RuntimeError("2nd client connect fired!")
         async with self.read_event_lock:
-            if not self.not_connected:
-                return
+            # Mypy does not understand that self.not_connected becomes
+            # false after connect call.
+            if not TYPE_CHECKING and not self.not_connected:
+                raise RuntimeError("Already connected!")
             try:
                 await self.connect(*event.data)
             except OSError as ex:
