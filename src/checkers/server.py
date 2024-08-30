@@ -5,7 +5,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -38,7 +38,7 @@ import trio
 from checkers.async_clock import Clock
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
-from checkers.component import Event, ExternalRaiseManager
+from checkers.component import ComponentManager, Event, ExternalRaiseManager
 from checkers.network import NetworkEventComponent, NetworkTimeoutError, Server
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
@@ -445,7 +445,7 @@ class GameServer(Server):
             ##    udp_socket.setsockopt(
             ##        trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
             with self.advertisement_scope:
-                while not self.can_start():
+                while True:  # not self.can_start():
                     try:
                         await self.post_advertisement(
                             udp_socket,
@@ -468,7 +468,7 @@ class GameServer(Server):
             if idx == 0:
                 players[client_id] = 2
             else:
-                players[client_id] = -1
+                players[client_id] = 0xFF  # Spectator
         return players
 
     @staticmethod
@@ -479,7 +479,7 @@ class GameServer(Server):
             if idx < 2:
                 players[client_id] = idx % 2
             else:
-                players[client_id] = -1
+                players[client_id] = 0xFF  # Spectator
         return players
 
     def new_game_init(self, turn: bool) -> None:
@@ -569,13 +569,13 @@ class GameServer(Server):
         """Network loop for given ServerClient."""
         while not self.can_start() and not client.not_connected:
             await client.write_event(
-                Event("server[write]->no_actions", bytearray()),
+                Event("server[write]->no_actions", b""),
             )
         while not client.not_connected:
             print(f"{client.name} client_network_loop tick")
             try:
                 await client.write_event(
-                    Event("server[write]->no_actions", bytearray()),
+                    Event("server[write]->no_actions", b""),
                 )
                 event = await client.read_event()
             except NetworkTimeoutError:
@@ -602,36 +602,78 @@ class GameServer(Server):
         """Return if game is active."""
         return self.state.check_for_win() is None
 
+    async def send_spectator_join_packets(
+        self,
+        client: ServerClient,
+    ) -> None:
+        """Send spectator start data."""
+        print("send_spectator_join_packets")
+
+        with self.temporary_component(
+            ComponentManager(f"private_events_pocket for {client.client_id}"),
+        ) as private_events_pocket:
+            with private_events_pocket.temporary_component(client):
+                # Send create_piece events for all pieces
+                async with trio.open_nursery() as nursery:
+                    for piece_pos, piece_type in self.state.get_pieces():
+                        nursery.start_soon(
+                            client.raise_event,
+                            Event(
+                                "create_piece->network",
+                                (piece_pos, piece_type),
+                            ),
+                        )
+
+                await client.raise_event(
+                    Event(f"playing_as->network[{client.client_id}]", 255),
+                )
+
+                # Raise initial config event with board size and initial turn.
+                await client.raise_event(
+                    Event(
+                        "initial_config->network",
+                        (self.state.size, self.state.turn),
+                    ),
+                )
+
     async def handler(self, stream: trio.SocketStream) -> None:
         """Accept clients."""
-        print(f"{self.__class__.__name__}: client connected")
         new_client_id = self.client_count
+        print(
+            f"{self.__class__.__name__}: client connected [client_id {new_client_id}]",
+        )
         self.client_count += 1
 
         can_start = self.can_start()
-        if can_start:
-            self.stop_serving()
+        game_active = self.game_active()
+        ##        if can_start:
+        ##            self.stop_serving()
 
         if self.client_count > self.max_clients:
             print(
                 f"{self.__class__.__name__}: client disconnected, too many clients",
             )
             await stream.aclose()
+            self.client_count -= 1
             return
 
         async with ServerClient.from_stream(
             new_client_id,
             stream=stream,
         ) as client:
+            if can_start and game_active:
+                await self.send_spectator_join_packets(client)
             with self.temporary_component(client):
-                if can_start:
+                if can_start and not game_active:
                     await self.raise_event(
                         Event("server_send_game_start", None),
                     )
                 try:
                     await self.client_network_loop(client)
                 finally:
-                    print(f"{self.__class__.__name__}: client disconnected")
+                    print(
+                        f"{self.__class__.__name__}: client disconnected [client_id {new_client_id}]",
+                    )
                     self.client_count -= 1
 
     async def handle_network_select_piece(
@@ -641,7 +683,7 @@ class GameServer(Server):
         """Handle piece event from client."""
         client_id, tile_pos = event.data
 
-        player = self.client_players.get(client_id, -1)
+        player = self.client_players.get(client_id, 0xFF)
         if player == 2:
             player = int(self.state.turn)
 
@@ -776,7 +818,7 @@ class GameServer(Server):
         """Handle select tile event from network."""
         client_id, tile_pos = event.data
 
-        player = self.client_players.get(client_id, -1)
+        player = self.client_players.get(client_id, 0xFF)
         if player == 2:
             player = int(self.state.turn)
 
@@ -821,6 +863,7 @@ class GameServer(Server):
         # Get action queue from old state
         action_queue = self.state.get_action_queue()
         self.state = new_state
+        # print(f'{new_state.turn = }')
 
         # Send action animations
         await self.handle_action_animations(action_queue)
