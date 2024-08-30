@@ -7,6 +7,7 @@ __author__ = "ItsDrike"
 __license__ = "LGPL-3.0-only"
 
 import pytest
+
 from checkers.utils import from_twos_complement, to_twos_complement
 
 # TODO: Consider adding tests for enforce_range

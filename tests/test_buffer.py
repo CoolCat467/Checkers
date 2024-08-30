@@ -7,6 +7,7 @@ __author__ = "ItsDrike"
 __license__ = "LGPL-3.0-only"
 
 import pytest
+
 from checkers.buffer import Buffer
 
 

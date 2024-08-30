@@ -10,6 +10,7 @@ import sys
 from abc import ABCMeta, abstractmethod
 
 import trio
+
 from checkers.client import GameClient, read_advertisements
 from checkers.component import (
     Component,
@@ -114,6 +115,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Set up initial state and perform our turn if possible."""
+        print("handle_initial_config fired")
         board_size, turn = event.data
         self.state = State(board_size, bool(turn), self.pieces)
         self.has_initial = True
@@ -174,7 +176,7 @@ async def run_client(
                 Event("client_connect", (host, port)),
             )
             print(f"Connected to server {host}:{port}")
-            while client.running:  # noqa: TRIO110
+            while client.running:  # noqa: ASYNC110
                 # Wait so backlog things happen
                 await trio.sleep(1)
         client.unbind_components()

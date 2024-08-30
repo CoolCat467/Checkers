@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import pytest
 import trio
+
 from checkers.component import (
     Component,
     ComponentManager,
@@ -112,7 +113,7 @@ def test_component_not_exist_error() -> None:
         manager.get_component("darkness")
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_self_component_handler() -> None:
     event_called = False
 
@@ -130,7 +131,7 @@ async def test_self_component_handler() -> None:
     assert event_called
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_raise_event_register_handlers() -> None:
     event_called = False
 
@@ -161,7 +162,7 @@ async def test_raise_event_register_handlers() -> None:
     assert not event_called
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_raise_leveled_comes_back() -> None:
     event_called = False
 
@@ -191,7 +192,7 @@ async def test_raise_leveled_comes_back() -> None:
     assert event_called_two
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_raise_event_register_handler() -> None:
     event_called = False
 
@@ -209,7 +210,7 @@ async def test_raise_event_register_handler() -> None:
     assert event_called
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_raises_event_in_nursery() -> None:
     nursery_called = False
     event_called = False
@@ -236,7 +237,7 @@ async def test_raises_event_in_nursery() -> None:
     assert event_called
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_internal_does_not_raise_event_in_nursery() -> None:
     nursery_called = False
     event_called = False

@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 
 import pytest
+
 from checkers.vector import (
     Vector2,
     get_angle_between_vectors,

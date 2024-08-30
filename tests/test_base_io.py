@@ -13,6 +13,14 @@ from typing import Any
 from unittest.mock import AsyncMock, Mock
 
 import pytest
+from helpers import SynchronizedMixin
+from protocol_helpers import (
+    ReadFunctionAsyncMock,
+    ReadFunctionMock,
+    WriteFunctionAsyncMock,
+    WriteFunctionMock,
+)
+
 from checkers.base_io import (
     INT_FORMATS_TYPE,
     BaseAsyncReader,
@@ -22,13 +30,6 @@ from checkers.base_io import (
     StructFormat,
 )
 from checkers.utils import to_twos_complement
-from helpers import SynchronizedMixin
-from protocol_helpers import (
-    ReadFunctionAsyncMock,
-    ReadFunctionMock,
-    WriteFunctionAsyncMock,
-    WriteFunctionMock,
-)
 
 # region: Initializable concrete implementations of ABC classes.
 
@@ -172,14 +173,14 @@ class WriterTests(ABC):
         """Initialize writer instance to be tested."""
         ...
 
-    @pytest.fixture()
+    @pytest.fixture
     def method_mock(self) -> Mock | AsyncMock:
         """Obtain the appropriate type of mock, supporting both sync and async modes."""
         if isinstance(self.writer, BaseSyncWriter):
             return Mock
         return AsyncMock
 
-    @pytest.fixture()
+    @pytest.fixture
     def autopatch(self, monkeypatch: pytest.MonkeyPatch):
         """Create a simple function, supporting patching both sync/async writer functions with appropriate mocks.
 
@@ -200,7 +201,7 @@ class WriterTests(ABC):
 
         return autopatch
 
-    @pytest.fixture()
+    @pytest.fixture
     def write_mock(self, monkeypatch: pytest.MonkeyPatch):
         """Monkeypatch the write function with a mock which is returned."""
         mock_f = (
@@ -439,14 +440,14 @@ class ReaderTests(ABC):
         """Initialize reader instance to be tested."""
         ...
 
-    @pytest.fixture()
+    @pytest.fixture
     def method_mock(self) -> Mock | AsyncMock:
         """Obtain the appropriate type of mock, supporting both sync and async modes."""
         if isinstance(self.reader, BaseSyncReader):
             return Mock
         return AsyncMock
 
-    @pytest.fixture()
+    @pytest.fixture
     def autopatch(self, monkeypatch: pytest.MonkeyPatch):
         """Create a simple function, supporting patching both sync/async reader functions with appropriate mocks.
 
@@ -467,7 +468,7 @@ class ReaderTests(ABC):
 
         return autopatch
 
-    @pytest.fixture()
+    @pytest.fixture
     def read_mock(self, monkeypatch: pytest.MonkeyPatch):
         """Monkeypatch the read function with a mock which is returned."""
         mock_f = (

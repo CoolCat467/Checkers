@@ -15,9 +15,10 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, TypeVar
 
-from checkers.state import Action, State
 from machine_client import RemoteState, run_clients_in_local_servers_sync
 from minimax import Minimax, MinimaxResult, Player
+
+from checkers.state import Action, State
 
 if TYPE_CHECKING:
     from collections.abc import Iterable

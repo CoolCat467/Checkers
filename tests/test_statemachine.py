@@ -1,4 +1,5 @@
 import pytest
+
 from checkers.statemachine import AsyncState, State
 
 

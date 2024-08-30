@@ -8,10 +8,11 @@ __license__ = "LGPL-3.0-only"
 
 from typing import cast
 
-from checkers.encryption import encrypt_token_and_secret
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
+
+from checkers.encryption import encrypt_token_and_secret
 
 _SERIALIZED_RSA_PRIVATE_KEY = b"""
 -----BEGIN PRIVATE KEY-----

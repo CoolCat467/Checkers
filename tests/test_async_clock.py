@@ -1,10 +1,11 @@
 import pytest
+
 from checkers import async_clock
 
 pytest_plugins = ("pytest_trio",)
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_tick() -> None:
     clock = async_clock.Clock()
 
@@ -18,7 +19,7 @@ async def test_tick() -> None:
     assert isinstance(clock.get_time(), int)
 
 
-@pytest.mark.trio()
+@pytest.mark.trio
 async def test_tick_fps() -> None:
     clock = async_clock.Clock()
 
