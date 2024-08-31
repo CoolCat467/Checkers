@@ -577,6 +577,7 @@ class GameBoard(sprite.Sprite):
 
         if not self.animation_queue:
             self.processing_animations = False
+            await trio.lowlevel.checkpoint()
             return
 
         queue_event = self.animation_queue.popleft()
@@ -587,6 +588,7 @@ class GameBoard(sprite.Sprite):
             if queue_event.data or not self.animation_queue:
                 # Handle one more tick to trigger stop
                 await self.handle_fire_next_animation()
+                await trio.lowlevel.checkpoint()
                 return
             # Otherwise, state event is False, meaning just popped end of block.
             # This means next event should always be new block start event
@@ -1363,7 +1365,7 @@ class PlayState(GameState):
 
     async def do_actions(self) -> None:
         """Perform actions for this State."""
-        print(f"{self.__class__.__name__} do_actions tick")
+        # print(f"{self.__class__.__name__} do_actions tick")
         if self.exit_data is None:
             return
 

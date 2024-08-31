@@ -410,7 +410,7 @@ class GameServer(Server):
         advertisement = (
             f"[AD]{hosting_port}[/AD][CHECKERS]{motd}[/CHECKERS]"
         ).encode()
-        print("post_advertisement")
+        # print("post_advertisement")
         await udp_socket.sendto(
             advertisement,
             (send_to_ip, ADVERTISEMENT_PORT),
@@ -445,6 +445,7 @@ class GameServer(Server):
             ##    udp_socket.setsockopt(
             ##        trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
             with self.advertisement_scope:
+                print("Starting advertisement posting.")
                 while True:  # not self.can_start():
                     try:
                         await self.post_advertisement(
@@ -459,6 +460,7 @@ class GameServer(Server):
                         )
                         break
                     await trio.sleep(1.5)
+            print("Stopped advertisement posting.")
 
     @staticmethod
     def setup_teams_internal(client_ids: list[int]) -> dict[int, int]:

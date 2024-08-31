@@ -41,7 +41,12 @@ class Event(Generic[T]):
 
     __slots__ = ("name", "data", "level")
 
-    def __init__(self, name: str, data: T, levels: int = 0) -> None:
+    def __init__(
+        self,
+        name: str,
+        data: T,
+        levels: int = 0,
+    ) -> None:
         """Initialize event."""
         self.name = name
         self.data = data
@@ -148,6 +153,9 @@ class Component:
     ) -> list[Component]:
         """Return Components from manager."""
         return self.manager.get_components(component_names)
+
+
+ComponentPassthrough = TypeVar("ComponentPassthrough", bound=Component)
 
 
 class ComponentManager(Component):
@@ -284,8 +292,8 @@ class ComponentManager(Component):
     @contextmanager
     def temporary_component(
         self,
-        component: Component,
-    ) -> Generator[Component, None, None]:
+        component: ComponentPassthrough,
+    ) -> Generator[ComponentPassthrough, None, None]:
         """Temporarily add given component but then remove after exit."""
         name = component.name
         self.add_component(component)
