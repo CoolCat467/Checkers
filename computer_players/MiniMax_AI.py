@@ -105,10 +105,11 @@ class MinimaxPlayer(RemoteState):
     async def preform_turn(self) -> Action:
         """Perform turn."""
         print("preform_turn")
-        ##        value, action = CheckersMinimax.adaptive_depth_minimax(
-        ##            self.state, 4, 5
-        ##        )
-        value, action = CheckersMinimax.minimax(self.state, 4)
+        ##value, action = CheckersMinimax.adaptive_depth_minimax(
+        ##    self.state, 4, 5
+        ##)
+        ##value, action = CheckersMinimax.minimax(self.state, 4)
+        value, action = CheckersMinimax.alphabeta(self.state, 4)
         if action is None:
             raise ValueError("action is None")
         print(f"{value = }")

@@ -6,6 +6,7 @@ __title__ = "Minimax"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import operator
 import random
 from abc import ABC, abstractmethod
 from collections.abc import Iterable
@@ -100,6 +101,64 @@ class Minimax(ABC, Generic[State, Action]):
             if new_value != value:
                 best_action = action
             value = new_value
+        return MinimaxResult(value, best_action)
+
+    @classmethod
+    def alphabeta(
+        cls,
+        state: State,
+        depth: int | None = 5,
+        a: int | float = -infinity,
+        b: int | float = infinity,
+    ) -> MinimaxResult[Action]:
+        """Return minimax alphabeta pruning result best action for given current state."""
+        # print(f'alphabeta {depth = } {a = } {b = }')
+
+        if cls.terminal(state):
+            return MinimaxResult(cls.value(state), None)
+        if depth is not None and depth <= 0:
+            # Choose a random action
+            # No need for cryptographic secure random
+            return MinimaxResult(
+                cls.value(state),
+                random.choice(tuple(cls.actions(state))),  # noqa: S311
+            )
+        next_down = None if depth is None else depth - 1
+
+        current_player = cls.player(state)
+        value: int | float
+        if current_player == Player.MAX:
+            value = -infinity
+            best = max
+            compare = operator.gt  # greater than (>)
+            set_idx = 0
+        else:
+            value = infinity
+            best = min
+            compare = operator.lt  # less than (<)
+            set_idx = 1
+
+        best_action: Action | None = None
+        for action in cls.actions(state):
+            result = cls.alphabeta(cls.result(state, action), next_down, a, b)
+            new_value = best(value, result.value)
+
+            if new_value != value:
+                best_action = action
+            value = new_value
+
+            if compare(new_value, (a, b)[set_idx ^ 1]):
+                # print("cutoff")
+                break  # cutoff
+
+            alpha_beta_value = (a, b)[set_idx]
+            new_alpha_beta_value = best(alpha_beta_value, value)
+
+            if new_alpha_beta_value != alpha_beta_value:
+                # Set new best
+                alpha_beta_list = [a, b]
+                alpha_beta_list[set_idx] = new_alpha_beta_value
+                a, b = alpha_beta_list
         return MinimaxResult(value, best_action)
 
 
