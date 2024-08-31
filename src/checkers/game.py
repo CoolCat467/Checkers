@@ -455,7 +455,7 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Handle create_piece event."""
         if not self.visible:
-            # If not visible, reraise until board is set up right
+            # If not visible, re-raise until board is set up right
             await self.raise_event(event)
             return
         piece_pos, piece_type = event.data
@@ -730,7 +730,7 @@ class GameBoard(sprite.Sprite):
         # Fill it with green so we know if anything is broken
         surf.fill(GREEN)
 
-        # For each tile xy choordinate,
+        # For each tile xy coordinate,
         loc_y = 0
         for y in range(board_height):
             loc_x = 0
@@ -880,8 +880,8 @@ class MrFloppy(sprite.Sprite):
 
         self.register_handler("drag", self.drag)
 
+    @staticmethod
     def controller(
-        self,
         image_identifiers: list[str | int],
     ) -> Generator[str | int | None, None, None]:
         """Animation controller."""
@@ -940,7 +940,7 @@ class HaltState(AsyncState["CheckersClient"]):
     __slots__ = ()
 
     def __init__(self) -> None:
-        """Initialize Hault State."""
+        """Initialize Halt State."""
         super().__init__("Halt")
 
     async def check_conditions(self) -> None:
@@ -962,12 +962,12 @@ class GameState(AsyncState["CheckersClient"]):
         self.manager = ComponentManager(self.name)
 
     def add_actions(self) -> None:
-        """Add internal component manager to statemachine's component manager."""
+        """Add internal component manager to state machine's component manager."""
         assert self.machine is not None
         self.machine.manager.add_component(self.manager)
 
     def group_add(self, new_sprite: sprite.Sprite) -> None:
-        """Add new sprite to statemachine's group."""
+        """Add new sprite to state machine's group."""
         assert self.machine is not None
         group = self.machine.get_group(self.id)
         assert group is not None, "Expected group from new group id"
