@@ -93,7 +93,7 @@ class BaseAsyncWriter(ABC):
     async def write(self, data: bytes, /) -> None:
         """Underlying write method, sending/storing the data.
 
-        All of the writer functions will eventually call this method.
+        All the writer functions will eventually call this method.
         """
 
     @overload

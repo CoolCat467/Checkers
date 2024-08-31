@@ -57,7 +57,7 @@ class Event(Generic[T]):
         return f"{self.__class__.__name__}({self.name!r}, {self.data!r}, {self.level!r})"
 
     def pop_level(self) -> bool:
-        """Travel up one level and return if should continue or not."""
+        """Travel up one level and return True if event should continue or not."""
         continue_level = self.level > 0
         self.level = max(0, self.level - 1)
         return continue_level

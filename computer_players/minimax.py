@@ -1,5 +1,7 @@
 """Minimax - Boilerplate code for Minimax AIs."""
 
+from __future__ import annotations
+
 # Programmed by CoolCat467
 
 __title__ = "Minimax"
@@ -9,10 +11,12 @@ __version__ = "0.0.0"
 import operator
 import random
 from abc import ABC, abstractmethod
-from collections.abc import Iterable
 from enum import IntEnum, auto
 from math import inf as infinity
-from typing import Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+
+if TYPE_CHECKING:
+    from collections.abc import Iterable
 
 
 class Player(IntEnum):

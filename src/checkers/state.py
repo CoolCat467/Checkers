@@ -61,7 +61,7 @@ class ActionSet(NamedTuple):
 
 
 def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
-    """Return the tile xy choordinates on the top left, top right, bottom left, and bottom right sides of given xy choordinates."""
+    """Return the tile xy coordinates on the top left, top right, bottom left, and bottom right sides of given xy coordinates."""
     cx, cy = xy
     sides = []
     for raw_dy in range(2):
@@ -326,7 +326,7 @@ class State:
 
         enemy_pieces = self.get_piece_types(self.get_enemy(piece_type))
 
-        # Get the side choordinates of the tile and make them tuples so
+        # Get the side coordinates of the tile and make them tuples so
         # the scan later works properly.
         sides = get_sides(position)
         # Make a dictionary to find what direction a tile is in if you

@@ -17,6 +17,8 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
+from __future__ import annotations
+
 __title__ = "Async Clock"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
