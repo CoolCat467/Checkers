@@ -710,7 +710,7 @@ class GameBoard(sprite.Sprite):
         # Get the proper name of the tile we're creating ('A1' to 'H8')
         x, y = position
         name = self.get_tile_name(x, y)
-        color = (x + y) % len(self.tile_color_map)
+        color = (x + y + 1) % len(self.tile_color_map)
 
         tile = Tile(color, position, name, self.get_tile_location(position))
         self.add_component(tile)
@@ -735,7 +735,7 @@ class GameBoard(sprite.Sprite):
         for y in range(board_height):
             loc_x = 0
             for x in range(board_width):
-                color = (x + y) % len(self.tile_color_map)
+                color = (x + y + 1) % len(self.tile_color_map)
                 # Blit the tile image to the surface at the tile's location
                 surf.blit(image.get_image(f"tile_{color}"), (loc_x, loc_y))
                 ### Blit the id of the tile at the tile's location

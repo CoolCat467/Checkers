@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -29,7 +29,10 @@ import math
 from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar, cast
 
 if TYPE_CHECKING:
-    from collections.abc import Generator
+    from collections.abc import Callable, Generator, Iterable
+
+MANDATORY_CAPTURE = True  # If a jump is available, do you have to or not?
+PAWN_JUMP_FORWARD_ONLY = True  # Pawns not allowed to go backwards in jumps?
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
@@ -100,8 +103,8 @@ class State:
     def __init__(
         self,
         size: tuple[int, int],
-        turn: int,
         pieces: dict[Pos, int],
+        turn: int = 1,  # Black moves first
         /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
@@ -142,7 +145,7 @@ class State:
         size = board_data.get("boardsize", (8, 8))
         turn = True
         pieces = cls.get_pieces_from_tiles(board_data.get("tiles", {}))
-        return cls(size, turn, pieces)
+        return cls(size, pieces, turn)
 
     @staticmethod
     def get_pieces_from_tiles(
@@ -160,8 +163,17 @@ class State:
 
     def calculate_actions(self, position: Pos) -> ActionSet:
         """Return actions the piece at given position can make."""
+        if MANDATORY_CAPTURE:
+            exists = False
+            for start, _end in self.get_all_actions(self.pieces[position]):
+                if start == position:
+                    exists = True
+                    break
+            if not exists:
+                return ActionSet({}, (), set())
         jumps = self.get_jumps(position)
-        moves = self.get_moves(position)
+        moves: tuple[Pos, ...]
+        moves = () if MANDATORY_CAPTURE and jumps else self.get_moves(position)
         ends = set(jumps)
         ends.update(moves)
         return ActionSet(jumps, moves, ends)
@@ -250,8 +262,8 @@ class State:
         # Swap turn
         return self.__class__(
             self.size,
-            not self.turn,
             pieces_copy,
+            not self.turn,
             pre_calculated_actions=self.pre_calculated_actions,
         )
 
@@ -336,11 +348,17 @@ class State:
         # Make a dictionary for the valid jumps and the pieces they jump
         valid: dict[Pos, list[Pos]] = {}
 
+        valid_sides: tuple[tuple[int, Pos], ...]
+        if PAWN_JUMP_FORWARD_ONLY:
+            valid_sides = pawn_modify(
+                tuple(enumerate(sides)),
+                piece_type,
+            )
+        else:
+            valid_sides = tuple(enumerate(sides))
+
         # For each side tile in the jumpable tiles for this type of piece,
-        for direction, side in pawn_modify(
-            tuple(enumerate(sides)),
-            piece_type,
-        ):
+        for direction, side in valid_sides:
             # Make sure side exists
             if not self.valid_location(side):
                 continue
@@ -412,10 +430,20 @@ class State:
             ],
         )
 
+    def wrap_actions(
+        self,
+        position: Pos,
+        calculate_ends: Callable[[Pos], Iterable[Pos]],
+    ) -> Generator[Action, None, None]:
+        """Yield end calculation function results as Actions."""
+        for end in calculate_ends(position):
+            yield self.action_from_points(position, end)
+
     def get_actions(self, position: Pos) -> Generator[Action, None, None]:
         """Yield all moves and jumps the piece at position can make."""
         ends = set(self.get_jumps(position))
-        ends.update(self.get_moves(position))
+        if not (ends and MANDATORY_CAPTURE):
+            ends.update(self.get_moves(position))
         ##        ends = self.get_actions_set(position).ends
         for end in ends:
             yield self.action_from_points(position, end)
@@ -423,10 +451,27 @@ class State:
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:
         """Yield all actions for given player."""
         player_pieces = {player, player + 2}
+        if not MANDATORY_CAPTURE:
+            for position, piece_type in self.pieces.items():
+                if piece_type not in player_pieces:
+                    continue
+                yield from self.get_actions(position)
+            return
+        jumps_available = False
         for position, piece_type in self.pieces.items():
             if piece_type not in player_pieces:
                 continue
-            yield from self.get_actions(position)
+            if not jumps_available:
+                for jump in self.wrap_actions(position, self.get_jumps):
+                    yield jump
+                    jumps_available = True
+            else:
+                yield from self.wrap_actions(position, self.get_jumps)
+        if not jumps_available:
+            for position, piece_type in self.pieces.items():
+                if piece_type not in player_pieces:
+                    continue
+                yield from self.wrap_actions(position, self.get_moves)
 
     def check_for_win(self) -> int | None:
         """Return player number if they won else None."""
@@ -471,7 +516,7 @@ def generate_pieces(
         # Reset the x pos to 0
         for x in range(board_width):
             # Get the color of that spot by adding x and y mod the number of different colors
-            color = (x + y) % colors
+            color = (x + y + 1) % colors
             # If a piece should be placed on that tile and the tile is not Red,
             if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
                 # Set the piece to White Pawn or Black Pawn depending on the current y pos

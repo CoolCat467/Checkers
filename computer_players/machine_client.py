@@ -44,7 +44,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         """Initialize remote state."""
         super().__init__("remote_state")
 
-        self.state = State((8, 8), False, {})
+        self.state = State((8, 8), {})
         self.has_initial = False
         self.pieces: dict[Pos, int] = {}
 
@@ -116,7 +116,7 @@ class RemoteState(Component, metaclass=ABCMeta):
     ) -> None:
         """Set up initial state and perform our turn if possible."""
         board_size, turn = event.data
-        self.state = State(board_size, bool(turn), self.pieces)
+        self.state = State(board_size, self.pieces, bool(turn))
         self.has_initial = True
         if turn == self.playing_as:
             await self.base_preform_turn()
@@ -194,7 +194,7 @@ def run_client_sync(
     remote_state_class: type[RemoteState],
 ) -> None:
     """Run client and connect to server at host:port."""
-    trio.run(run_client, host, port, remote_state_class)
+    trio.run(run_client, host, port, remote_state_class, set())
 
 
 async def run_clients_in_local_servers(

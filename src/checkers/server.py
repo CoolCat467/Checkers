@@ -27,7 +27,6 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
-import random
 import traceback
 from collections import deque
 from functools import partial
@@ -297,13 +296,13 @@ class CheckersState(State):
     def __init__(
         self,
         size: Pos,
-        turn: bool,
         pieces: dict[Pos, int],
+        turn: bool = True,
         /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
         """Initialize Checkers State."""
-        super().__init__(size, turn, pieces, pre_calculated_actions)
+        super().__init__(size, pieces, turn, pre_calculated_actions)
         self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
 
     def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
@@ -361,7 +360,7 @@ class GameServer(Server):
         super().__init__("GameServer")
 
         self.client_count: int
-        self.state: CheckersState = CheckersState(self.board_size, False, {})
+        self.state: CheckersState = CheckersState(self.board_size, {})
 
         self.client_players: dict[int, int] = {}
         self.player_selections: dict[int, Pos] = {}
@@ -484,13 +483,13 @@ class GameServer(Server):
                 players[client_id] = 0xFF  # Spectator
         return players
 
-    def new_game_init(self, turn: bool) -> None:
+    def new_game_init(self) -> None:
         """Start new game."""
         self.client_players.clear()
         self.player_selections.clear()
 
         pieces = generate_pieces(*self.board_size)
-        self.state = CheckersState(self.board_size, turn, pieces)
+        self.state = CheckersState(self.board_size, pieces)
 
         # Why keep track of another object just to know client ID numbers
         # if we already have that with the components? No need!
@@ -547,7 +546,7 @@ class GameServer(Server):
 
         # Choose which team plays first
         # Using non-cryptographically secure random because it doesn't matter
-        self.new_game_init(bool(random.randint(0, 1)))  # noqa: S311
+        self.new_game_init()
 
         # Send create_piece events for all pieces
         async with trio.open_nursery() as nursery:
@@ -859,14 +858,12 @@ class GameServer(Server):
 
         action = self.state.action_from_points(piece_pos, tile_pos)
         # print(f"{action = }")
-        # print(f'{self.state.turn = }')
 
         # Get new state after performing valid action
         new_state = self.state.preform_action(action)
         # Get action queue from old state
         action_queue = self.state.get_action_queue()
         self.state = new_state
-        # print(f'{new_state.turn = }')
 
         # Send action animations
         await self.handle_action_animations(action_queue)
