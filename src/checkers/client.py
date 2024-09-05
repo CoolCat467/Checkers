@@ -246,13 +246,11 @@ class GameClient(NetworkEventComponent):
             event = await self.read_event()
         except trio.ClosedResourceError:
             await self.close()
-            assert self.not_connected
             print("Client side socket closed from another task.")
             return
         except NetworkTimeoutError as exc:
             if self.running:
                 await self.close()
-                assert self.not_connected
                 traceback.print_exception(exc)
                 await self.raise_disconnect(
                     "Failed to read event from server.",
