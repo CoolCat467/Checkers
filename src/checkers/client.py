@@ -33,12 +33,15 @@ import trio
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import Event
-from checkers.network import NetworkEventComponent, NetworkTimeoutError
+from checkers.network import (
+    NetworkEventComponent,
+    NetworkStreamNotConnectedError,
+    NetworkTimeoutError,
+)
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
     Pos,
-    TickEventData,
     read_position,
     write_position,
 )
@@ -147,7 +150,7 @@ class GameClient(NetworkEventComponent):
     to the server, and reading and raising incoming events from the server.
     """
 
-    __slots__ = ("read_event_lock",)
+    __slots__ = ("connect_event_lock", "running")
 
     def __init__(self, name: str) -> None:
         """Initialize GameClient."""
@@ -181,7 +184,8 @@ class GameClient(NetworkEventComponent):
             },
         )
 
-        self.read_event_lock = trio.Lock()
+        self.connect_event_lock = trio.Lock()
+        self.running = False
 
     def bind_handlers(self) -> None:
         """Register event handlers."""
@@ -205,7 +209,7 @@ class GameClient(NetworkEventComponent):
                 "server->playing_as": self.read_playing_as,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
-                f"client[{self.name}]_read_event": self.handle_read_event,
+                # f"client[{self.name}]_read_event": self.handle_read_event,
             },
         )
 
@@ -229,10 +233,7 @@ class GameClient(NetworkEventComponent):
         await self.close()
         assert self.not_connected
 
-    async def handle_read_event(
-        self,
-        tick_event: Event[TickEventData],
-    ) -> None:
+    async def handle_read_event(self) -> None:
         """Raise events from server."""
         ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
@@ -244,17 +245,24 @@ class GameClient(NetworkEventComponent):
             # print("handle_read_event start")
             event = await self.read_event()
         except trio.ClosedResourceError:
-            # assert self.not_connected
-            print(
-                f"{self.not_connected = }\nhandle_read_event trio.ClosedResourceError",
-            )
+            await self.close()
+            assert self.not_connected
+            print("Client side socket closed from another task.")
             return
         except NetworkTimeoutError as exc:
-            traceback.print_exception(exc)
-            await self.raise_disconnect(
-                "Failed to read event from server.",
-            )
+            if self.running:
+                await self.close()
+                assert self.not_connected
+                traceback.print_exception(exc)
+                await self.raise_disconnect(
+                    "Failed to read event from server.",
+                )
             return
+        except NetworkStreamNotConnectedError as exc:
+            traceback.print_exception(exc)
+            await self.close()
+            assert self.not_connected
+            raise
         else:
             await self.raise_event(event)
         ##    await self.raise_event(
@@ -267,9 +275,9 @@ class GameClient(NetworkEventComponent):
     ) -> None:
         """Have client connect to address specified in event."""
         print("handle_client_connect event fired")
-        if self.read_event_lock.locked():
+        if self.connect_event_lock.locked():
             raise RuntimeError("2nd client connect fired!")
-        async with self.read_event_lock:
+        async with self.connect_event_lock:
             # Mypy does not understand that self.not_connected becomes
             # false after connect call.
             if not TYPE_CHECKING and not self.not_connected:
@@ -279,10 +287,12 @@ class GameClient(NetworkEventComponent):
             except OSError as ex:
                 traceback.print_exception(ex)
             else:
-                while not self.not_connected:
-                    await self.raise_event(
-                        Event(f"client[{self.name}]_read_event", None),
-                    )
+                self.running = True
+                while not self.not_connected and self.running:
+                    await self.handle_read_event()
+                ##                        await self.raise_event(
+                ##                            Event(f"client[{self.name}]_read_event", None),
+                ##                        )
                 return
             await self.raise_disconnect("Error connecting to server.")
 
@@ -405,6 +415,7 @@ class GameClient(NetworkEventComponent):
         winner = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(Event("game_winner", winner))
+        self.running = False
 
     async def read_action_complete(self, event: Event[bytearray]) -> None:
         """Read action_complete event from server.

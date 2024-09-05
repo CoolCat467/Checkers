@@ -66,6 +66,12 @@ class NetworkTimeoutError(Exception):
     __slots__ = ()
 
 
+class NetworkStreamNotConnectedError(RuntimeError):
+    """Network Stream Not Connected Error."""
+
+    __slots__ = ()
+
+
 class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     """Network Component (client)."""
 
@@ -85,9 +91,9 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     @property
     def stream(self) -> trio.SocketStream:
-        """Trio SocketStream or raise RuntimeError."""
+        """Trio SocketStream or raise NetworkStreamNotConnectedError."""
         if self._stream is None:
-            raise RuntimeError("Stream not connected!")
+            raise NetworkStreamNotConnectedError("Stream not connected!")
         return self._stream
 
     @classmethod
@@ -115,13 +121,19 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             raise
 
     async def read(self, length: int) -> bytearray:
-        """Read `length` bytes from stream."""
+        """Read `length` bytes from stream.
+
+        Can raise following exceptions:
+            NetworkStreamNotConnectedError
+            NetworkTimeoutError - Timeout or no data
+            OSError - Stopped responding
+        """
         content = bytearray()
         while max_read_count := length - len(content):
             received = b""
             ##            try:
-            ##            with trio.move_on_after(self.timeout):
-            received = await self.stream.receive_some(max_read_count)
+            with trio.move_on_after(self.timeout):
+                received = await self.stream.receive_some(max_read_count)
             ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
             ##                await self.close()
             ##                raise
@@ -137,7 +149,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
                 raise OSError(
                     f"Server stopped responding (got {len(content)} bytes, "
                     f"but expected {length} bytes)."
-                    f" Partial obtained data: {content!r}",
+                    f" Partial obtained packet: {content!r}",
                 )
         return content
 
@@ -153,9 +165,10 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     async def close(self) -> None:
         """Close the stream."""
-        if self.not_connected:
+        if self._stream is None:
+            await trio.lowlevel.checkpoint()
             return
-        await self.stream.aclose()
+        await self._stream.aclose()
         self._stream = None
 
     async def send_eof(self) -> None:

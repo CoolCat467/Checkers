@@ -979,6 +979,7 @@ class GameState(AsyncState["CheckersClient"]):
         assert self.machine is not None
         self.machine.remove_group(self.id)
         self.manager.unbind_components()
+        self.id = 0
 
     def change_state(
         self,
@@ -1354,6 +1355,8 @@ class PlayState(GameState):
         winner = event.data
         self.exit_data = (0, f"{PLAYERS[winner]} Won", False)
 
+        await self.machine.raise_event(Event("network_stop", None))
+
     async def handle_client_disconnected(self, event: Event[str]) -> None:
         """Handle client disconnected error."""
         error = event.data
@@ -1384,29 +1387,36 @@ class PlayState(GameState):
         if exit_status == 1:
             message, error_message = message.split("$$")
 
-        continue_button = KwargButton(
-            "continue_button",
-            font,
-            visible=True,
-            color=Color(0, 0, 0),
-            text=f"{message} - Return to Title",
-            location=[x // 2 for x in SCREEN_SIZE],
-            handle_click=self.change_state("title"),
-        )
-        self.group_add(continue_button)
+        if not self.manager.component_exists("continue_button"):
+            continue_button = KwargButton(
+                "continue_button",
+                font,
+                visible=True,
+                color=Color(0, 0, 0),
+                text=f"{message} - Return to Title",
+                location=[x // 2 for x in SCREEN_SIZE],
+                handle_click=self.change_state("title"),
+            )
+            self.group_add(continue_button)
+        else:
+            continue_button = self.manager.get_component("continue_button")
 
         if exit_status == 1:
-            error_text = OutlinedText("error_text", font)
+            if not self.manager.component_exists("error_text"):
+                error_text = OutlinedText("error_text", font)
+            else:
+                error_text = self.manager.get_component("error_text")
             error_text.visible = True
             error_text.color = Color(255, 0, 0)
             error_text.border_width = 1
-            error_text.text = error_message
+            error_text.text += error_message + "\n"
             error_text.location = continue_button.location + Vector2(
                 0,
                 continue_button.rect.h + 10,
             )
 
-            self.group_add(error_text)
+            if not self.manager.component_exists("error_text"):
+                self.group_add(error_text)
 
 
 class CheckersClient(sprite.GroupProcessor):
