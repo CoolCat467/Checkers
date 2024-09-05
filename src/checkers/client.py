@@ -290,9 +290,11 @@ class GameClient(NetworkEventComponent):
                 self.running = True
                 while not self.not_connected and self.running:
                     await self.handle_read_event()
-                ##                        await self.raise_event(
-                ##                            Event(f"client[{self.name}]_read_event", None),
-                ##                        )
+                self.running = False
+
+                await self.close()
+                await self.raise_event(Event("client_connection_closed", None))
+
                 return
             await self.raise_disconnect("Error connecting to server.")
 

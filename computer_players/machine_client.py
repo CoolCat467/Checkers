@@ -148,7 +148,10 @@ class MachineClient(ComponentManager):
     def bind_handlers(self) -> None:
         """Register client event handlers."""
         self.register_handlers(
-            {"client_disconnected": self.handle_client_disconnected},
+            {
+                "client_disconnected": self.handle_client_disconnected,
+                "client_connection_closed": self.handle_client_disconnected,
+            },
         )
 
     ##    async def raise_event(self, event: Event) -> None:
@@ -184,6 +187,7 @@ async def run_client(
             while client.running:  # noqa: ASYNC110
                 # Wait so backlog things happen
                 await trio.sleep(1)
+            print(f"Disconnected from server {host}:{port}")
         client.unbind_components()
     connected.remove((host, port))
 
