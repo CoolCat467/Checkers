@@ -121,5 +121,6 @@ def run() -> None:
     run_clients_in_local_servers_sync(MinimaxPlayer)
 
 
-print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
-run()
+if __name__ == "__main__":
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
+    run()

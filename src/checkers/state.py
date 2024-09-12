@@ -129,7 +129,7 @@ class State:
         for y in range(h):
             line = []
             for x in range(w):
-                if (x + y) % 2:
+                if (x + y + 1) % 2:
                     # line.append("_")
                     line.append(" ")
                     continue
