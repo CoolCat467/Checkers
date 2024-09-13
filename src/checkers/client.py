@@ -168,7 +168,7 @@ class GameClient(NetworkEventComponent):
         )
         self.register_read_network_events(
             {
-                0: "no_actions->client",
+                0: "callback_ping->client",
                 1: "server->create_piece",
                 2: "server->select_piece",
                 3: "server->create_tile",
@@ -192,7 +192,7 @@ class GameClient(NetworkEventComponent):
         super().bind_handlers()
         self.register_handlers(
             {
-                # "no_actions->client": self.print_no_actions,
+                # "callback_ping->client": self.print_callback_ping,
                 "gameboard_piece_clicked": self.write_piece_click,
                 "gameboard_tile_clicked": self.write_tile_click,
                 "server->create_piece": self.read_create_piece,
@@ -213,13 +213,13 @@ class GameClient(NetworkEventComponent):
             },
         )
 
-    async def print_no_actions(self, event: Event[bytearray]) -> None:
-        """Print received `no_actions` event from server.
+    async def print_callback_ping(self, event: Event[bytearray]) -> None:
+        """Print received `callback_ping` event from server.
 
         This event is used as a sort of keepalive heartbeat, because
         it stops the connection from timing out.
         """
-        print(f"print_no_actions {event = }")
+        print(f"print_callback_ping {event = }")
 
     async def raise_disconnect(self, message: str) -> None:
         """Raise client_disconnected event with given message."""

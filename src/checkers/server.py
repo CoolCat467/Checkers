@@ -74,7 +74,7 @@ class ServerClient(NetworkEventComponent):
 
         self.register_network_write_events(
             {
-                "server[write]->no_actions": 0,
+                "server[write]->callback_ping": 0,
                 "server[write]->create_piece": 1,
                 "server[write]->select_piece": 2,
                 "server[write]->create_tile": 3,
@@ -570,13 +570,13 @@ class GameServer(Server):
         """Network loop for given ServerClient."""
         while not self.can_start() and not client.not_connected:
             await client.write_event(
-                Event("server[write]->no_actions", bytearray()),
+                Event("server[write]->callback_ping", bytearray()),
             )
         while not client.not_connected:
             print(f"{client.name} client_network_loop tick")
             try:
                 await client.write_event(
-                    Event("server[write]->no_actions", bytearray()),
+                    Event("server[write]->callback_ping", bytearray()),
                 )
                 event = await client.read_event()
             except NetworkTimeoutError:
