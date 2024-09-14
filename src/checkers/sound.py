@@ -26,16 +26,19 @@ __version__ = "0.0.0"
 __license__ = "GNU General Public License Version 3"
 
 
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from pygame import mixer
+
+if TYPE_CHECKING:
+    from os import PathLike
 
 
 class SoundData(NamedTuple):
     """Sound data container."""
 
     loops: int = 0
-    maxtime: int | float = 0
+    maxtime: int = 0
     fade_ms: int = 0
     volume: int = 100
     ##    volume_left: int = 100
@@ -43,7 +46,7 @@ class SoundData(NamedTuple):
 
 
 def play_sound(
-    filename: str,
+    filename: PathLike[str] | str,
     sound_data: SoundData,
 ) -> tuple[mixer.Sound, int | float]:
     """Play sound with pygame."""

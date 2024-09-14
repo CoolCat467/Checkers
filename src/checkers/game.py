@@ -360,7 +360,7 @@ def generate_tile_image(
 
 def play_sound(
     sound_name: str,
-) -> None:
+) -> tuple[pygame.mixer.Sound, int | float]:
     """Play sound effect."""
     sound_filename = SOUND_LOOKUP.get(sound_name)
     if sound_filename is None:
