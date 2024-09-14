@@ -291,7 +291,10 @@ class GameClient(NetworkEventComponent):
                 self.running = False
 
                 await self.close()
-                await self.raise_event(Event("client_connection_closed", None))
+                if self.manager_exists:
+                    await self.raise_event(
+                        Event("client_connection_closed", None),
+                    )
 
                 return
             await self.raise_disconnect("Error connecting to server.")

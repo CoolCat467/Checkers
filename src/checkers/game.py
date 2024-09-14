@@ -32,7 +32,6 @@ __version__ = "2.0.1"
 # 1 = True  = Black = 1, 3
 
 import contextlib
-import os
 import platform
 from collections import deque
 from os import path
@@ -57,6 +56,7 @@ from checkers.component import (
 from checkers.network_shared import DEFAULT_PORT, find_ip
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
+from checkers.sound import SoundData, play_sound as base_play_sound
 from checkers.statemachine import AsyncState
 from checkers.vector import Vector2
 
@@ -77,6 +77,20 @@ FPS: Final = 48
 VSYNC = True
 
 PLAYERS: Final = ("Red Player", "Black Player")
+
+SOUND_LOOKUP: Final = {
+    "delete_piece": "pop.mp3",
+    "piece_move": "slide.mp3",
+    "piece_update": "ding.mp3",
+    "game_won": "newthingget.ogg",
+    "button_click": "select.mp3",
+    "tick": "tick.mp3",
+}
+SOUND_DATA: Final = {
+    "delete_piece": SoundData(
+        volume=50,
+    ),
+}
 
 
 BLACK: Final = (0, 0, 0)
@@ -344,6 +358,21 @@ def generate_tile_image(
     return surf
 
 
+def play_sound(
+    sound_name: str,
+) -> None:
+    """Play sound effect."""
+    sound_filename = SOUND_LOOKUP.get(sound_name)
+    if sound_filename is None:
+        raise RuntimeError(f"Error: Sound with ID `{sound_name}` not found.")
+    sound_data = SOUND_DATA.get(sound_name, SoundData())
+
+    return base_play_sound(
+        DATA_FOLDER / sound_filename,
+        sound_data,
+    )
+
+
 class GameBoard(sprite.Sprite):
     """Entity that stores data about the game board and renders it."""
 
@@ -357,7 +386,8 @@ class GameBoard(sprite.Sprite):
     )
 
     # Define Tile Color Map and Piece Map
-    tile_color_map = (BLACK, RED)
+    ##    tile_color_map = (BLACK, RED)
+    tile_color_map = ((18, 18, 18), RED)
 
     # Define Black Pawn color to be more of a dark grey so you can see it
     black = (127, 127, 127)
@@ -366,10 +396,10 @@ class GameBoard(sprite.Sprite):
     # Define each piece by giving what color it should be and an image
     # to recolor
     piece_map = (
-        (red, "data/Pawn.png"),
-        (black, "data/Pawn.png"),
-        (red, "data/King.png"),
-        (black, "data/King.png"),
+        (red, "Pawn.png"),
+        (black, "Pawn.png"),
+        (red, "King.png"),
+        (black, "King.png"),
     )
 
     def __init__(
@@ -487,6 +517,7 @@ class GameBoard(sprite.Sprite):
         piece_name = self.get_tile_name(*piece_pos)
         await self.raise_event(Event(f"destroy_piece_{piece_name}", None))
         self.pieces.pop(piece_pos)
+        play_sound("delete_piece")
         await self.raise_event(Event("fire_next_animation", None))
 
     async def handle_update_piece_animation_event(
@@ -507,6 +538,7 @@ class GameBoard(sprite.Sprite):
         self.pieces[piece_pos] = piece_type
         piece_name = self.get_tile_name(*piece_pos)
         await self.raise_event(Event(f"piece_update_{piece_name}", piece_type))
+        play_sound("piece_update")
 
     async def handle_move_piece_animation_event(
         self,
@@ -543,6 +575,7 @@ class GameBoard(sprite.Sprite):
                 [(to_location, from_pos, to_pos)],
             ),
         )
+        play_sound("piece_move")
 
     async def new_animating_state(self, new_state: bool) -> None:
         """Process animation start or end."""
@@ -567,6 +600,7 @@ class GameBoard(sprite.Sprite):
         """Handle game_winner event."""
         # Process end of final animation
         await self.new_animating_state(False)
+        play_sound("game_won")
 
     async def handle_fire_next_animation(
         self,
@@ -624,8 +658,6 @@ class GameBoard(sprite.Sprite):
         outline: sprite.OutlineComponent = image.get_component("outline")
         outline.size = 2
 
-        base_folder = os.path.dirname(__file__)
-
         for index, color in enumerate(self.tile_color_map):
             name = f"tile_{index}"
             surface = generate_tile_image(
@@ -648,7 +680,7 @@ class GameBoard(sprite.Sprite):
         # Generate a Piece Surface for each piece using a base image and a color
         for piece_type, piece_data in enumerate(self.piece_map):
             color, filename = piece_data
-            real_path = os.path.join(base_folder, *filename.split("/"))
+            real_path = DATA_FOLDER / filename
 
             name = f"piece_{piece_type}"
             surface = base2d.replace_with_color(
@@ -988,6 +1020,7 @@ class GameState(AsyncState["CheckersClient"]):
         """Return an async function that will change state to `new_state`."""
 
         async def set_state(*args: object, **kwargs: object) -> None:
+            play_sound("button_click")
             await self.machine.set_state(new_state)
 
         return set_state

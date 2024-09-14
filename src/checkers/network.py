@@ -25,6 +25,7 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 
+import contextlib
 from typing import (
     TYPE_CHECKING,
     Any,
@@ -173,7 +174,8 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
 
     async def send_eof(self) -> None:
         """Close the sending half of the stream."""
-        await self.stream.send_eof()
+        with contextlib.suppress(trio.ClosedResourceError):
+            await self.stream.send_eof()
 
     async def wait_write_might_not_block(self) -> None:
         """stream.wait_send_all_might_not_block."""
