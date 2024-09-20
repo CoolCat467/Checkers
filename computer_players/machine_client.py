@@ -20,11 +20,8 @@ from checkers.component import (
 )
 from checkers.state import Action, Pos, State
 
-if sys.version_info >= (3, 11):
-    BaseExceptionGroup_ = BaseExceptionGroup
-else:
-    BaseExceptionGroup_ = trio.MultiError
-
+if sys.version_info < (3, 11):
+    from exceptiongroup import BaseExceptionGroup
 
 # Player:
 # 0 = False = Person  = MIN = 0, 2
@@ -222,7 +219,7 @@ async def run_clients_in_local_servers(
                         connected,
                     )
                 await trio.sleep(1)
-    except BaseExceptionGroup_ as exc:
+    except BaseExceptionGroup as exc:
         caught = False
         for ex in exc.exceptions:
             if isinstance(ex, KeyboardInterrupt):

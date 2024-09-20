@@ -41,6 +41,7 @@ dependencies = [
     "typing_extensions>=4.12.2",
     "trio~=0.26.2",
     "cryptography>=43.0.0",
+    "exceptiongroup; python_version < '3.11'",
 ]
 
 [tool.setuptools.dynamic]
