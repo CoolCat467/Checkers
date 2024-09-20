@@ -22,7 +22,7 @@ from __future__ import annotations
 __title__ = "Checkers"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
@@ -34,9 +34,8 @@ __version__ = "2.0.1"
 import contextlib
 import platform
 from collections import deque
-from os import path
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, TypeAlias, TypeVar
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import pygame
 import trio
@@ -53,7 +52,7 @@ from checkers.component import (
     Event,
     ExternalRaiseManager,
 )
-from checkers.network_shared import DEFAULT_PORT, find_ip
+from checkers.network_shared import DEFAULT_PORT, Pos, find_ip
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
 from checkers.sound import SoundData, play_sound as base_play_sound
@@ -68,6 +67,7 @@ if TYPE_CHECKING:
         Iterable,
         Sequence,
     )
+    from types import ModuleType
 
     from pygame.surface import Surface
 
@@ -105,11 +105,21 @@ WHITE: Final = (255, 255, 255)
 
 T = TypeVar("T")
 
-DATA_FOLDER: Final = Path(__file__).parent / "data"
+if globals().get("__file__") is None:
+    if TYPE_CHECKING:
+
+        def resolve(name: str) -> ModuleType: ...  # noqa: D103
+
+    else:
+        from importlib.resources._common import resolve
+
+    __file__ = str(
+        Path(resolve("checkers.data").__path__[0]).parent / "game.py",
+    )
+
+DATA_FOLDER: Final = Path(__file__).absolute().parent / "data"
 
 IS_WINDOWS: Final = platform.system() == "Windows"
-
-Pos: TypeAlias = tuple[int, int]
 
 
 def render_text(
@@ -704,7 +714,7 @@ class GameBoard(sprite.Sprite):
             outline_ident = outline.precalculate_outline(name, outline_color)
             image.add_image(f"{name}_outlined", outline_ident)
 
-    def get_tile_location(self, position: Pos) -> Vector2:
+    def get_tile_location(self, position: tuple[int, int]) -> Vector2:
         """Return the center point of a given tile position."""
         location = Vector2.from_iter(position) * self.tile_size
         center = self.tile_size // 2
@@ -773,7 +783,7 @@ class GameBoard(sprite.Sprite):
                 ### Blit the id of the tile at the tile's location
                 ##surf.blit(
                 ##    render_text(
-                ##        trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+                ##        DATA_FOLDER / "VeraSerif.ttf",
                 ##        20,
                 ##        "".join(map(str, (x, y))),
                 ##        GREEN
@@ -826,7 +836,7 @@ class ClickDestinationComponent(Component):
 
         if not self.selected:
             movement: sprite.MovementComponent = self.get_component("movement")
-            movement.speed = 0
+            movement.speed = 0.0
 
     async def click(self, event: Event[dict[str, int]]) -> None:
         """Toggle selected."""
@@ -841,15 +851,18 @@ class ClickDestinationComponent(Component):
             self.selected = True
             await self.update_selected()
         movement: sprite.MovementComponent = self.get_component("movement")
-        movement.speed = 0
+        movement.speed = 0.0
 
-    async def mouse_down(self, event: Event[dict[str, int | Pos]]) -> None:
+    async def mouse_down(
+        self,
+        event: Event[dict[str, int | tuple[int, int]]],
+    ) -> None:
         """Target click pos if selected."""
         if not self.selected:
             return
         if event.data["button"] == 1:
             movement: sprite.MovementComponent = self.get_component("movement")
-            movement.speed = 200
+            movement.speed = 200.0
             target: sprite.TargetingComponent = self.get_component("targeting")
             assert isinstance(event.data["pos"], tuple)
             target.destination = Vector2.from_iter(event.data["pos"])
@@ -944,7 +957,7 @@ class FPSCounter(objects.Text):
     def __init__(self) -> None:
         """Initialize FPS counter."""
         font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+            DATA_FOLDER / "VeraSerif.ttf",
             28,
         )
         super().__init__("fps", font)
@@ -1112,11 +1125,11 @@ class TitleState(GameState):
         self.id = self.machine.new_group("title")
 
         button_font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+            DATA_FOLDER / "VeraSerif.ttf",
             28,
         )
         title_font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+            DATA_FOLDER / "VeraSerif.ttf",
             56,
         )
 
@@ -1266,7 +1279,7 @@ class PlayJoiningState(GameState):
         self.buttons: dict[tuple[str, int], int] = {}
 
         self.font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+            DATA_FOLDER / "VeraSerif.ttf",
             28,
         )
 
@@ -1412,7 +1425,7 @@ class PlayState(GameState):
         self.exit_data = (exit_status, message, True)
 
         font = pygame.font.Font(
-            trio.Path(path.dirname(__file__), "data", "VeraSerif.ttf"),
+            DATA_FOLDER / "VeraSerif.ttf",
             28,
         )
 
@@ -1455,7 +1468,7 @@ class PlayState(GameState):
 class CheckersClient(sprite.GroupProcessor):
     """Checkers Game Client."""
 
-    __slots__ = ("manager",)
+    __slots__ = ("manager", "__weakref__")
 
     def __init__(self, manager: ComponentManager) -> None:
         """Initialize Checkers Client."""
@@ -1503,7 +1516,7 @@ async def async_run() -> None:
         client = CheckersClient(event_manager)
 
         background = pygame.image.load(
-            path.join(path.dirname(__file__), "data", "background.png"),
+            DATA_FOLDER / "background.png",
         ).convert()
         client.clear(screen, background)
 

@@ -30,11 +30,8 @@ from typing import (
     TYPE_CHECKING,
     Any,
     AnyStr,
-    Generic,
     Literal,
     NoReturn,
-    SupportsIndex,
-    TypeAlias,
 )
 
 import trio
@@ -51,14 +48,9 @@ from checkers.component import (
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
     from types import TracebackType
 
     from typing_extensions import Self
-
-    BytesConvertable: TypeAlias = SupportsIndex | Iterable[SupportsIndex]
-else:
-    BytesConvertable = Generic
 
 
 class NetworkTimeoutError(Exception):
@@ -67,7 +59,7 @@ class NetworkTimeoutError(Exception):
     __slots__ = ()
 
 
-class NetworkStreamNotConnectedError(RuntimeError):
+class NetworkStreamNotConnectedError(Exception):
     """Network Stream Not Connected Error."""
 
     __slots__ = ()

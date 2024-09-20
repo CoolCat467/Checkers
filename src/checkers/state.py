@@ -26,7 +26,17 @@ __version__ = "0.0.0"
 
 import copy
 import math
-from typing import TYPE_CHECKING, Any, NamedTuple, Self, TypeVar, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    NamedTuple,
+    Self,
+    TypeAlias,
+    TypeVar,
+    cast,
+)
+
+from mypy_extensions import u8
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
@@ -45,7 +55,7 @@ PAWN_JUMP_FORWARD_ONLY = True  # Pawns not allowed to go backwards in jumps?
 
 T = TypeVar("T")
 
-Pos = tuple[int, int]
+Pos: TypeAlias = tuple[u8, u8]
 
 
 class Action(NamedTuple):
@@ -79,7 +89,7 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
     return cast(tuple[Pos, Pos, Pos, Pos], tuple_sides)
 
 
-def pawn_modify(moves: tuple[T, ...], piece_type: int) -> tuple[T, ...]:
+def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
     """Return moves but remove invalid moves for pawns."""
     assert (
         len(moves) == 4
@@ -104,7 +114,7 @@ class State:
         self,
         size: tuple[int, int],
         pieces: dict[Pos, int],
-        turn: int = 1,  # Black moves first
+        turn: bool = True,  # Black moves first
         /,
         pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
@@ -285,7 +295,7 @@ class State:
 
     def get_turn(self) -> int:
         """Return whose turn it is. 0 = red, 1 = black."""
-        return self.turn
+        return int(self.turn)
 
     def valid_location(self, position: Pos) -> bool:
         """Return if position is valid."""
@@ -483,7 +493,7 @@ class State:
                 has_move = True
                 # Player has at least one move, no need to continue
                 break
-            if not has_move and self.turn == player:
+            if not has_move and self.turn == bool(player):
                 # Continued without break, so player either has no moves
                 # or no possible moves, so their opponent wins
                 return (player + 1) % 2
