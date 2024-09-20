@@ -67,7 +67,6 @@ if TYPE_CHECKING:
         Iterable,
         Sequence,
     )
-    from types import ModuleType
 
     from pygame.surface import Surface
 
@@ -106,15 +105,11 @@ WHITE: Final = (255, 255, 255)
 T = TypeVar("T")
 
 if globals().get("__file__") is None:
-    if TYPE_CHECKING:
-
-        def resolve(name: str) -> ModuleType: ...  # noqa: D103
-
-    else:
-        from importlib.resources._common import resolve
+    import importlib
 
     __file__ = str(
-        Path(resolve("checkers.data").__path__[0]).parent / "game.py",
+        Path(importlib.import_module("checkers.data").__path__[0]).parent
+        / "game.py",
     )
 
 DATA_FOLDER: Final = Path(__file__).absolute().parent / "data"
@@ -1468,7 +1463,7 @@ class PlayState(GameState):
 class CheckersClient(sprite.GroupProcessor):
     """Checkers Game Client."""
 
-    __slots__ = ("manager", "__weakref__")
+    __slots__ = ("manager",)
 
     def __init__(self, manager: ComponentManager) -> None:
         """Initialize Checkers Client."""
