@@ -35,7 +35,7 @@ class RemoteState(Component, metaclass=ABCMeta):
     turn.
     """
 
-    __slots__ = ("state", "pieces", "has_initial", "playing_as")
+    __slots__ = ("state", "pieces", "has_initial", "playing_as", "moves")
 
     def __init__(self) -> None:
         """Initialize remote state."""
@@ -46,6 +46,7 @@ class RemoteState(Component, metaclass=ABCMeta):
         self.pieces: dict[Pos, int] = {}
 
         self.playing_as = 1
+        self.moves = 0
 
     def bind_handlers(self) -> None:
         """Register game event handlers."""
@@ -78,8 +79,12 @@ class RemoteState(Component, metaclass=ABCMeta):
 
     async def base_preform_turn(self) -> None:
         """Perform turn."""
-        if self.state.check_for_win() is not None:
+        self.moves += 1
+        winner = self.state.check_for_win()
+        if winner is not None:
             print("Terminal state, not performing turn")
+            value = ("Lost", "Won")[winner == self.playing_as]
+            print(f"{value} after {self.moves}")
             return
         action = await self.preform_turn()
         await self.preform_action(action)
