@@ -30,7 +30,6 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NamedTuple,
-    Self,
     TypeAlias,
     TypeVar,
     cast,
@@ -40,6 +39,8 @@ from mypy_extensions import u8
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
+
+    from typing_extensions import Self
 
 MANDATORY_CAPTURE = True  # If a jump is available, do you have to or not?
 PAWN_JUMP_FORWARD_ONLY = True  # Pawns not allowed to go backwards in jumps?
