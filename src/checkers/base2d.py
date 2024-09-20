@@ -33,7 +33,7 @@ from checkers.statemachine import StateMachine
 from checkers.vector import Vector2
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Generator, Iterable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
 
 def amol(
@@ -146,20 +146,6 @@ def get_colors(
             if color not in colors:
                 colors.add(color)
     return colors
-
-
-def average_color(
-    surface: pygame.surface.Surface,
-) -> Generator[int, None, None]:
-    """Return the average RGB value of a surface."""
-    s_r, s_g, s_b = 0, 0, 0
-    colors = get_colors(surface)
-    for color in colors:
-        r, g, b = color
-        s_r += r
-        s_g += g
-        s_b += b
-    return (int(x / len(colors)) for x in (s_r, s_g, s_b))
 
 
 def replace_with_color(
@@ -357,8 +343,8 @@ class BaseButton(GameEntity):
         self.value = 0
         self.max_value = int(states)
         self.anim = anim
-        self.press_time: float = 1
-        self.last_press: float = 0
+        self.press_time: float = 1.0
+        self.last_press: float = 0.0
         self.scan = int(max(get_surf_lens(self.anim)) / 2) + 2
 
         keys = list(kwargs.keys())

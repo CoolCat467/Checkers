@@ -52,7 +52,7 @@ def play_sound(
     """Play sound with pygame."""
     sound_object = mixer.Sound(filename)
     sound_object.set_volume(sound_data.volume)
-    seconds = sound_object.get_length()
+    seconds: int | float = sound_object.get_length()
     if sound_data.maxtime > 0:
         seconds = sound_data.maxtime
     _channel = sound_object.play(
