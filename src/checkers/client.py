@@ -46,6 +46,9 @@ from checkers.network_shared import (
     write_position,
 )
 
+if TYPE_CHECKING:
+    from mypy_extensions import u8
+
 
 async def read_advertisements(
     timeout: int = 3,  # noqa: ASYNC109
@@ -304,7 +307,7 @@ class GameClient(NetworkEventComponent):
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
-        piece_type = buffer.read_value(StructFormat.UBYTE)
+        piece_type: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
             Event("gameboard_create_piece", (piece_pos, piece_type)),
@@ -381,7 +384,7 @@ class GameClient(NetworkEventComponent):
         buffer = Buffer(event.data)
 
         piece_pos = read_position(buffer)
-        piece_type = buffer.read_value(StructFormat.UBYTE)
+        piece_type: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
             Event("gameboard_update_piece_animation", (piece_pos, piece_type)),
@@ -415,7 +418,7 @@ class GameClient(NetworkEventComponent):
         """Read update_piece event from server."""
         buffer = Buffer(event.data)
 
-        winner = buffer.read_value(StructFormat.UBYTE)
+        winner: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(Event("game_winner", winner))
         self.running = False
@@ -430,7 +433,7 @@ class GameClient(NetworkEventComponent):
 
         from_pos = read_position(buffer)
         to_pos = read_position(buffer)
-        current_turn = buffer.read_value(StructFormat.UBYTE)
+        current_turn: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
             Event("game_action_complete", (from_pos, to_pos, current_turn)),
@@ -441,7 +444,7 @@ class GameClient(NetworkEventComponent):
         buffer = Buffer(event.data)
 
         board_size = read_position(buffer)
-        current_turn = buffer.read_value(StructFormat.UBYTE)
+        current_turn: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
             Event("game_initial_config", (board_size, current_turn)),
@@ -451,7 +454,7 @@ class GameClient(NetworkEventComponent):
         """Read playing_as event from server."""
         buffer = Buffer(event.data)
 
-        playing_as = buffer.read_value(StructFormat.UBYTE)
+        playing_as: u8 = buffer.read_value(StructFormat.UBYTE)
 
         await self.raise_event(
             Event("game_playing_as", playing_as),

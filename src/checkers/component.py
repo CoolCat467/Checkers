@@ -33,6 +33,8 @@ import trio
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Generator, Iterable
 
+    from mypy_extensions import u8
+
 T = TypeVar("T")
 
 
@@ -45,7 +47,7 @@ class Event(Generic[T]):
         self,
         name: str,
         data: T,
-        levels: int = 0,
+        levels: u8 = 0,
     ) -> None:
         """Initialize event."""
         self.name = name

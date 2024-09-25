@@ -39,6 +39,7 @@ keywords = [
 dependencies = [
     "pygame~=2.6.0",
     "typing_extensions>=4.12.2",
+    "mypy_extensions>=1.0.0",
     "trio~=0.26.2",
     "cryptography>=43.0.0",
     "exceptiongroup; python_version < '3.11'",
@@ -53,7 +54,7 @@ version = {attr = "checkers.game.__version__"}
 "Bug Tracker" = "https://github.com/CoolCat467/Checkers/issues"
 
 [project.scripts]
-checkers_game = "checkers.game:cli_run"
+checkers_game = "checkers:cli_run"
 
 [tool.setuptools.package-data]
 checkers = ["py.typed", "data/*"]

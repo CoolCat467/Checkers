@@ -2,7 +2,7 @@
 
 # Programmed by CoolCat467
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2024  CoolCat467
 #
 #     This program is free software: you can redistribute it and/or modify
 #     it under the terms of the GNU General Public License as published by
@@ -26,6 +26,7 @@ __license__ = "GNU General Public License Version 3"
 from typing import TYPE_CHECKING, Final, NamedTuple, TypeAlias
 
 import trio
+from mypy_extensions import u8
 
 from .base_io import StructFormat
 
@@ -37,7 +38,7 @@ ADVERTISEMENT_PORT: Final = 4445
 
 DEFAULT_PORT: Final = 31613
 
-Pos: TypeAlias = tuple[int, int]
+Pos: TypeAlias = tuple[u8, u8]
 
 
 class TickEventData(NamedTuple):
@@ -49,8 +50,8 @@ class TickEventData(NamedTuple):
 
 def read_position(buffer: Buffer) -> Pos:
     """Read a position tuple from buffer."""
-    pos_x = buffer.read_value(StructFormat.UBYTE)
-    pos_y = buffer.read_value(StructFormat.UBYTE)
+    pos_x: u8 = buffer.read_value(StructFormat.UBYTE)
+    pos_y: u8 = buffer.read_value(StructFormat.UBYTE)
 
     return pos_x, pos_y
 
