@@ -1,6 +1,7 @@
-Pop 2 by greenvwbeetle -- https://freesound.org/s/244654/ -- License: Creative Commons 0
-clock-tick-01.flac by pbimal -- https://freesound.org/s/534094/ -- License: Creative Commons 0
-Plate Sliding on Counter.wav by PVM -- https://freesound.org/s/585634/ -- License: Creative Commons 0
-bell ding 3.wav by 5ro4 -- https://freesound.org/s/611111/ -- License: Creative Commons 0
-New Thing Get by congusbongus -- https://opengameart.org/content/new-thing-get -- License: Creative Commons 0
-Menu Selection Click by NenadSimic -- https://opengameart.org/content/menu-selection-click -- License: Creative Commons By 3.0
+See LICENSE-THIRD-PARTY for full licence details
+Pop 2 by greenvwbeetle -- https://freesound.org/s/244654/
+clock-tick-01.flac by pbimal -- https://freesound.org/s/534094/
+Plate Sliding on Counter.wav by PVM -- https://freesound.org/s/585634/
+bell ding 3.wav by 5ro4 -- https://freesound.org/s/611111/
+New Thing Get by congusbongus -- https://opengameart.org/content/new-thing-get
+Menu Selection Click by NenadSimic -- https://opengameart.org/content/menu-selection-click
