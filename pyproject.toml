@@ -1,6 +1,6 @@
 [build-system]
-requires = ["hatchling >= 1.20.0"]
-build-backend = "hatchling.build"
+requires = ["setuptools >= 64"]
+build-backend = "setuptools.build_meta"
 
 [project]
 name = "checkers"
@@ -45,8 +45,8 @@ dependencies = [
     "exceptiongroup; python_version < '3.11'",
 ]
 
-[tool.hatch.version]
-path = "src/checkers/game.py"
+[tool.setuptools.dynamic]
+version = {attr = "checkers.game.__version__"}
 
 [project.urls]
 "Homepage" = "https://github.com/CoolCat467/Checkers"
@@ -56,17 +56,8 @@ path = "src/checkers/game.py"
 [project.scripts]
 checkers_game = "checkers:cli_run"
 
-[tool.hatch.build.targets.wheel.hooks.mypyc]
-dependencies = [
-    "hatch-mypyc>=0.16.0",
-    "mypy==1.11.2",
-]
-require-runtime-dependencies = true
-exclude = [
-    "src/checkers/vector.py",
-    "src/checkers/base_io.py",
-    "src/checkers/buffer.py",
-]
+[tool.setuptools.package-data]
+checkers = ["py.typed", "data/*"]
 
 [tool.mypy]
 mypy_path = "src"
