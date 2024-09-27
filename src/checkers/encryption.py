@@ -9,13 +9,19 @@ __author__ = "ItsDrike"
 __license__ = "LGPL-3.0-only"
 
 import os
+from typing import cast
 
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
 from cryptography.hazmat.primitives.asymmetric.rsa import (
-    RSAPrivateKey,
-    RSAPublicKey,
+    RSAPrivateKey as RSAPrivateKey,
+    RSAPublicKey as RSAPublicKey,
     generate_private_key,
+)
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PublicFormat,
+    load_der_public_key,
 )
 
 
@@ -109,3 +115,24 @@ def decrypt_token_and_secret(
     decrypted_token = private_key.decrypt(verification_token, PKCS1v15())
     decrypted_secret = private_key.decrypt(shared_secret, PKCS1v15())
     return decrypted_token, decrypted_secret
+
+
+def serialize_public_key(
+    public_key: RSAPublicKey,
+) -> bytes:
+    """Return public key serialize as bytes."""
+    return public_key.public_bytes(
+        encoding=Encoding.DER,
+        format=PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def deserialize_public_key(serialized_public_key: bytes) -> RSAPublicKey:
+    """Return deserialized public key."""
+    # Key type is determined by the passed key itself.
+    # We know in our case it will be an RSA public key,
+    # so we explicitly type-cast here.
+    return cast(
+        RSAPublicKey,
+        load_der_public_key(serialized_public_key, default_backend()),
+    )

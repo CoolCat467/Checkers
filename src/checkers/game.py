@@ -22,7 +22,7 @@ from __future__ import annotations
 __title__ = "Checkers"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
-__version__ = "2.0.2"
+__version__ = "2.1.0"
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8

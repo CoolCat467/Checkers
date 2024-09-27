@@ -33,8 +33,13 @@ import trio
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import Event
+from checkers.encrypted_event import EncryptedNetworkEventComponent
+from checkers.encryption import (
+    deserialize_public_key,
+    encrypt_token_and_secret,
+    generate_shared_secret,
+)
 from checkers.network import (
-    NetworkEventComponent,
     NetworkStreamNotConnectedError,
     NetworkTimeoutError,
 )
@@ -146,7 +151,7 @@ async def read_advertisements(
         return response
 
 
-class GameClient(NetworkEventComponent):
+class GameClient(EncryptedNetworkEventComponent):
     """Game Client Network Event Component.
 
     This class handles connecting to the game server, transmitting events
@@ -167,6 +172,7 @@ class GameClient(NetworkEventComponent):
             {
                 "select_piece->server": 0,
                 "select_tile->server": 1,
+                "encryption_response->server": 2,
             },
         )
         self.register_read_network_events(
@@ -184,6 +190,7 @@ class GameClient(NetworkEventComponent):
                 10: "server->action_complete",
                 11: "server->initial_config",
                 12: "server->playing_as",
+                13: "server->encryption_request",
             },
         )
 
@@ -210,6 +217,7 @@ class GameClient(NetworkEventComponent):
                 "server->action_complete": self.read_action_complete,
                 "server->initial_config": self.read_initial_config,
                 "server->playing_as": self.read_playing_as,
+                "server->encryption_request": self.read_encryption_request,
                 "network_stop": self.handle_network_stop,
                 "client_connect": self.handle_client_connect,
                 # f"client[{self.name}]_read_event": self.handle_read_event,
@@ -459,6 +467,40 @@ class GameClient(NetworkEventComponent):
         await self.raise_event(
             Event("game_playing_as", playing_as),
         )
+
+    async def write_encryption_response(
+        self,
+        shared_secret: bytes,
+        verify_token: bytes,
+    ) -> None:
+        """Write encryption response to server."""
+        buffer = Buffer()
+        buffer.write_bytearray(shared_secret)
+        buffer.write_bytearray(verify_token)
+
+        await self.write_event(Event("encryption_response->server", buffer))
+
+    async def read_encryption_request(self, event: Event[bytearray]) -> None:
+        """Read and handle encryption request from server."""
+        buffer = Buffer(event.data)
+
+        serialized_public_key = buffer.read_bytearray()
+        verify_token = buffer.read_bytearray()
+
+        public_key = deserialize_public_key(serialized_public_key)
+
+        shared_secret = generate_shared_secret()
+
+        encrypted_token, encrypted_secret = encrypt_token_and_secret(
+            public_key,
+            verify_token,
+            shared_secret,
+        )
+
+        await self.write_encryption_response(encrypted_secret, encrypted_token)
+
+        # Start encrypting all future data
+        self.enable_encryption(shared_secret)
 
     async def handle_network_stop(self, event: Event[None]) -> None:
         """Send EOF if connected and close socket."""
