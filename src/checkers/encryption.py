@@ -142,8 +142,7 @@ def serialize_public_key(
 def deserialize_public_key(serialized_public_key: bytes) -> RSAPublicKey:
     """Return deserialized public key."""
     # Key type is determined by the passed key itself.
-    # We know in our case it will be an RSA public key,
-    # so we explicitly type-cast here.
+    # Should be be an RSA public key in this case.
     key = load_der_public_key(serialized_public_key, default_backend())
     assert isinstance(key, RSAPublicKey)
     return key

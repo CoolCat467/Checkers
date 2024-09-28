@@ -8,8 +8,9 @@ __license__ = "LGPL-3.0-only"
 
 from typing import cast
 
-from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
 from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
+from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
 from checkers.encryption import encrypt_token_and_secret
@@ -41,8 +42,10 @@ RSA_PUBLIC_KEY = RSA_PRIVATE_KEY.public_key()
 
 def test_encrypt_token_and_secret() -> None:
     """Test encryption returns properly encrypted (decryptable) values."""
-    verification_token = bytes.fromhex("9bd416ef")
-    shared_secret = bytes.fromhex("f71e3033d4c0fc6aadee4417831b5c3e")
+    verification_token = bytes.fromhex("da053623dd3dcd441e105ee5ce212ac8")
+    shared_secret = bytes.fromhex(
+        "95a883358f09cd5698b3cf8a414a8a659a35c4eb877e9b0228b7f64df85b0f26",
+    )
 
     encrypted_token, encrypted_secret = encrypt_token_and_secret(
         RSA_PUBLIC_KEY,
@@ -51,9 +54,16 @@ def test_encrypt_token_and_secret() -> None:
     )
 
     assert (
-        RSA_PRIVATE_KEY.decrypt(encrypted_token, PKCS1v15())
+        RSA_PRIVATE_KEY.decrypt(
+            encrypted_token,
+            OAEP(MGF1(SHA256()), SHA256(), None),
+        )
         == verification_token
     )
     assert (
-        RSA_PRIVATE_KEY.decrypt(encrypted_secret, PKCS1v15()) == shared_secret
+        RSA_PRIVATE_KEY.decrypt(
+            encrypted_secret,
+            OAEP(MGF1(SHA256()), SHA256(), None),
+        )
+        == shared_secret
     )
