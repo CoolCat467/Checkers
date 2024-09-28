@@ -355,7 +355,7 @@ class ServerClient(EncryptedNetworkEventComponent):
             )
 
         # Start encrypting all future data
-        self.enable_encryption(shared_secret)
+        self.enable_encryption(shared_secret, verify_token)
 
 
 class CheckersState(State):
@@ -640,6 +640,7 @@ class GameServer(Server):
         """Network loop for given ServerClient."""
         # Encrypt traffic
         await client.start_encryption_request()
+        assert client.encryption_enabled
 
         while not self.can_start() and not client.not_connected:
             await client.write_event(

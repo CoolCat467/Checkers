@@ -51,17 +51,20 @@ class EncryptedNetworkEventComponent(NetworkEventComponent):
         """Initialize Encrypted Network Event Component."""
         super().__init__(name)
 
-        self.cipher: Cipher[modes.CFB8]
+        self.cipher: Cipher[modes.CFB8] | None = None
         self.encryptor: CipherContext
         self.decryptor: CipherContext
-        self.shared_secret: bytes | None = None
 
     @property
     def encryption_enabled(self) -> bool:
         """Return if encryption is enabled."""
-        return self.shared_secret is not None
+        return self.cipher is not None
 
-    def enable_encryption(self, shared_secret: bytes) -> None:
+    def enable_encryption(
+        self,
+        shared_secret: bytes,
+        initialization_vector: bytes,
+    ) -> None:
         """Enable encryption for this connection, using the ``shared_secret``.
 
         After calling this method, the reading and writing process for this connection
@@ -79,10 +82,9 @@ class EncryptedNetworkEventComponent(NetworkEventComponent):
         if type(shared_secret) is not bytes:
             shared_secret = bytes(shared_secret)
 
-        self.shared_secret = shared_secret
         self.cipher = Cipher(
-            algorithms.AES(shared_secret),
-            modes.CFB8(shared_secret),
+            algorithms.AES256(shared_secret),
+            modes.CFB8(initialization_vector),
             backend=default_backend(),
         )
         self.encryptor = self.cipher.encryptor()

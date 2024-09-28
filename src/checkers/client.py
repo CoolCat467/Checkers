@@ -500,7 +500,7 @@ class GameClient(EncryptedNetworkEventComponent):
         await self.write_encryption_response(encrypted_secret, encrypted_token)
 
         # Start encrypting all future data
-        self.enable_encryption(shared_secret)
+        self.enable_encryption(shared_secret, verify_token)
 
     async def handle_network_stop(self, event: Event[None]) -> None:
         """Send EOF if connected and close socket."""
