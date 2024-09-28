@@ -107,7 +107,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """Connect to host:port on TCP."""
         if not self.not_connected:
             raise RuntimeError("Already connected!")
-        try:
+        try:  # pragma: nocover
             self._stream = await trio.open_tcp_stream(host, port)
         except OSError:  # pragma: nocover
             await self.close()
@@ -274,7 +274,7 @@ class NetworkEventComponent(NetworkComponent):
             raise ValueError(f"Packet ID {packet_id!r} already registered!")
         if self._write_event_name_to_packet_id.get(event_name) == packet_id:
             raise ValueError(
-                f"Packet id {packet_id!r} packets are also being received"
+                f"Packet id {packet_id!r} packets are also being received "
                 f"from server with as {event_name!r} events, "
                 "which will would lead to infinite looping over network",
             )
@@ -306,7 +306,8 @@ class Server(ComponentManager):
             return
         self.cancel_scope.cancel()
 
-    async def serve(  # type: ignore[misc]  # "Implicit return in function which does not return"
+    # "Implicit return in function which does not return"
+    async def serve(  # type: ignore[misc]  # pragma: nocover
         self,
         port: int,
         host: AnyStr | None = None,
@@ -341,7 +342,10 @@ class Server(ComponentManager):
 
             await nursery.start(handle_serve)
 
-    async def handler(self, stream: trio.SocketStream) -> None:
+    async def handler(
+        self,
+        stream: trio.SocketStream,
+    ) -> None:  # pragma: nocover
         """Handle new client streams.
 
         Override in a subclass - Default only closes the stream

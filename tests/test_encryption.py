@@ -13,7 +13,12 @@ from cryptography.hazmat.primitives.asymmetric.rsa import RSAPrivateKey
 from cryptography.hazmat.primitives.hashes import SHA256
 from cryptography.hazmat.primitives.serialization import load_pem_private_key
 
-from checkers.encryption import encrypt_token_and_secret
+from checkers.encryption import (
+    decrypt_token_and_secret,
+    deserialize_public_key,
+    encrypt_token_and_secret,
+    serialize_public_key,
+)
 
 _SERIALIZED_RSA_PRIVATE_KEY = b"""
 -----BEGIN PRIVATE KEY-----
@@ -38,6 +43,9 @@ RSA_PRIVATE_KEY = cast(
     load_pem_private_key(_SERIALIZED_RSA_PRIVATE_KEY, password=None),
 )
 RSA_PUBLIC_KEY = RSA_PRIVATE_KEY.public_key()
+SERIALIZED_RSA_PUBLIC_KEY = bytes.fromhex(
+    "30819f300d06092a864886f70d010101050003818d0030818902818100cb515109911ea3e4740d8a17a7ccd9cf226c83c7615e4a5505cd124571ee210a4ba26c7c42e15f51fcb7fa90dce6f83ebe0e163817c7d9fb1af7d981e90da2cc06ea59d01ff9fbb76b1803a0fe5af4a2c75145d89eb03e6a4aae21d2e7d4c3938a298da575e12e0ae178d61a69bc0ea0b381790f182d9dba715bfb503c99d92b0203010001",
+)
 
 
 def test_encrypt_token_and_secret() -> None:
@@ -67,3 +75,34 @@ def test_encrypt_token_and_secret() -> None:
         )
         == shared_secret
     )
+
+
+def test_decrypt_token_and_secret() -> None:
+    """Test decryption returns properly decrypted values."""
+    encrypted_token = bytes.fromhex(
+        "5541c0c0fc99d8908ed428b20c260795bec7b4041a4f98d26fbed383e8dba077eb53fb5cf905e722e2ceb341843e875508134817bcd3a909ac279e77ed94fd98c428bbe00db630a5ad3df310380d9274ed369cc6a011e7edd45cbe44ae8ad2575ef793b23057e4b15f1b6e3e195ff0921e46370773218517922fbb8b96092d88",
+    )
+    encrypted_secret = bytes.fromhex(
+        "1a43782ca17f71e87e6ef98f9be66050ecf5d185da81445d26ceb5941f95d69d61b726d27b5ca62aed4cbe27b40fd4bd6b16b5be154a7b6a24ae31c705bc47d9397589b448fb72b14572ea2a9d843c6a3c674b7454cef97e2d65be36e0d0a8cc9f1093a19a8d52a5633a5317d19779bb46146dfaea7a690a7f080fb77d59c7f9",
+    )
+
+    assert decrypt_token_and_secret(
+        RSA_PRIVATE_KEY,
+        encrypted_token,
+        encrypted_secret,
+    ) == (
+        bytes.fromhex("da053623dd3dcd441e105ee5ce212ac8"),
+        bytes.fromhex(
+            "95a883358f09cd5698b3cf8a414a8a659a35c4eb877e9b0228b7f64df85b0f26",
+        ),
+    )
+
+
+def test_serialize_public_key() -> None:
+    """Test serialize_public_key."""
+    assert serialize_public_key(RSA_PUBLIC_KEY) == SERIALIZED_RSA_PUBLIC_KEY
+
+
+def test_deserialize_public_key() -> None:
+    """Test deserialize_public_key."""
+    assert deserialize_public_key(SERIALIZED_RSA_PUBLIC_KEY) == RSA_PUBLIC_KEY

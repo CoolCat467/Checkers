@@ -203,6 +203,13 @@ class ComponentManager(Component):
         component_name: str,
     ) -> None:
         """Register handler_func as handler for event_name."""
+        if (
+            component_name != self.name
+            and component_name not in self.__components
+        ):
+            raise ValueError(
+                f"Component named {component_name!r} is not registered!",
+            )
         if event_name not in self.__event_handlers:
             self.__event_handlers[event_name] = set()
         self.__event_handlers[event_name].add((handler_coro, component_name))

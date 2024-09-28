@@ -71,7 +71,7 @@ def write_position(buffer: Buffer, pos: Pos) -> None:
 # reached from the outside. Quite nasty problem actually.
 
 
-async def find_ip() -> str:
+async def find_ip() -> str:  # pragma: nocover
     """Guess the IP where the server can be found from the network."""
     # we get a UDP-socket for the TEST-networks reserved by IANA.
     # It is highly unlikely, that there is special routing used

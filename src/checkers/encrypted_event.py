@@ -75,16 +75,9 @@ class EncryptedNetworkEventComponent(NetworkEventComponent):
 
             See :func:`checkers.encryption.generate_shared_secret`.
         """
-        # Ensure the `shared_secret` is an instance of the bytes class, not any
-        # subclass. This is needed since the cryptography library calls some C
-        # code in the back, which relies on this being bytes. If it's not a bytes
-        # instance, convert it.
-        if type(shared_secret) is not bytes:
-            shared_secret = bytes(shared_secret)
-
         self.cipher = Cipher(
-            algorithms.AES256(shared_secret),
-            modes.CFB8(initialization_vector),
+            algorithms.AES256(bytes(shared_secret)),
+            modes.CFB8(bytes(initialization_vector)),
             backend=default_backend(),
         )
         self.encryptor = self.cipher.encryptor()

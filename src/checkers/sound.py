@@ -45,7 +45,7 @@ class SoundData(NamedTuple):
     ##    volume_right: int = 100
 
 
-def play_sound(
+def play_sound(  # pragma: nocover
     filename: PathLike[str] | str,
     sound_data: SoundData,
 ) -> tuple[mixer.Sound, int | float]:
