@@ -77,21 +77,12 @@ def encrypt_token_and_secret(
     :param shared_secret: The generated shared secret
     :return: A tuple containing (encrypted token, encrypted secret)
     """
-    # Ensure both the `shared_secret` and `verification_token` are instances
-    # of the bytes class, not any subclass. This is needed since the cryptography
-    # library calls some C code in the back, which relies on this being bytes. If
-    # it's not a bytes instance, convert it.
-    if type(verification_token) is not bytes:  # we don't want isinstance
-        verification_token = bytes(verification_token)
-    if type(shared_secret) is not bytes:  # we don't want isinstance
-        shared_secret = bytes(shared_secret)
-
     encrypted_token = public_key.encrypt(
-        verification_token,
+        bytes(verification_token),
         OAEP(MGF1(SHA256()), SHA256(), None),
     )
     encrypted_secret = public_key.encrypt(
-        shared_secret,
+        bytes(shared_secret),
         OAEP(MGF1(SHA256()), SHA256(), None),
     )
     return encrypted_token, encrypted_secret
@@ -109,21 +100,12 @@ def decrypt_token_and_secret(
     :param shared_secret: The shared secret encrypted and sent by the client
     :return: A tuple containing (decrypted token, decrypted secret)
     """
-    # Ensure both the `shared_secret` and `verification_token` are instances
-    # of the bytes class, not any subclass. This is needed since the cryptography
-    # library calls some C code in the back, which relies on this being bytes. If
-    # it's not a bytes instance, convert it.
-    if type(verification_token) is not bytes:  # we don't want isinstance
-        verification_token = bytes(verification_token)
-    if type(shared_secret) is not bytes:  # we don't want isinstance
-        shared_secret = bytes(shared_secret)
-
     decrypted_token = private_key.decrypt(
-        verification_token,
+        bytes(verification_token),
         OAEP(MGF1(SHA256()), SHA256(), None),
     )
     decrypted_secret = private_key.decrypt(
-        shared_secret,
+        bytes(shared_secret),
         OAEP(MGF1(SHA256()), SHA256(), None),
     )
     return decrypted_token, decrypted_secret

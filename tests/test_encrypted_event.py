@@ -7,8 +7,6 @@ import trio.testing
 from checkers.component import Event
 from checkers.encrypted_event import EncryptedNetworkEventComponent
 
-pytest_plugins = ("pytest_trio",)
-
 
 @pytest.mark.trio
 async def test_event_transmission() -> None:

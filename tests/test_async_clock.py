@@ -2,8 +2,6 @@ import pytest
 
 from checkers import async_clock
 
-pytest_plugins = ("pytest_trio",)
-
 
 @pytest.mark.trio
 async def test_tick() -> None:

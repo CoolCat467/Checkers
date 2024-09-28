@@ -12,8 +12,6 @@ from checkers.component import (
     ExternalRaiseManager,
 )
 
-pytest_plugins = ("pytest_trio",)
-
 
 def test_event_init() -> None:
     event = Event("event_name", {"fish": 27}, 3)
@@ -341,6 +339,10 @@ async def test_temporary_component() -> None:
         await sound_effect.raise_event(Event("event_name", 27))
         assert event_called
     assert not manager.component_exists("sound_effect")
+    with manager.temporary_component(
+        Component("sound_effect"),
+    ) as sound_effect:
+        manager.remove_component("sound_effect")
 
 
 @pytest.mark.trio
@@ -357,8 +359,12 @@ async def test_remove_component() -> None:
     manager.add_component(sound_effect)
     assert manager.component_exists("sound_effect")
     sound_effect.register_handler("event_name", event_call)
+    sound_effect.register_handler("waffle_name", event_call)
 
     await sound_effect.raise_event(Event("event_name", 27))
     assert event_called
+    manager.add_component(Component("jerald"))
+    manager.register_handler("event_name", event_call)
+    manager.remove_component("jerald")
     manager.remove_component("sound_effect")
     assert not manager.component_exists("sound_effect")
