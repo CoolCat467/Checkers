@@ -18,7 +18,7 @@
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 
-from checkers.game import cli_run as cli_run
-
 if __name__ == "__main__":
+    from checkers.game import cli_run as cli_run
+
     cli_run()

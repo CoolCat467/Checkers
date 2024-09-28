@@ -11,11 +11,17 @@ __license__ = "LGPL-3.0-only"
 import os
 
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.asymmetric.padding import PKCS1v15
+from cryptography.hazmat.primitives.asymmetric.padding import MGF1, OAEP
 from cryptography.hazmat.primitives.asymmetric.rsa import (
-    RSAPrivateKey,
-    RSAPublicKey,
+    RSAPrivateKey as RSAPrivateKey,
+    RSAPublicKey as RSAPublicKey,
     generate_private_key,
+)
+from cryptography.hazmat.primitives.hashes import SHA256
+from cryptography.hazmat.primitives.serialization import (
+    Encoding,
+    PublicFormat,
+    load_der_public_key,
 )
 
 
@@ -25,9 +31,9 @@ def generate_shared_secret() -> bytes:  # pragma: no cover
     This secret will be sent to the server in :class:`~mcproto.packets.login.login.LoginEncryptionResponse` packet,
     and used to encrypt all future communication afterwards.
 
-    This will be symmetric encryption using AES/CFB8 stream cipher. And this shared secret will be 16-bytes long.
+    This will be symmetric encryption using AES/CFB8 stream cipher. And this shared secret will be 256-bits long.
     """
-    return os.urandom(16)
+    return os.urandom(256 // 8)
 
 
 def generate_verify_token() -> bytes:  # pragma: no cover
@@ -39,7 +45,7 @@ def generate_verify_token() -> bytes:  # pragma: no cover
     This token doesn't need to be cryptographically secure, it's just a sanity check that
     the client has encrypted the data correctly.
     """
-    return os.urandom(4)
+    return os.urandom(16)
 
 
 def generate_rsa_key() -> RSAPrivateKey:  # pragma: no cover
@@ -71,17 +77,14 @@ def encrypt_token_and_secret(
     :param shared_secret: The generated shared secret
     :return: A tuple containing (encrypted token, encrypted secret)
     """
-    # Ensure both the `shared_secret` and `verification_token` are instances
-    # of the bytes class, not any subclass. This is needed since the cryptography
-    # library calls some C code in the back, which relies on this being bytes. If
-    # it's not a bytes instance, convert it.
-    if type(verification_token) is not bytes:  # we don't want isinstance
-        verification_token = bytes(verification_token)
-    if type(shared_secret) is not bytes:  # we don't want isinstance
-        shared_secret = bytes(shared_secret)
-
-    encrypted_token = public_key.encrypt(verification_token, PKCS1v15())
-    encrypted_secret = public_key.encrypt(shared_secret, PKCS1v15())
+    encrypted_token = public_key.encrypt(
+        bytes(verification_token),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
+    encrypted_secret = public_key.encrypt(
+        bytes(shared_secret),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
     return encrypted_token, encrypted_secret
 
 
@@ -97,15 +100,31 @@ def decrypt_token_and_secret(
     :param shared_secret: The shared secret encrypted and sent by the client
     :return: A tuple containing (decrypted token, decrypted secret)
     """
-    # Ensure both the `shared_secret` and `verification_token` are instances
-    # of the bytes class, not any subclass. This is needed since the cryptography
-    # library calls some C code in the back, which relies on this being bytes. If
-    # it's not a bytes instance, convert it.
-    if type(verification_token) is not bytes:  # we don't want isinstance
-        verification_token = bytes(verification_token)
-    if type(shared_secret) is not bytes:  # we don't want isinstance
-        shared_secret = bytes(shared_secret)
-
-    decrypted_token = private_key.decrypt(verification_token, PKCS1v15())
-    decrypted_secret = private_key.decrypt(shared_secret, PKCS1v15())
+    decrypted_token = private_key.decrypt(
+        bytes(verification_token),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
+    decrypted_secret = private_key.decrypt(
+        bytes(shared_secret),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
     return decrypted_token, decrypted_secret
+
+
+def serialize_public_key(
+    public_key: RSAPublicKey,
+) -> bytes:
+    """Return public key serialize as bytes."""
+    return public_key.public_bytes(
+        encoding=Encoding.DER,
+        format=PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def deserialize_public_key(serialized_public_key: bytes) -> RSAPublicKey:
+    """Return deserialized public key."""
+    # Key type is determined by the passed key itself.
+    # Should be be an RSA public key in this case.
+    key = load_der_public_key(serialized_public_key, default_backend())
+    assert isinstance(key, RSAPublicKey)
+    return key

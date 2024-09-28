@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import gc
+
 import pytest
 import trio
 
@@ -9,8 +11,6 @@ from checkers.component import (
     Event,
     ExternalRaiseManager,
 )
-
-pytest_plugins = ("pytest_trio",)
 
 
 def test_event_init() -> None:
@@ -56,9 +56,11 @@ def test_component_manager_property_error() -> None:
         component.manager  # noqa: B018
 
 
-def test_componentmanager_add_has_managerproperty() -> None:
+def test_componentmanager_add_has_manager_property() -> None:
     manager = ComponentManager("manager")
     sound_effect = Component("sound_effect")
+    with pytest.raises(AttributeError):
+        print(sound_effect.manager)
     manager.add_component(sound_effect)
     assert manager.component_exists("sound_effect")
     assert sound_effect.manager_exists
@@ -69,6 +71,28 @@ def test_componentmanager_add_has_managerproperty() -> None:
     assert manager.list_components() == ("sound_effect",)
     assert sound_effect.get_component("sound_effect") is sound_effect
     assert sound_effect.get_components(("sound_effect",)) == [sound_effect]
+
+
+def test_componentmanager_manager_property_weakref_failure() -> None:
+    # Have to override __del__, unbind_components called and unbinds
+    # components so weakref failure branch never hit in normal
+    # circumstances
+    class EvilNoUnbindManager(ComponentManager):
+        def __del__(self) -> None:
+            return
+
+    manager = EvilNoUnbindManager("manager")
+    sound_effect = Component("sound_effect")
+    with pytest.raises(AttributeError):
+        print(sound_effect.manager)
+    manager.add_component(sound_effect)
+    assert sound_effect.manager is manager
+    del manager
+    # make sure gc collects manager
+    for _ in range(3):
+        gc.collect()
+    with pytest.raises(AttributeError):
+        print(sound_effect.manager)
 
 
 def test_double_bind_error() -> None:
@@ -129,6 +153,38 @@ async def test_self_component_handler() -> None:
 
     await manager.raise_event(Event("fish_appears_event", None))
     assert event_called
+
+
+@pytest.mark.trio
+async def test_raise_event_register_handlers_double_call() -> None:
+    event_called_count = 0
+
+    async def event_call(event: Event[int]) -> None:
+        nonlocal event_called_count
+        assert event.data == 27
+        event_called_count += 1
+
+    manager = ComponentManager("manager")
+    assert not manager.has_handler("event_name")
+
+    manager.register_component_handler("event_name", event_call, manager.name)
+    assert manager.has_handler("event_name")
+    await manager.raise_event(Event("event_name", 27))
+    assert event_called_count == 1
+
+    event_called_count = 0
+
+    with pytest.raises(ValueError, match="is not registered!"):
+        manager.register_component_handler(
+            "event_name",
+            event_call,
+            "2nd name",
+        )
+    manager.add_component(Component("2nd name"))
+    manager.register_component_handler("event_name", event_call, "2nd name")
+
+    await manager.raise_event(Event("event_name", 27))
+    assert event_called_count == 2
 
 
 @pytest.mark.trio
@@ -262,3 +318,53 @@ async def test_internal_does_not_raise_event_in_nursery() -> None:
         await manager.raise_event_internal(Event("bean_event", None))
     assert not nursery_called
     assert event_called
+
+
+@pytest.mark.trio
+async def test_temporary_component() -> None:
+    event_called = False
+
+    async def event_call(event: Event[int]) -> None:
+        nonlocal event_called
+        assert event.data == 27
+        event_called = True
+
+    manager = ComponentManager("manager")
+    with manager.temporary_component(
+        Component("sound_effect"),
+    ) as sound_effect:
+        assert manager.component_exists("sound_effect")
+        sound_effect.register_handler("event_name", event_call)
+
+        await sound_effect.raise_event(Event("event_name", 27))
+        assert event_called
+    assert not manager.component_exists("sound_effect")
+    with manager.temporary_component(
+        Component("sound_effect"),
+    ) as sound_effect:
+        manager.remove_component("sound_effect")
+
+
+@pytest.mark.trio
+async def test_remove_component() -> None:
+    event_called = False
+
+    async def event_call(event: Event[int]) -> None:
+        nonlocal event_called
+        assert event.data == 27
+        event_called = True
+
+    manager = ComponentManager("manager")
+    sound_effect = Component("sound_effect")
+    manager.add_component(sound_effect)
+    assert manager.component_exists("sound_effect")
+    sound_effect.register_handler("event_name", event_call)
+    sound_effect.register_handler("waffle_name", event_call)
+
+    await sound_effect.raise_event(Event("event_name", 27))
+    assert event_called
+    manager.add_component(Component("jerald"))
+    manager.register_handler("event_name", event_call)
+    manager.remove_component("jerald")
+    manager.remove_component("sound_effect")
+    assert not manager.component_exists("sound_effect")

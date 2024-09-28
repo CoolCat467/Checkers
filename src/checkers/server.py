@@ -5,22 +5,22 @@
 
 # Programmed by CoolCat467
 
+from __future__ import annotations
+
 # Copyright (C) 2023-2024  CoolCat467
 #
-#     This program is free software: you can redistribute it and/or modify
-#     it under the terms of the GNU General Public License as published by
-#     the Free Software Foundation, either version 3 of the License, or
-#     (at your option) any later version.
+# This program is free software: you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation, either version 3 of the License, or
+# (at your option) any later version.
 #
-#     This program is distributed in the hope that it will be useful,
-#     but WITHOUT ANY WARRANTY; without even the implied warranty of
-#     MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-#     GNU General Public License for more details.
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
 #
-#     You should have received a copy of the GNU General Public License
-#     along with this program.  If not, see <https://www.gnu.org/licenses/>.
-
-from __future__ import annotations
+# You should have received a copy of the GNU General Public License
+# along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 __title__ = "Server"
 __author__ = "CoolCat467"
@@ -38,6 +38,14 @@ from checkers.async_clock import Clock
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import ComponentManager, Event, ExternalRaiseManager
+from checkers.encrypted_event import EncryptedNetworkEventComponent
+from checkers.encryption import (
+    RSAPrivateKey,
+    decrypt_token_and_secret,
+    generate_rsa_key,
+    generate_verify_token,
+    serialize_public_key,
+)
 from checkers.network import NetworkEventComponent, NetworkTimeoutError, Server
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
@@ -55,7 +63,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
 
 
-class ServerClient(NetworkEventComponent):
+class ServerClient(EncryptedNetworkEventComponent):
     """Server Client Network Event Component.
 
     When clients connect to server, this class handles the incoming
@@ -63,7 +71,7 @@ class ServerClient(NetworkEventComponent):
     that are transferred over the network.
     """
 
-    __slots__ = ("client_id",)
+    __slots__ = ("client_id", "rsa_key", "verify_token")
 
     def __init__(self, client_id: int) -> None:
         """Initialize Server Client."""
@@ -87,22 +95,28 @@ class ServerClient(NetworkEventComponent):
                 "server[write]->action_complete": 10,
                 "server[write]->initial_config": 11,
                 "server[write]->playing_as": 12,
+                "server[write]->encryption_request": 13,
             },
         )
         self.register_read_network_events(
             {
                 0: f"client[{self.client_id}]->select_piece",
                 1: f"client[{self.client_id}]->select_tile",
+                2: f"client[{self.client_id}]->encryption_response",
             },
         )
+
+        self.rsa_key: RSAPrivateKey | None = None
+        self.verify_token: bytes | None = None
 
     def bind_handlers(self) -> None:
         """Bind event handlers."""
         super().bind_handlers()
         self.register_handlers(
             {
-                f"client[{self.client_id}]->select_piece": self.handle_raw_select_piece,
-                f"client[{self.client_id}]->select_tile": self.handle_raw_select_tile,
+                f"client[{self.client_id}]->select_piece": self.read_raw_select_piece,
+                f"client[{self.client_id}]->select_tile": self.read_raw_select_tile,
+                f"client[{self.client_id}]->encryption_response": self.handle_encryption_response,
                 "create_piece->network": self.handle_create_piece,
                 "select_piece->network": self.handle_piece_select,
                 "create_tile->network": self.handle_create_tile,
@@ -118,7 +132,7 @@ class ServerClient(NetworkEventComponent):
             },
         )
 
-    async def handle_raw_select_piece(self, event: Event[bytearray]) -> None:
+    async def read_raw_select_piece(self, event: Event[bytearray]) -> None:
         """Read raw select piece event and reraise as network->select_piece."""
         buffer = Buffer(event.data)
 
@@ -128,7 +142,7 @@ class ServerClient(NetworkEventComponent):
             Event("network->select_piece", (self.client_id, (pos_x, pos_y))),
         )
 
-    async def handle_raw_select_tile(self, event: Event[bytearray]) -> None:
+    async def read_raw_select_tile(self, event: Event[bytearray]) -> None:
         """Read raw select tile event and reraise as network->select_tile."""
         buffer = Buffer(event.data)
 
@@ -286,6 +300,62 @@ class ServerClient(NetworkEventComponent):
         buffer = Buffer()
         buffer.write_value(StructFormat.UBYTE, playing_as)
         await self.write_event(Event("server[write]->playing_as", buffer))
+
+    async def start_encryption_request(self) -> None:
+        """Start encryption request and raise as server[write]->encryption_request."""
+        if self.encryption_enabled:
+            raise RuntimeError("Encryption is already set up!")
+        self.rsa_key = generate_rsa_key()
+        self.verify_token = generate_verify_token()
+
+        public_key = self.rsa_key.public_key()
+
+        serialized_public_key = serialize_public_key(public_key)
+
+        buffer = Buffer()
+        buffer.write_bytearray(serialized_public_key)
+        buffer.write_bytearray(self.verify_token)
+
+        await self.write_event(
+            Event("server[write]->encryption_request", buffer),
+        )
+
+        event = await self.read_event()
+        if event.name != f"client[{self.client_id}]->encryption_response":
+            raise RuntimeError(
+                f"Expected encryption response, got but {event.name!r}",
+            )
+        await self.handle_encryption_response(event)
+
+    async def handle_encryption_response(
+        self,
+        event: Event[bytearray],
+    ) -> None:
+        """Read encryption response."""
+        if self.rsa_key is None or self.verify_token is None:
+            raise RuntimeError(
+                "Was not expecting encryption response, request start not sent!",
+            )
+        if self.encryption_enabled:
+            raise RuntimeError("Encryption is already set up!")
+        buffer = Buffer(event.data)
+
+        encrypted_shared_secret = buffer.read_bytearray()
+        encrypted_verify_token = buffer.read_bytearray()
+
+        verify_token, shared_secret = decrypt_token_and_secret(
+            self.rsa_key,
+            encrypted_verify_token,
+            encrypted_shared_secret,
+        )
+
+        if verify_token != self.verify_token:
+            raise RuntimeError(
+                "Received verify token does not match sent verify token!",
+            )
+
+        # Start encrypting all future data
+        self.enable_encryption(shared_secret, verify_token)
 
 
 class CheckersState(State):
@@ -568,6 +638,10 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
+        # Encrypt traffic
+        await client.start_encryption_request()
+        assert client.encryption_enabled
+
         while not self.can_start() and not client.not_connected:
             await client.write_event(
                 Event("server[write]->callback_ping", bytearray()),
