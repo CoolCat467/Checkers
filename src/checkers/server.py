@@ -638,10 +638,6 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
-        # Encrypt traffic
-        await client.start_encryption_request()
-        assert client.encryption_enabled
-
         while not self.can_start() and not client.not_connected:
             await client.write_event(
                 Event("server[write]->callback_ping", bytearray()),
@@ -737,6 +733,10 @@ class GameServer(Server):
             new_client_id,
             stream=stream,
         ) as client:
+            # Encrypt traffic
+            await client.start_encryption_request()
+            assert client.encryption_enabled
+
             if can_start and game_active:
                 await self.send_spectator_join_packets(client)
             with self.temporary_component(client):
