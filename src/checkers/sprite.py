@@ -93,7 +93,7 @@ class Sprite(ComponentManager, WeakDirtySprite):
 
     def __get_location(self) -> Vector2:
         """Return rect center as new Vector2."""
-        return Vector2.from_iter(self.rect.center)
+        return cast(Vector2, Vector2.from_iter(self.rect.center))
 
     def __set_location(self, value: tuple[int, int]) -> None:
         """Set rect center from tuple of integers."""
@@ -546,7 +546,10 @@ class TargetingComponent(Component):
     def to_destination(self) -> Vector2:
         """Return vector of self.location to self.destination."""
         sprite = cast(Sprite, self.get_component("sprite"))
-        return Vector2.from_points(sprite.location, self.destination)
+        return cast(
+            Vector2,
+            Vector2.from_points(sprite.location, self.destination),
+        )
 
     async def move_destination_time(self, time_passed: float) -> None:
         """Move with time_passed."""
