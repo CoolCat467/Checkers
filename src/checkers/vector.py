@@ -31,13 +31,14 @@ from typing import (
     TYPE_CHECKING,
     Any,
     NamedTuple,
-    Self,
     TypeVar,
     cast,
 )
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable, Iterator
+
+    from typing_extensions import Self
 
     NamedTupleMeta = type
 else:
@@ -161,7 +162,7 @@ class BaseVector:
             # math.sumprod is new in python 3.12
             return math.sumprod(self, vec)
         # ignore is for `unreachable` if >= 3.12, or `unused-ignore` if < 3.12
-        return math.fsum(self * vec)  # type: ignore  # pragma: nocover
+        return sum(a * b for a, b in zip(self, vec, strict=True))  # type: ignore  # pragma: nocover
 
     def dot(self, vec: Iterable[float]) -> float:
         """Return the dot product of this vector and another (same as @)."""
@@ -237,7 +238,7 @@ class Vector2(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
     ) -> Self:
         """Return vector from angle in radians."""
         unit = cls(math.cos(radians), math.sin(radians))
-        return cast(Self, unit * distance)
+        return cast("Self", unit * distance)
 
     @classmethod
     def from_degrees(
@@ -324,7 +325,7 @@ class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
 
         # If the angle is very small, return a linear interpolation
         if theta < 1e-6:
-            return cast(Vector3, v1.lerp(v2))
+            return cast("Self", v1.lerp(v2))
 
         # Calculate the sin of the angle
         sin_theta = math.sin(theta)
@@ -334,7 +335,7 @@ class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         b = math.sin(t * theta) / sin_theta
 
         # Return the interpolated vector
-        return cast(Vector3, cast(Vector4, ((v1 * a) + (v2 * b))).normalized())
+        return cast("Self", cast("Self", ((v1 * a) + (v2 * b))).normalized())
 
 
 class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
@@ -368,7 +369,7 @@ class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
 
         # If the angle is very small, return a linear interpolation
         if theta < 1e-6:
-            return cast(Vector4, q1.lerp(q2))
+            return cast("Self", q1.lerp(q2))
 
         # Calculate the sin of the angle
         sin_theta = math.sin(theta)
@@ -378,7 +379,7 @@ class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         b = math.sin(t * theta) / sin_theta
 
         # Return the interpolated quaternion
-        return cast(Vector4, cast(Vector4, ((q1 * a) + (q2 * b))).normalized())
+        return cast("Self", cast("Self", ((q1 * a) + (q2 * b))).normalized())
 
 
 if __name__ == "__main__":  # pragma: nocover
