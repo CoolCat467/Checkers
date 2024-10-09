@@ -183,7 +183,9 @@ class BaseVector:
         return self.from_iter(max(min(c, max_value), min_value) for c in self)
 
 
-# Needs to subclass NamedTupleMeta for NamedTuple subclass to work later
+_REAL_BASE = BaseVector
+
+
 class VectorMeta(NamedTupleMeta):
     """Metaclass for Vectors.
 
@@ -194,41 +196,49 @@ class VectorMeta(NamedTupleMeta):
     __slots__ = ()
 
     def __new__(
-        cls: type[T],
+        cls: type[VectorMeta],
         name: str,
         bases: tuple[type, ...],
         attrs: dict[str, Any],
-    ) -> T:
+    ) -> type:
         """Inject BaseVector's methods into given class."""
-        new_class: T = super().__new__(cls, name, bases, attrs)  # type: ignore[misc]
+        real_named_tuple = NamedTuple.__mro_entries__((NamedTuple,))[0]  # type: ignore[attr-defined]
+
+        bases = tuple(
+            real_named_tuple if base is BaseVector else base
+            for base in bases
+            if base is not real_named_tuple
+        )
+
+        nm_tpl = super().__new__(cls, name, bases, attrs)
 
         # Inject BaseVector's methods into given class
-        ignore = ("__module__", "__slots__", "__doc__")
-        for name, attribute in BaseVector.__dict__.items():
+        ignore = ("__module__", "__slots__", "__doc__", "__dict__")
+        for name, attribute in _REAL_BASE.__dict__.items():
             if name in ignore:
                 continue
-            setattr(new_class, name, attribute)
+            setattr(nm_tpl, name, attribute)
 
-        return new_class
-
-
-# Pretend we are subclassing BaseVector as well as NamedTuple when type
-# checking, otherwise mypy doesn't understand that VectorMeta injects
-# everything BaseVector has into new class.
-#
-# Every usage of this has a type: ignore[misc] because mypy doesn't
-# think you should be allowed to do *NamedVector.
-if TYPE_CHECKING:
-    NamedVector = (BaseVector, NamedTuple)
-else:
-    NamedVector = (NamedTuple,)
+        return nm_tpl
 
 
-class Vector2(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
+# Override BaseVector with object that uses VectorMeta metaclass.
+# This tricks type checker into believing that Vector classes are truly
+# instances of BaseVector.
+BaseVector = cast(type[BaseVector], type.__new__(VectorMeta, "BaseVector", (), {}))  # type: ignore[misc]
+
+
+class Vector2(BaseVector):
     """Vector2 Object. Takes an x and a y coordinate."""
 
     x: float
     y: float
+
+    if TYPE_CHECKING:
+        # Because type checking does not recognize that BaseVector is
+        # really NamedTupleMeta with extra strings attached, type checkers
+        # do not realize __init__ method is already set up.
+        def __init__(self, x: float, y: float) -> None: ...
 
     @classmethod
     def from_radians(
@@ -237,8 +247,7 @@ class Vector2(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         distance: float = 1,
     ) -> Self:
         """Return vector from angle in radians."""
-        unit = cls(math.cos(radians), math.sin(radians))
-        return cast("Self", unit * distance)
+        return cls(math.cos(radians), math.sin(radians)) * distance
 
     @classmethod
     def from_degrees(
@@ -285,15 +294,19 @@ def project_v_onto_w(vec_v: Vector2, vec_w: Vector2) -> Vector2:
     """Return the projection of v onto w."""
     # vector @ vector == vector.magnitude() ** 2 but with higher precision
     scalar: float = (vec_v @ vec_w) / (vec_w @ vec_w)
-    return cast(Vector2, vec_w * scalar)
+    return vec_w * scalar
 
 
-class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
+class Vector3(BaseVector):
     """Vector3 Object. Takes an x, y, and z coordinate."""
 
     x: float
     y: float
     z: float
+
+    if TYPE_CHECKING:
+
+        def __init__(self, x: float, y: float, z: float) -> None: ...
 
     def cross(
         self: Self,
@@ -311,8 +324,8 @@ class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         """Return spherical linear interpolation between this vector and another vector."""
         # Created by GPT-4o
         # Normalize both vectors
-        v1: Vector3 = self.normalized()
-        v2: Vector3 = self.from_iter(other).normalized()
+        v1 = self.normalized()
+        v2 = self.from_iter(other).normalized()
 
         # Calculate the dot product
         dot = v1.dot(v2)
@@ -325,7 +338,7 @@ class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
 
         # If the angle is very small, return a linear interpolation
         if theta < 1e-6:
-            return cast("Self", v1.lerp(v2))
+            return v1.lerp(v2, t)
 
         # Calculate the sin of the angle
         sin_theta = math.sin(theta)
@@ -335,10 +348,10 @@ class Vector3(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         b = math.sin(t * theta) / sin_theta
 
         # Return the interpolated vector
-        return cast("Self", cast("Self", ((v1 * a) + (v2 * b))).normalized())
+        return (v1 * a + v2 * b).normalized()
 
 
-class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
+class Vector4(BaseVector):
     """Vector4, Aka quaternion. Takes an x, y, z, and w coordinate."""
 
     x: float
@@ -346,12 +359,16 @@ class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
     z: float
     w: float
 
+    if TYPE_CHECKING:
+
+        def __init__(self, x: float, y: float, z: float, w: float) -> None: ...
+
     def slerp(self: Self, other: Iterable[float], t: float) -> Self:
         """Return spherical linear interpolation between this quaternion and another quaternion."""
         # Created by GPT-4o
         # Normalize both quaternions
-        q1: Vector4 = self.normalized()
-        q2: Vector4 = self.from_iter(other).normalized()
+        q1 = self.normalized()
+        q2 = self.from_iter(other).normalized()
 
         # Calculate the dot product
         dot = q1.dot(q2)
@@ -369,7 +386,7 @@ class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
 
         # If the angle is very small, return a linear interpolation
         if theta < 1e-6:
-            return cast("Self", q1.lerp(q2))
+            return q1.lerp(q2, t)
 
         # Calculate the sin of the angle
         sin_theta = math.sin(theta)
@@ -379,8 +396,9 @@ class Vector4(*NamedVector, metaclass=VectorMeta):  # type: ignore[misc]
         b = math.sin(t * theta) / sin_theta
 
         # Return the interpolated quaternion
-        return cast("Self", cast("Self", ((q1 * a) + (q2 * b))).normalized())
+        return (q1 * a + q2 * b).normalized()
 
 
 if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
+    print(f"{Vector2(3, 4) = }")

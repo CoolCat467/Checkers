@@ -307,7 +307,7 @@ class GameEntity:
     def is_over(self, point: tuple[int, int] | Vector2) -> bool:
         """Return True if point is over self.image."""
         # Return True if a point is over image
-        return self.rect.collidepoint(point)
+        return self.rect.collidepoint(tuple(point))
 
     def collision(self, sprite: GameEntity) -> bool:
         """Return True if a sprite's image is over self.image."""

@@ -35,7 +35,7 @@ import contextlib
 import platform
 from collections import deque
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Final, TypeVar, cast
+from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import pygame
 import trio
@@ -713,10 +713,7 @@ class GameBoard(sprite.Sprite):
         """Return the center point of a given tile position."""
         location = Vector2.from_iter(position) * self.tile_size
         center = self.tile_size // 2
-        return cast(
-            Vector2,
-            location + (center, center) + self.rect.topleft,  # noqa: RUF005
-        )
+        return location + (center, center) + self.rect.topleft  # noqa: RUF005
 
     def add_piece(
         self,
