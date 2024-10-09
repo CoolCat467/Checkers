@@ -208,7 +208,7 @@ else:
     VectorBase = type.__new__(
         NamedTupleMeta,
         "VectorBase",
-        (BaseVector,),
+        (BaseVector, tuple),
         {"__slots__": ()},
     )
 

@@ -17,10 +17,13 @@ class NamedTupleMeta(type):
         ns: dict[str, typing.Any],
     ) -> typing.Any:  # pragma: nocover
         """Create NamedTuple."""
-        # assert typing._NamedTuple in bases  # type: ignore[attr-defined]
-        if typing._NamedTuple not in bases:  # type: ignore[attr-defined]
-            bases += (typing._NamedTuple,)  # type: ignore[attr-defined]
         bases = tuple(tuple if base is typing._NamedTuple else base for base in bases)  # type: ignore[attr-defined]
+        for base in bases:
+            if tuple not in base.__mro__:
+                continue
+            break
+        else:
+            raise ValueError("must subclass tuple somewhere in bases")
         types = ns.get("__annotations__", {})
         default_names = []
         for field_name in types:
