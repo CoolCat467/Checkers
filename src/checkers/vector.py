@@ -29,22 +29,35 @@ import math
 import sys
 from typing import (
     TYPE_CHECKING,
-    Any,
-    NamedTuple,
-    TypeVar,
-    cast,
 )
+
+from checkers.namedtuple_mod import NamedTupleMeta
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable, Iterator
 
     from typing_extensions import Self
 
-    NamedTupleMeta = type
-else:
-    from typing import NamedTupleMeta
-
-T = TypeVar("T")
+# As a forward to the madness below, we are doing something incredibly sneeky.
+# We have BaseVector, which we want to have all of the shared functionality
+# of all Vector subclasses. We also want each Vector class to be a NamedTuple
+# so we can let Python handle storing data in the most efficiant way and
+# make Vectors immutable.
+#
+# Problem is, we can't have Vector classes be
+# subclasses of both NamedTuple and BaseVector, because mypy says
+# `NamedTuple should be a single base  [misc]`, and at runtime the typing module
+# stops us with `TypeError: can only inherit from a NamedTuple type and Generic`
+# So the question becomes, how does NamedTuple work anyways? Can we
+# duplicate its functionality? Turns out it's not as simple as it seems.
+# NamedTuples are not actually real classes. They are fake classes that under
+# the hood use a metaclass called NamedTupleMeta to create the real namedtuple
+# from collections.abc.
+#
+# So my solution was to override NamedTupleMeta with my own version
+# without the runtime check, and that works great. Problem is, type checkers
+# don't think you are allowed to subclass more than NamedTuple and Generic,
+# so we have do do a bit of a hack to avoid that as well.
 
 
 class BaseVector:
@@ -111,6 +124,11 @@ class BaseVector:
     ) -> Self:
         """Return result of multiplying self components by rhs scalar."""
         return self.from_iter(c * scalar for c in self)
+
+    # Make sure to override right multiply, otherwise tuple's __rmul__
+    # is still set, which can lead to unexpected results,
+    # eg 3 * Vector2(1, 2) -> (1, 2, 1, 2, 1, 2)
+    __rmul__ = __mul__
 
     def __truediv__(
         self: Self,
@@ -183,52 +201,19 @@ class BaseVector:
         return self.from_iter(max(min(c, max_value), min_value) for c in self)
 
 
-_REAL_BASE = BaseVector
+# Trick type checker into thinking VectorBase is just a BaseVector alias
+if TYPE_CHECKING:
+    VectorBase = BaseVector
+else:
+    VectorBase = type.__new__(
+        NamedTupleMeta,
+        "VectorBase",
+        (BaseVector,),
+        {"__slots__": ()},
+    )
 
 
-class VectorMeta(NamedTupleMeta):
-    """Metaclass for Vectors.
-
-    This is a bit of a hack to allow classes to be a subclass of both
-    BaseVector and NamedTuple at the same time.
-    """
-
-    __slots__ = ()
-
-    def __new__(
-        cls: type[VectorMeta],
-        name: str,
-        bases: tuple[type, ...],
-        attrs: dict[str, Any],
-    ) -> type:
-        """Inject BaseVector's methods into given class."""
-        real_named_tuple = NamedTuple.__mro_entries__((NamedTuple,))[0]  # type: ignore[attr-defined]
-
-        bases = tuple(
-            real_named_tuple if base is BaseVector else base
-            for base in bases
-            if base is not real_named_tuple
-        )
-
-        nm_tpl = super().__new__(cls, name, bases, attrs)
-
-        # Inject BaseVector's methods into given class
-        ignore = ("__module__", "__slots__", "__doc__", "__dict__")
-        for name, attribute in _REAL_BASE.__dict__.items():
-            if name in ignore:
-                continue
-            setattr(nm_tpl, name, attribute)
-
-        return nm_tpl
-
-
-# Override BaseVector with object that uses VectorMeta metaclass.
-# This tricks type checker into believing that Vector classes are truly
-# instances of BaseVector.
-BaseVector = cast(type[BaseVector], type.__new__(VectorMeta, "BaseVector", (), {}))  # type: ignore[misc]
-
-
-class Vector2(BaseVector):
+class Vector2(VectorBase):
     """Vector2 Object. Takes an x and a y coordinate."""
 
     x: float
@@ -238,7 +223,7 @@ class Vector2(BaseVector):
         # Because type checking does not recognize that BaseVector is
         # really NamedTupleMeta with extra strings attached, type checkers
         # do not realize __init__ method is already set up.
-        def __init__(self, x: float, y: float) -> None: ...
+        def __init__(self, x: float, y: float) -> None: ...  # noqa: D107
 
     @classmethod
     def from_radians(
@@ -297,7 +282,7 @@ def project_v_onto_w(vec_v: Vector2, vec_w: Vector2) -> Vector2:
     return vec_w * scalar
 
 
-class Vector3(BaseVector):
+class Vector3(VectorBase):
     """Vector3 Object. Takes an x, y, and z coordinate."""
 
     x: float
@@ -306,7 +291,12 @@ class Vector3(BaseVector):
 
     if TYPE_CHECKING:
 
-        def __init__(self, x: float, y: float, z: float) -> None: ...
+        def __init__(  # noqa: D107
+            self,
+            x: float,
+            y: float,
+            z: float,
+        ) -> None: ...
 
     def cross(
         self: Self,
@@ -351,7 +341,7 @@ class Vector3(BaseVector):
         return (v1 * a + v2 * b).normalized()
 
 
-class Vector4(BaseVector):
+class Vector4(VectorBase):
     """Vector4, Aka quaternion. Takes an x, y, z, and w coordinate."""
 
     x: float
@@ -361,7 +351,13 @@ class Vector4(BaseVector):
 
     if TYPE_CHECKING:
 
-        def __init__(self, x: float, y: float, z: float, w: float) -> None: ...
+        def __init__(  # noqa: D107
+            self,
+            x: float,
+            y: float,
+            z: float,
+            w: float,
+        ) -> None: ...
 
     def slerp(self: Self, other: Iterable[float], t: float) -> Self:
         """Return spherical linear interpolation between this quaternion and another quaternion."""
@@ -401,4 +397,3 @@ class Vector4(BaseVector):
 
 if __name__ == "__main__":  # pragma: nocover
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
-    print(f"{Vector2(3, 4) = }")
