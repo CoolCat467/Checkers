@@ -65,6 +65,7 @@ exclude = [
     "src/checkers/vector.py",
     "src/checkers/base_io.py",
     "src/checkers/buffer.py",
+    "src/checkers/namedtuple_mod.py",
 ]
 
 [tool.mypy]
