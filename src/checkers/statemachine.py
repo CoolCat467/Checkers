@@ -155,7 +155,10 @@ class BaseStateMachine:
     @property
     def running(self) -> bool:
         """Boolean of if state machine is running."""
-        return self.active_state is not None
+        try:
+            return self.active_state is not None  # type: ignore[attr-defined]
+        except AttributeError:
+            return False
 
 
 class StateMachine(BaseStateMachine):

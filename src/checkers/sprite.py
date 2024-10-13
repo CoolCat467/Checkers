@@ -693,7 +693,7 @@ class GroupProcessor(AsyncStateMachine):
 
     def new_group_class(
         self,
-        group_class: LayeredDirty,
+        group_class: type[LayeredDirty[Any]],
         name: str | None = None,
     ) -> int:
         """Make a new group from given group class and return id."""
@@ -702,14 +702,16 @@ class GroupProcessor(AsyncStateMachine):
         group_instance = group_class()
         self.groups[self.new_gid] = group_instance
         group_instance.set_timing_threshold(self._timing)
-        if self._clear[1] is not None:
-            group_instance.clear(*self._clear)
+        screen, background = self._clear
+        if background is not None:
+            assert screen is not None
+            group_instance.clear(screen, background)
         self.new_gid += 1
         return self.new_gid - 1
 
     def new_group(self, name: str | None = None) -> int:
         """Make a new group and return id."""
-        self.new_group_class(self.sub_renderer_class, name)
+        return self.new_group_class(self.sub_renderer_class, name)
 
     def remove_group(self, gid: int) -> None:
         """Remove group."""
