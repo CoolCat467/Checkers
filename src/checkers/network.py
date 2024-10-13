@@ -41,6 +41,7 @@ from checkers.base_io import (
     BaseAsyncWriter,
     StructFormat,
 )
+from checkers.buffer import Buffer
 from checkers.component import (
     Component,
     ComponentManager,
@@ -120,6 +121,9 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             NetworkStreamNotConnectedError
             NetworkTimeoutError - Timeout or no data
             OSError - Stopped responding
+            trio.BusyResourceError - Another task is already writing data
+            trio.BrokenResourceError - Something is wrong and stream is broken
+            trio.ClosedResourceError - Stream is closed or another task closes stream
         """
         content = bytearray()
         while max_read_count := length - len(content):
@@ -130,7 +134,6 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
             ##                await self.close()
             ##                raise
-            content.extend(received)
             if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
@@ -144,6 +147,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
                     f"but expected {length} bytes)."
                     f" Partial obtained packet: {content!r}",
                 )
+            content.extend(received)
         return content
 
     async def write(self, data: bytes) -> None:
@@ -203,7 +207,9 @@ class NetworkEventComponent(NetworkComponent):
         "write_lock",
     )
 
-    packet_id_format: Literal[StructFormat.USHORT] = StructFormat.USHORT
+    # Max of 255 packet ids
+    # Next higher is USHORT with 65535 packet ids
+    packet_id_format: Literal[StructFormat.UBYTE] = StructFormat.UBYTE
 
     def __init__(self, name: str) -> None:
         """Initialize Network Event Component."""
@@ -250,9 +256,11 @@ class NetworkEventComponent(NetworkComponent):
         packet_id = self._write_event_name_to_packet_id.get(event.name)
         if packet_id is None:
             raise RuntimeError(f"Unhandled network event name {event.name!r}")
+        buffer = Buffer()
+        buffer.write_value(self.packet_id_format, packet_id)
+        buffer.write_bytearray(event.data)
         async with self.write_lock:
-            await self.write_value(self.packet_id_format, packet_id)
-            await self.write_bytearray(event.data)
+            await self.write(buffer)
 
     async def read_event(self) -> Event[bytearray]:
         """Receive event from network."""

@@ -521,10 +521,11 @@ class TargetingComponent(Component):
     def update_heading(self) -> None:
         """Update the heading of the movement component."""
         movement = cast(MovementComponent, self.get_component("movement"))
-        if self.to_destination == (0, 0):
+        to_dest = self.to_destination()
+        if to_dest @ to_dest == 0:
             movement.heading = Vector2(0, 0)
             return
-        movement.heading = self.to_destination.normalized()
+        movement.heading = to_dest.normalized()
 
     def __set_destination(self, value: Iterable[int]) -> None:
         """Set destination as well as movement heading."""
@@ -542,7 +543,6 @@ class TargetingComponent(Component):
         doc="Target Destination",
     )
 
-    @property
     def to_destination(self) -> Vector2:
         """Return vector of self.location to self.destination."""
         sprite = cast(Sprite, self.get_component("sprite"))
@@ -565,7 +565,7 @@ class TargetingComponent(Component):
         await trio.lowlevel.checkpoint()
 
         travel_distance = min(
-            self.to_destination.magnitude(),
+            self.to_destination().magnitude(),
             movement.speed * time_passed,
         )
 
@@ -691,16 +691,27 @@ class GroupProcessor(AsyncStateMachine):
         for renderer in self.groups.values():
             renderer.set_timing_threshold(self._timing)
 
-    def new_group(self, name: str | None = None) -> int:
-        """Make a new group and return id."""
+    def new_group_class(
+        self,
+        group_class: type[LayeredDirty[Any]],
+        name: str | None = None,
+    ) -> int:
+        """Make a new group from given group class and return id."""
         if name is not None:
             self.group_names[name] = self.new_gid
-        self.groups[self.new_gid] = self.sub_renderer_class()
-        self.groups[self.new_gid].set_timing_threshold(self._timing)
-        if self._clear[1] is not None:
-            self.groups[self.new_gid].clear(*self._clear)
+        group_instance = group_class()
+        self.groups[self.new_gid] = group_instance
+        group_instance.set_timing_threshold(self._timing)
+        screen, background = self._clear
+        if background is not None:
+            assert screen is not None
+            group_instance.clear(screen, background)
         self.new_gid += 1
         return self.new_gid - 1
+
+    def new_group(self, name: str | None = None) -> int:
+        """Make a new group and return id."""
+        return self.new_group_class(self.sub_renderer_class, name)
 
     def remove_group(self, gid: int) -> None:
         """Remove group."""
@@ -725,6 +736,9 @@ class GroupProcessor(AsyncStateMachine):
             group_id = gid_name
         if group_id in self.groups:
             return self.groups[group_id]
+        # Erase old named group that is not in groups anymore.
+        # Not sure how that would happen, pretty weird this is here
+        # to be honest (comment written months/years later).
         if named is not None:
             del self.group_names[named]
         return None

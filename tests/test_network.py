@@ -152,7 +152,7 @@ async def test_event_transmission() -> None:
         await client_one.write_event(event)
         assert (
             await two.receive_some()
-            == b"\x00\x00\x1eI will give my cat food to bob"
+            == b"\x00\x1eI will give my cat food to bob"
         )
 
         await client_one.wait_write_might_not_block()

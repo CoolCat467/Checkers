@@ -152,6 +152,14 @@ class BaseStateMachine:
             text += f" {self.states}"
         return f"{text}>"
 
+    @property
+    def running(self) -> bool:
+        """Boolean of if state machine is running."""
+        try:
+            return self.active_state is not None  # type: ignore[attr-defined]
+        except AttributeError:
+            return False
+
 
 class StateMachine(BaseStateMachine):
     """Synchronous State Machine base class."""

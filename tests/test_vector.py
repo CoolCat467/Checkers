@@ -8,6 +8,8 @@ import pytest
 
 from checkers.vector import (
     Vector2,
+    Vector3,
+    Vector4,
     get_angle_between_vectors,
     project_v_onto_w,
 )
@@ -122,6 +124,27 @@ def test_matmul() -> None:
     assert Vector2(21, 75).dot(Vector2(5, 28)) == (21 * 5) + (75 * 28)
 
 
+def test_reflect() -> None:
+    assert Vector2(9, 7).reflect((1, 0)) == Vector2(-9, 7)
+    assert Vector2(9, 7).reflect((0, 1)) == Vector2(9, -7)
+    assert Vector2(9, 7).reflect((-1, 0)) == Vector2(-9, 7)
+    assert round(Vector2(9, 7).reflect(Vector2(1, 1).normalized())) == Vector2(
+        -7,
+        -9,
+    )
+
+
+def test_lerp() -> None:
+    assert Vector2(9, 7).lerp((0, 0), 0) == Vector2(9, 7)
+    assert Vector2(9, 7).lerp((0, 0), 1) == Vector2(0, 0)
+    assert Vector2(9, 7).lerp((0, 0), 0.5) == Vector2(x=4.5, y=3.5)
+
+
+def test_clamp() -> None:
+    assert Vector2(9, 7).clamp(0, 7) == Vector2(7, 7)
+    assert Vector2(9, -7).clamp(0, 7) == Vector2(7, 0)
+
+
 def test_get_angle_between_vectors() -> None:
     assert (
         math.degrees(get_angle_between_vectors(Vector2(0, 3), Vector2(3, 0)))
@@ -146,3 +169,42 @@ def test_project_v_onto_w() -> None:
         project_v_onto_w(Vector2(4, 16), Vector2(2, -6)),
         4,
     ) == Vector2(x=-4.4, y=13.2)
+
+
+def test_cross() -> None:
+    assert Vector3(1, 2, 3).cross((4, 5, 6)) == Vector3(-3, 6, -3)
+
+
+def test_slerp_v3() -> None:
+    assert (
+        Vector3(1, 2, 3).slerp((4, 5, 6), 0) == Vector3(1, 2, 3).normalized()
+    )
+    assert (
+        Vector3(1, 2, 3).slerp((4, 5, 6), 1) == Vector3(4, 5, 6).normalized()
+    )
+    assert Vector3(1, 2, 3).slerp((4, 5, 6), 0.5) == Vector3(
+        x=0.3638667954886597,
+        y=0.5556981892812023,
+        z=0.747529583073745,
+    )
+
+
+def test_slerp_v4() -> None:
+    assert Vector4(1, 2, 3, 4).slerp((5, 6, 7, 8), 0) == Vector4(
+        x=0.18257418583505539,
+        y=0.36514837167011077,
+        z=0.5477225575051662,
+        w=0.7302967433402215,
+    )
+    assert Vector4(1, 2, 3, 4).slerp((5, 6, 7, 8), 1) == Vector4(
+        x=0.3790490217894517,
+        y=0.454858826147342,
+        z=0.5306686305052324,
+        w=0.6064784348631227,
+    )
+    assert Vector4(1, 2, 3, 4).slerp((5, 6, 7, 8), 0.5) == Vector4(
+        x=0.28302330376727836,
+        y=0.41323282779013937,
+        z=0.5434423518130005,
+        w=0.6736518758358615,
+    )

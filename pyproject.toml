@@ -49,7 +49,6 @@ dependencies = [
 path = "src/checkers/game.py"
 
 [project.urls]
-"Homepage" = "https://github.com/CoolCat467/Checkers"
 "Source" = "https://github.com/CoolCat467/Checkers"
 "Bug Tracker" = "https://github.com/CoolCat467/Checkers/issues"
 
@@ -69,7 +68,7 @@ exclude = [
 ]
 
 [tool.mypy]
-mypy_path = "src"
+files = ["src/checkers/",]
 check_untyped_defs = true
 disallow_any_generics = true
 disallow_untyped_calls = true
@@ -153,14 +152,14 @@ extend-ignore = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report term-missing --cov=checkers"
+addopts = "--cov-report=xml --cov-report=term-missing --cov=checkers"
 testpaths = [
     "tests",
 ]
 
 [tool.coverage.run]
 branch = true
-source = ["src"]
+source_pkgs = ["checkers"]
 omit = [
     "__init__.py",
 ]
@@ -187,32 +186,3 @@ partial_branches = [
     "if .* or not _t.TYPE_CHECKING:",
     "if .* or not t.TYPE_CHECKING:",
 ]
-
-[tool.tox]
-legacy_tox_ini = """
-    [tox]
-    envlist = py310, py311, py312, pytest, mypy
-    isolated_build = false
-
-    [gh-actions]
-    python =
-        3.10: py310, pytest
-        3.11: py311, pytest
-        3.12: py312, pytest, mypy
-
-    [testenv]
-    setenv =
-        PYTHONPATH = {toxinidir}
-
-    [testenv:pytest]
-    deps =
-        pytest
-        pytest-cov
-        pytest-trio
-    commands = pytest --basetemp={envtmpdir}
-
-    [testenv:mypy]
-    deps =
-        mypy
-    commands = mypy src
-"""

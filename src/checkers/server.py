@@ -51,7 +51,9 @@ from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
     DEFAULT_PORT,
+    ClientBoundEvents,
     Pos,
+    ServerBoundEvents,
     TickEventData,
     find_ip,
     read_position,
@@ -80,29 +82,31 @@ class ServerClient(EncryptedNetworkEventComponent):
 
         self.timeout = 3
 
+        cbe = ClientBoundEvents
         self.register_network_write_events(
             {
-                "server[write]->callback_ping": 0,
-                "server[write]->create_piece": 1,
-                "server[write]->select_piece": 2,
-                "server[write]->create_tile": 3,
-                "server[write]->delete_tile": 4,
-                "server[write]->delete_piece_animation": 5,
-                "server[write]->update_piece_animation": 6,
-                "server[write]->move_piece_animation": 7,
-                "server[write]->animation_state": 8,
-                "server[write]->game_over": 9,
-                "server[write]->action_complete": 10,
-                "server[write]->initial_config": 11,
-                "server[write]->playing_as": 12,
-                "server[write]->encryption_request": 13,
+                "server[write]->callback_ping": cbe.callback_ping,
+                "server[write]->create_piece": cbe.create_piece,
+                "server[write]->select_piece": cbe.select_piece,
+                "server[write]->create_tile": cbe.create_tile,
+                "server[write]->delete_tile": cbe.delete_tile,
+                "server[write]->delete_piece_animation": cbe.delete_piece_animation,
+                "server[write]->update_piece_animation": cbe.update_piece_animation,
+                "server[write]->move_piece_animation": cbe.move_piece_animation,
+                "server[write]->animation_state": cbe.animation_state,
+                "server[write]->game_over": cbe.game_over,
+                "server[write]->action_complete": cbe.action_complete,
+                "server[write]->initial_config": cbe.initial_config,
+                "server[write]->playing_as": cbe.playing_as,
+                "server[write]->encryption_request": cbe.encryption_request,
             },
         )
+        sbe = ServerBoundEvents
         self.register_read_network_events(
             {
-                0: f"client[{self.client_id}]->select_piece",
-                1: f"client[{self.client_id}]->select_tile",
-                2: f"client[{self.client_id}]->encryption_response",
+                sbe.select_piece: f"client[{self.client_id}]->select_piece",
+                sbe.select_tile: f"client[{self.client_id}]->select_tile",
+                sbe.encryption_response: f"client[{self.client_id}]->encryption_response",
             },
         )
 
@@ -638,10 +642,6 @@ class GameServer(Server):
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
-        # Encrypt traffic
-        await client.start_encryption_request()
-        assert client.encryption_enabled
-
         while not self.can_start() and not client.not_connected:
             await client.write_event(
                 Event("server[write]->callback_ping", bytearray()),
@@ -737,6 +737,10 @@ class GameServer(Server):
             new_client_id,
             stream=stream,
         ) as client:
+            # Encrypt traffic
+            await client.start_encryption_request()
+            assert client.encryption_enabled
+
             if can_start and game_active:
                 await self.send_spectator_join_packets(client)
             with self.temporary_component(client):
