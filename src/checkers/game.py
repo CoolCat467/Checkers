@@ -32,7 +32,7 @@ __version__ = "2.1.0"
 # 1 = True  = Black = 1, 3
 
 import contextlib
-import platform
+import sys
 from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, TypeVar
@@ -113,8 +113,6 @@ if globals().get("__file__") is None:
     )
 
 DATA_FOLDER: Final = Path(__file__).absolute().parent / "data"
-
-IS_WINDOWS: Final = platform.system() == "Windows"
 
 
 def render_text(
@@ -1572,8 +1570,8 @@ def cli_run() -> None:
     # If we're not imported as a module, run.
     # Make sure the game will display correctly on high DPI monitors on Windows.
 
-    if IS_WINDOWS:
-        from ctypes import windll  # type: ignore
+    if sys.platform == "win32":
+        from ctypes import windll
 
         with contextlib.suppress(AttributeError):
             windll.user32.SetProcessDPIAware()
