@@ -24,15 +24,16 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 
 
+from enum import IntEnum, auto
 from typing import TYPE_CHECKING, Final, NamedTuple, TypeAlias
 
 import trio
 from mypy_extensions import u8
 
-from .base_io import StructFormat
+from checkers.base_io import StructFormat
 
 if TYPE_CHECKING:
-    from .buffer import Buffer
+    from checkers.buffer import Buffer
 
 ADVERTISEMENT_IP: Final = "224.0.2.60"
 ADVERTISEMENT_PORT: Final = 4445
@@ -92,3 +93,30 @@ async def find_ip() -> str:  # pragma: nocover
         candidates.append(ip_addr)
 
     return candidates[0]
+
+
+class ClientBoundEvents(IntEnum):
+    """Client bound event IDs."""
+
+    encryption_request = 0
+    callback_ping = auto()
+    initial_config = auto()
+    playing_as = auto()
+    create_piece = auto()
+    select_piece = auto()
+    create_tile = auto()
+    delete_tile = auto()
+    animation_state = auto()
+    delete_piece_animation = auto()
+    update_piece_animation = auto()
+    move_piece_animation = auto()
+    action_complete = auto()
+    game_over = auto()
+
+
+class ServerBoundEvents(IntEnum):
+    """Server bound event IDs."""
+
+    encryption_response = 0
+    select_piece = auto()
+    select_tile = auto()

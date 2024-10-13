@@ -46,7 +46,9 @@ from checkers.network import (
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
+    ClientBoundEvents,
     Pos,
+    ServerBoundEvents,
     read_position,
     write_position,
 )
@@ -168,29 +170,31 @@ class GameClient(EncryptedNetworkEventComponent):
         # room.
         self.timeout = 5
 
+        sbe = ServerBoundEvents
         self.register_network_write_events(
             {
-                "select_piece->server": 0,
-                "select_tile->server": 1,
-                "encryption_response->server": 2,
+                "select_piece->server": sbe.select_piece,
+                "select_tile->server": sbe.select_tile,
+                "encryption_response->server": sbe.encryption_response,
             },
         )
+        cbe = ClientBoundEvents
         self.register_read_network_events(
             {
-                0: "callback_ping->client",
-                1: "server->create_piece",
-                2: "server->select_piece",
-                3: "server->create_tile",
-                4: "server->delete_tile",
-                5: "server->delete_piece_animation",
-                6: "server->update_piece_animation",
-                7: "server->move_piece_animation",
-                8: "server->animation_state",
-                9: "server->game_over",
-                10: "server->action_complete",
-                11: "server->initial_config",
-                12: "server->playing_as",
-                13: "server->encryption_request",
+                cbe.callback_ping: "callback_ping->client",
+                cbe.create_piece: "server->create_piece",
+                cbe.select_piece: "server->select_piece",
+                cbe.create_tile: "server->create_tile",
+                cbe.delete_tile: "server->delete_tile",
+                cbe.delete_piece_animation: "server->delete_piece_animation",
+                cbe.update_piece_animation: "server->update_piece_animation",
+                cbe.move_piece_animation: "server->move_piece_animation",
+                cbe.animation_state: "server->animation_state",
+                cbe.game_over: "server->game_over",
+                cbe.action_complete: "server->action_complete",
+                cbe.initial_config: "server->initial_config",
+                cbe.playing_as: "server->playing_as",
+                cbe.encryption_request: "server->encryption_request",
             },
         )
 
