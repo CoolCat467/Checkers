@@ -59,8 +59,7 @@ async def test_event_encrypted_transmission() -> None:
 
     await client_one.write_event(event)
     assert (
-        await two.receive_some()
-        == b"\x00\x00\x1eI will give my cat food to bob"
+        await two.receive_some() == b"\x00\x1eI will give my cat food to bob"
     )
 
     client_one.enable_encryption(shared_secret, verification_token)
@@ -73,7 +72,7 @@ async def test_event_encrypted_transmission() -> None:
 
     await client_one.write_event(event)
     assert await two.receive_some() == bytearray.fromhex(
-        "80a24bdaf285718a7c33223da8d98567ca21bdb82c7ebdd46e33cb6dc14b94a230",
+        "2bb572309dfb71d22eb5f0442c5347f2d666ed16c97093190a8101c3e59f2beb",
     )
 
     await client_one.close()
