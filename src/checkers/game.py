@@ -1482,11 +1482,6 @@ class CheckersClient(sprite.GroupProcessor):
             ),
         )
 
-    @property
-    def running(self) -> bool:
-        """Boolean of if state machine is running."""
-        return self.active_state is not None
-
     async def raise_event(self, event: Event[Any]) -> None:
         """Raise component event in all groups."""
         await self.manager.raise_event(event)

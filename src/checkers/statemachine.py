@@ -152,6 +152,11 @@ class BaseStateMachine:
             text += f" {self.states}"
         return f"{text}>"
 
+    @property
+    def running(self) -> bool:
+        """Boolean of if state machine is running."""
+        return self.active_state is not None
+
 
 class StateMachine(BaseStateMachine):
     """Synchronous State Machine base class."""

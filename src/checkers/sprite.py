@@ -691,16 +691,25 @@ class GroupProcessor(AsyncStateMachine):
         for renderer in self.groups.values():
             renderer.set_timing_threshold(self._timing)
 
-    def new_group(self, name: str | None = None) -> int:
-        """Make a new group and return id."""
+    def new_group_class(
+        self,
+        group_class: LayeredDirty,
+        name: str | None = None,
+    ) -> int:
+        """Make a new group from given group class and return id."""
         if name is not None:
             self.group_names[name] = self.new_gid
-        self.groups[self.new_gid] = self.sub_renderer_class()
-        self.groups[self.new_gid].set_timing_threshold(self._timing)
+        group_instance = group_class()
+        self.groups[self.new_gid] = group_instance
+        group_instance.set_timing_threshold(self._timing)
         if self._clear[1] is not None:
-            self.groups[self.new_gid].clear(*self._clear)
+            group_instance.clear(*self._clear)
         self.new_gid += 1
         return self.new_gid - 1
+
+    def new_group(self, name: str | None = None) -> int:
+        """Make a new group and return id."""
+        self.new_group_class(self.sub_renderer_class, name)
 
     def remove_group(self, gid: int) -> None:
         """Remove group."""
@@ -725,6 +734,9 @@ class GroupProcessor(AsyncStateMachine):
             group_id = gid_name
         if group_id in self.groups:
             return self.groups[group_id]
+        # Erase old named group that is not in groups anymore.
+        # Not sure how that would happen, pretty weird this is here
+        # to be honest (comment written months/years later).
         if named is not None:
             del self.group_names[named]
         return None
