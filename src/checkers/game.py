@@ -43,7 +43,7 @@ from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 
-from checkers import base2d, objects, sprite
+from checkers import base2d, element_list, objects, sprite
 from checkers.async_clock import Clock
 from checkers.client import GameClient, read_advertisements
 from checkers.component import (
@@ -737,6 +737,7 @@ class GameBoard(sprite.Sprite):
         group.add(piece)  # type: ignore[arg-type]
 
         self.pieces[position] = piece_type
+        assert isinstance(piece.name, str)
         return piece.name
 
     def add_tile(self, position: Pos) -> str:
@@ -751,6 +752,7 @@ class GameBoard(sprite.Sprite):
         self.add_component(tile)
         group.add(tile)  # type: ignore[arg-type]
 
+        assert isinstance(tile.name, str)
         return tile.name
 
     def generate_board_image(self) -> Surface:
@@ -1179,6 +1181,21 @@ class TitleState(GameState):
         )
         self.group_add(internal_button)
 
+        quit_button = KwargButton(
+            "quit_button",
+            button_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text="Quit",
+            location=join_button.location
+            + Vector2(
+                0,
+                join_button.rect.h + 10,
+            ),
+            handle_click=self.change_state("Halt"),
+        )
+        self.group_add(quit_button)
+
         await self.machine.raise_event(Event("init", None))
 
 
@@ -1236,44 +1253,72 @@ class PlayInternalHostingState(PlayHostingState):
     internal_server = True
 
 
-class JoinButton(Button):
-    """Join Button."""
+class ReturnElement(element_list.Element, objects.Button):
+    """Connection list return to title element sprite."""
 
     __slots__ = ()
 
-    def __init__(self, id_: int, font: pygame.font.Font, motd: str) -> None:
-        """Initialize Join Button."""
-        super().__init__(f"join_button_{id_}", font)
-        self.text = motd
-        self.location = [x // 2 for x in SCREEN_SIZE]
+    def __init__(self, name: str, font: pygame.font.Font) -> None:
+        """Initialize return element."""
+        super().__init__(name, font)
+
+        self.update_location_on_resize = False
+        self.border_width = 4
+        self.outline = RED
+        self.text = "Return to Title"
+        self.visible = True
+        self.location = (SCREEN_SIZE[0] // 2, self.location.y + 10)
 
     async def handle_click(
         self,
         _: Event[sprite.PygameMouseButtonEventData],
     ) -> None:
         """Handle Click Event."""
-        print(f"{self!r} handle_click")
+        await self.raise_event(
+            Event("return_to_title", None, 2),
+        )
+
+
+class ConnectionElement(element_list.Element, objects.Button):
+    """Connection list element sprite."""
+
+    __slots__ = ()
+
+    def __init__(
+        self,
+        name: tuple[str, int],
+        font: pygame.font.Font,
+        motd: str,
+    ) -> None:
+        """Initialize connection element."""
+        super().__init__(name, font)
+
+        self.text = f"[{name[0]}:{name[1]}]\n{motd}"
+        self.visible = True
+
+    async def handle_click(
+        self,
+        _: Event[sprite.PygameMouseButtonEventData],
+    ) -> None:
+        """Handle Click Event."""
+        details = self.name
+        await self.raise_event(
+            Event("join_server", details, 2),
+        )
 
 
 class PlayJoiningState(GameState):
     """Start running client."""
 
-    __slots__ = (
-        "font",
-        "buttons",
-        "next_button",
-    )
+    __slots__ = ("font",)
 
     def __init__(self) -> None:
         """Initialize Joining State."""
         super().__init__("play_joining")
 
-        self.next_button = 0
-        self.buttons: dict[tuple[str, int], int] = {}
-
         self.font = pygame.font.Font(
             DATA_FOLDER / "VeraSerif.ttf",
-            28,
+            12,
         )
 
     async def entry_actions(self) -> None:
@@ -1283,14 +1328,28 @@ class PlayJoiningState(GameState):
         self.id = self.machine.new_group("join")
         client = GameClient("network")
 
+        # Add network to higher level manager
         self.machine.manager.add_component(client)
 
-        self.buttons.clear()
-        self.next_button = 0
+        connections = element_list.ElementList("connection_list")
+        self.manager.add_component(connections)
+        group = self.machine.get_group(self.id)
+        assert group is not None
+        group.add(connections)
 
-        self.manager.register_handler(
-            "update_listing",
-            self.handle_update_listing,
+        return_font = pygame.font.Font(
+            DATA_FOLDER / "VeraSerif.ttf",
+            30,
+        )
+        return_button = ReturnElement("return_button", return_font)
+        connections.add_element(return_button)
+
+        self.manager.register_handlers(
+            {
+                "update_listing": self.handle_update_listing,
+                "return_to_title": self.handle_return_to_title,
+                "join_server": self.handle_join_server,
+            },
         )
 
         await self.manager.raise_event(Event("update_listing", None))
@@ -1298,25 +1357,53 @@ class PlayJoiningState(GameState):
     async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
         assert self.machine is not None
-        for advertisement in await read_advertisements():
-            motd, details = advertisement
 
-            if details not in self.buttons:
-                self.buttons[details] = self.next_button
+        connections = self.manager.get_component("connection_list")
 
-                print(f"handle_update_listing {motd = }  {details = }")
-                ##button = JoinButton(self.next_button, self.font, motd, details)
-                ##self.group_add(button)
+        old: list[tuple[str, int]] = []
+        current: list[tuple[str, int]] = []
 
-                self.next_button += 1
-                ####
-                await self.machine.raise_event(
-                    Event("client_connect", details),
+        ##        print(f'{self.machine.active_state = }')
+        ##        print(f'{self.name = }')
+        while (
+            self.machine.active_state is not None
+            and self.machine.active_state is self
+        ):
+            ##            print("handle_update_listing click")
+
+            for motd, details in await read_advertisements():
+                current.append(details)
+                if connections.component_exists(details):
+                    continue
+                element = ConnectionElement(details, self.font, motd)
+                element.rect.topleft = (
+                    connections.get_new_connection_position()
                 )
-                await self.machine.set_state("play")
-                return
-        print("handle_update_listing click")
-        await self.manager.raise_event(Event("update_listing", None))
+                element.rect.topleft = (10, element.location.y + 3)
+                connections.add_element(element)
+            for details in old:
+                if details in current:
+                    continue
+                connections.delete_element(details)
+            old, current = current, []
+
+    async def handle_join_server(self, event: Event[tuple[str, int]]) -> None:
+        """Handle join server event."""
+        details = event.data
+        await self.machine.raise_event(
+            Event("client_connect", details),
+        )
+        await self.machine.set_state("play")
+
+    async def handle_return_to_title(self, _: Event[None]) -> None:
+        """Handle return to title event."""
+        # Fire server stop event so server shuts down if it exists
+        await self.machine.raise_event(Event("network_stop", None))
+
+        if self.machine.manager.component_exists("network"):
+            self.machine.manager.remove_component("network")
+
+        await self.machine.set_state("title")
 
 
 ##    async def check_conditions(self) -> str | None:

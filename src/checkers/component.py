@@ -70,7 +70,7 @@ class Component:
 
     __slots__ = ("name", "__manager")
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: object) -> None:
         """Initialise with name."""
         self.name = name
         self.__manager: ref[ComponentManager] | None = None
@@ -165,14 +165,14 @@ class ComponentManager(Component):
 
     __slots__ = ("__event_handlers", "__components", "__weakref__")
 
-    def __init__(self, name: str, own_name: str | None = None) -> None:
+    def __init__(self, name: object, own_name: object | None = None) -> None:
         """If own_name is set, add self to list of components as specified name."""
         super().__init__(name)
         self.__event_handlers: dict[
             str,
-            set[tuple[Callable[[Event[Any]], Awaitable[Any]], str]],
+            set[tuple[Callable[[Event[Any]], Awaitable[Any]], object]],
         ] = {}
-        self.__components: dict[str, Component] = {}
+        self.__components: dict[object, Component] = {}
 
         if own_name is not None:
             self.__add_self_as_component(own_name)
@@ -182,7 +182,7 @@ class ComponentManager(Component):
         """Return representation of self."""
         return f"<{self.__class__.__name__} Components: {self.__components}>"
 
-    def __add_self_as_component(self, name: str) -> None:
+    def __add_self_as_component(self, name: object) -> None:
         """Add this manager as component to self without binding."""
         if self.component_exists(name):  # pragma: nocover
             raise ValueError(f'Component named "{name}" already exists!')
@@ -200,7 +200,7 @@ class ComponentManager(Component):
         self,
         event_name: str,
         handler_coro: Callable[[Event[Any]], Awaitable[None]],
-        component_name: str,
+        component_name: object,
     ) -> None:
         """Register handler_func as handler for event_name."""
         if (
@@ -271,7 +271,7 @@ class ComponentManager(Component):
         for component in components:
             self.add_component(component)
 
-    def remove_component(self, component_name: str) -> None:
+    def remove_component(self, component_name: object) -> None:
         """Remove a component."""
         if not self.component_exists(component_name):
             raise ValueError(f"Component {component_name!r} does not exist!")
@@ -294,7 +294,7 @@ class ComponentManager(Component):
         for name in empty:
             self.__event_handlers.pop(name)
 
-    def component_exists(self, component_name: str) -> bool:
+    def component_exists(self, component_name: object) -> bool:
         """Return if component exists in this manager."""
         return component_name in self.__components
 
@@ -312,21 +312,21 @@ class ComponentManager(Component):
             if self.component_exists(name):
                 self.remove_component(name)
 
-    def components_exist(self, component_names: Iterable[str]) -> bool:
+    def components_exist(self, component_names: Iterable[object]) -> bool:
         """Return if all component names given exist in this manager."""
         return all(self.component_exists(name) for name in component_names)
 
-    def get_component(self, component_name: str) -> Any:
+    def get_component(self, component_name: object) -> Any:
         """Return Component or raise ValueError."""
         if not self.component_exists(component_name):
             raise ValueError(f'"{component_name}" component does not exist')
         return self.__components[component_name]
 
-    def get_components(self, component_names: Iterable[str]) -> list[Any]:
+    def get_components(self, component_names: Iterable[object]) -> list[Any]:
         """Return iterable of components asked for or raise ValueError."""
         return [self.get_component(name) for name in component_names]
 
-    def list_components(self) -> tuple[str, ...]:
+    def list_components(self) -> tuple[object, ...]:
         """Return list of components bound to this manager."""
         return tuple(self.__components)
 
@@ -358,9 +358,9 @@ class ExternalRaiseManager(ComponentManager):
 
     def __init__(
         self,
-        name: str,
+        name: object,
         nursery: trio.Nursery,
-        own_name: str | None = None,
+        own_name: object | None = None,
     ) -> None:
         """Initialize with name, own component name, and nursery."""
         super().__init__(name, own_name)

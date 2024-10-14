@@ -53,7 +53,7 @@ class Text(sprite.Sprite):
 
     __slots__ = ("__text", "font")
 
-    def __init__(self, name: str, font: Font) -> None:
+    def __init__(self, name: object, font: Font) -> None:
         """Initialize with font. Defaults to white text."""
         super().__init__(name)
 
@@ -135,7 +135,7 @@ class OutlinedText(Text):
     border_width = 3
     border_radius = 8
 
-    def __init__(self, name: str, font: Font) -> None:
+    def __init__(self, name: object, font: Font) -> None:
         """Initialize with name and font."""
         super().__init__(name, font)
 
@@ -196,7 +196,7 @@ class Button(OutlinedText):
 
     __slots__ = ()
 
-    def __init__(self, name: str, font: Font) -> None:
+    def __init__(self, name: object, font: Font) -> None:
         """Initialize with name and font."""
         super().__init__(name, font)
 

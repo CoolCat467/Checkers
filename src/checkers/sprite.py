@@ -75,7 +75,7 @@ class Sprite(ComponentManager, WeakDirtySprite):
 
     __slots__ = ("rect", "__image", "mask", "update_location_on_resize")
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, name: object) -> None:
         """Initialize with name."""
         ComponentManager.__init__(self, name, "sprite")
         WeakDirtySprite.__init__(self)
@@ -95,9 +95,13 @@ class Sprite(ComponentManager, WeakDirtySprite):
         """Return rect center as new Vector2."""
         return Vector2.from_iter(self.rect.center)
 
-    def __set_location(self, value: tuple[int, int]) -> None:
+    def _set_location(self, value: tuple[int, int]) -> None:
         """Set rect center from tuple of integers."""
         self.rect.center = value
+
+    def __set_location(self, value: tuple[int, int]) -> None:
+        """Set rect center from tuple of integers."""
+        self._set_location(value)
 
     location = property(
         __get_location,
