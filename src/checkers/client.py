@@ -25,6 +25,7 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 import struct
+import time
 import traceback
 from typing import TYPE_CHECKING
 
@@ -108,7 +109,7 @@ async def read_advertisements(
                 trio.socket.IP_ADD_MEMBERSHIP,
                 mreq,
             )
-        else:
+        else:  # IPv6
             mreq = group_bin + struct.pack("@I", 0)
             udp_socket.setsockopt(
                 trio.socket.IPPROTO_IPV6,
@@ -181,7 +182,7 @@ class GameClient(EncryptedNetworkEventComponent):
         cbe = ClientBoundEvents
         self.register_read_network_events(
             {
-                cbe.callback_ping: "callback_ping->client",
+                cbe.callback_ping: "server->callback_ping",
                 cbe.create_piece: "server->create_piece",
                 cbe.select_piece: "server->select_piece",
                 cbe.create_tile: "server->create_tile",
@@ -206,7 +207,7 @@ class GameClient(EncryptedNetworkEventComponent):
         super().bind_handlers()
         self.register_handlers(
             {
-                # "callback_ping->client": self.print_callback_ping,
+                "server->callback_ping": self.read_callback_ping,
                 "gameboard_piece_clicked": self.write_piece_click,
                 "gameboard_tile_clicked": self.write_tile_click,
                 "server->create_piece": self.read_create_piece,
@@ -313,6 +314,18 @@ class GameClient(EncryptedNetworkEventComponent):
 
                 return
             await self.raise_disconnect("Error connecting to server.")
+
+    async def read_callback_ping(self, event: Event[bytearray]) -> None:
+        """Read callback_ping event from server."""
+        ns = int.from_bytes(event.data)
+        now = int(time.time() * 1e9)
+        difference = now - ns
+
+        # print(f'{difference / 1e9 = } seconds')
+
+        await self.raise_event(
+            Event("callback_ping", difference),
+        )
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server."""

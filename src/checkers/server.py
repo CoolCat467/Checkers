@@ -27,6 +27,7 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
+import time
 import traceback
 from collections import deque
 from functools import partial
@@ -133,6 +134,7 @@ class ServerClient(EncryptedNetworkEventComponent):
                 "action_complete->network": self.handle_action_complete,
                 "initial_config->network": self.handle_initial_config,
                 f"playing_as->network[{self.client_id}]": self.handle_playing_as,
+                f"callback_ping->network[{self.client_id}]": self.handle_callback_ping,
             },
         )
 
@@ -304,6 +306,25 @@ class ServerClient(EncryptedNetworkEventComponent):
         buffer = Buffer()
         buffer.write_value(StructFormat.UBYTE, playing_as)
         await self.write_event(Event("server[write]->playing_as", buffer))
+
+    async def write_callback_ping(self) -> None:
+        """Write callback_ping."""
+        buffer = Buffer()
+
+        # Try to be as accurate with time as possible
+        await self.wait_write_might_not_block()
+        ns = int(time.time() * 1e9)
+        # Use as many bits as time needs, write_buffer handles size for us.
+        buffer.write(ns.to_bytes(-(-ns.bit_length() // 8), "big"))
+
+        await self.write_event(Event("server[write]->callback_ping", buffer))
+
+    async def handle_callback_ping(
+        self,
+        _: Event[None],
+    ) -> None:
+        """Reraise as server[write]->callback_ping."""
+        await self.write_callback_ping()
 
     async def start_encryption_request(self) -> None:
         """Start encryption request and raise as server[write]->encryption_request."""
@@ -643,15 +664,11 @@ class GameServer(Server):
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient."""
         while not self.can_start() and not client.not_connected:
-            await client.write_event(
-                Event("server[write]->callback_ping", bytearray()),
-            )
+            await client.write_callback_ping()
         while not client.not_connected:
             print(f"{client.name} client_network_loop tick")
             try:
-                await client.write_event(
-                    Event("server[write]->callback_ping", bytearray()),
-                )
+                await client.write_callback_ping()
                 event = await client.read_event()
             except NetworkTimeoutError:
                 continue
