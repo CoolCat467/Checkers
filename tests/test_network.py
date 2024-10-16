@@ -174,5 +174,5 @@ async def test_event_transmission() -> None:
 def test_server() -> None:
     server = Server("name")
     server.stop_serving()
-    server.cancel_scope = trio.CancelScope()
+    server.serve_cancel_scope = trio.CancelScope()
     server.stop_serving()
