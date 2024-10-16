@@ -281,7 +281,7 @@ class Piece(sprite.Sprite):
 class Tile(sprite.Sprite):
     """Outlined tile sprite - Only exists for selecting destination."""
 
-    __slots__ = ("color", "board_position", "position_name")
+    __slots__ = ("color", "board_position")
 
     def __init__(
         self,
@@ -295,7 +295,6 @@ class Tile(sprite.Sprite):
 
         self.color = color
         self.board_position = position
-        self.position_name = position_name
         self.location = location
 
         self.update_location_on_resize = True
@@ -313,7 +312,7 @@ class Tile(sprite.Sprite):
         self.register_handlers(
             {
                 "click": self.handle_click_event,
-                f"self_destruct_tile_{self.position_name}": self.handle_self_destruct_event,
+                f"self_destruct_{self.name}": self.handle_self_destruct_event,
             },
         )
 
@@ -487,10 +486,10 @@ class GameBoard(sprite.Sprite):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle create_piece event."""
-        if not self.visible:
+        while not self.visible:
+            print("Hitting handle_create_piece_event and not visible yet.")
             # If not visible, re-raise until board is set up right
-            await self.raise_event(event)
-            return
+            await trio.sleep(0.02)
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
 
@@ -862,10 +861,13 @@ class ClickDestinationComponent(Component):
             assert isinstance(event.data["pos"], tuple)
             target.destination = Vector2.from_iter(event.data["pos"])
 
-    async def move_towards_dest(self, event: Event[dict[str, float]]) -> None:
+    async def move_towards_dest(
+        self,
+        event: Event[sprite.TickEventData],
+    ) -> None:
         """Move closer to destination."""
         target: sprite.TargetingComponent = self.get_component("targeting")
-        await target.move_destination_time(event.data["time_passed"])
+        await target.move_destination_time(event.data.time_passed)
 
 
 class MrFloppy(sprite.Sprite):
@@ -957,12 +959,13 @@ class FPSCounter(objects.Text):
         )
         super().__init__("fps", font)
 
-        self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
+        self.location = (20, 20)
 
-    async def on_tick(self, event: Event[dict[str, float]]) -> None:
+    async def on_tick(self, event: Event[sprite.TickEventData]) -> None:
         """Update text."""
-        # self.text = f'FPS: {event.data["fps"]:.2f}'
-        self.text = f'FPS: {event.data["fps"]:.0f}'
+        # self.text = f'FPS: {event.data.fps:.2f}'
+        self.text = f"FPS: {event.data.fps:.0f}"
+        self.visible = True
 
     def bind_handlers(self) -> None:
         """Register tick event handler."""
@@ -1398,7 +1401,7 @@ class PlayJoiningState(GameState):
     async def handle_return_to_title(self, _: Event[None]) -> None:
         """Handle return to title event."""
         # Fire server stop event so server shuts down if it exists
-        await self.machine.raise_event(Event("network_stop", None))
+        await self.machine.raise_event_internal(Event("network_stop", None))
 
         if self.machine.manager.component_exists("network"):
             self.machine.manager.remove_component("network")
@@ -1462,7 +1465,8 @@ class PlayState(GameState):
     async def exit_actions(self) -> None:
         """Raise network stop event and remove components."""
         # Fire server stop event so server shuts down if it exists
-        await self.machine.raise_event(Event("network_stop", None))
+        # await self.machine.raise_event(Event("network_stop", None))
+        await self.machine.raise_event_internal(Event("network_stop", None))
 
         if self.machine.manager.component_exists("network"):
             self.machine.manager.remove_component("network")
@@ -1481,7 +1485,7 @@ class PlayState(GameState):
         winner = event.data
         self.exit_data = (0, f"{PLAYERS[winner]} Won", False)
 
-        await self.machine.raise_event(Event("network_stop", None))
+        await self.machine.raise_event_internal(Event("network_stop", None))
 
     async def handle_client_disconnected(self, event: Event[str]) -> None:
         """Handle client disconnected error."""
@@ -1524,6 +1528,9 @@ class PlayState(GameState):
                 handle_click=self.change_state("title"),
             )
             self.group_add(continue_button)
+            group = continue_button.groups()[0]
+            # LayeredDirty, not just AbstractGroup
+            group.move_to_front(continue_button)  # type: ignore[attr-defined]
         else:
             continue_button = self.manager.get_component("continue_button")
 
@@ -1550,7 +1557,7 @@ class CheckersClient(sprite.GroupProcessor):
 
     __slots__ = ("manager",)
 
-    def __init__(self, manager: ComponentManager) -> None:
+    def __init__(self, manager: ExternalRaiseManager) -> None:
         """Initialize Checkers Client."""
         super().__init__()
         self.manager = manager
@@ -1570,6 +1577,10 @@ class CheckersClient(sprite.GroupProcessor):
     async def raise_event(self, event: Event[Any]) -> None:
         """Raise component event in all groups."""
         await self.manager.raise_event(event)
+
+    async def raise_event_internal(self, event: Event[Any]) -> None:
+        """Raise component event in all groups."""
+        await self.manager.raise_event_internal(event)
 
 
 async def async_run() -> None:

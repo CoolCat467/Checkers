@@ -8,6 +8,8 @@ __version__ = "0.0.0"
 
 import sys
 from abc import ABCMeta, abstractmethod
+from contextlib import asynccontextmanager
+from typing import TYPE_CHECKING
 
 import trio
 
@@ -19,6 +21,9 @@ from checkers.component import (
     ExternalRaiseManager,
 )
 from checkers.state import Action, Pos, State
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator
 
 if sys.version_info < (3, 11):
     from exceptiongroup import BaseExceptionGroup
@@ -140,12 +145,14 @@ class MachineClient(ComponentManager):
 
         self.running = True
 
-        self.add_components(
-            (
-                remote_state_class(),
-                GameClient("game_client"),
-            ),
-        )
+        self.add_component(remote_state_class())
+
+    @asynccontextmanager
+    async def client_with_block(self) -> AsyncGenerator[GameClient, None]:
+        """Add client temporarily with `with` block, ensuring closure."""
+        async with GameClient("game_client") as client:
+            with self.temporary_component(client):
+                yield client
 
     def bind_handlers(self) -> None:
         """Register client event handlers."""
@@ -182,14 +189,21 @@ async def run_client(
         )
         client = MachineClient(remote_state_class)
         with event_manager.temporary_component(client):
-            await event_manager.raise_event(
-                Event("client_connect", (host, port)),
-            )
-            print(f"Connected to server {host}:{port}")
-            while client.running:  # noqa: ASYNC110
-                # Wait so backlog things happen
-                await trio.sleep(1)
-            print(f"Disconnected from server {host}:{port}")
+            async with client.client_with_block():
+                await event_manager.raise_event(
+                    Event("client_connect", (host, port)),
+                )
+                print(f"Connected to server {host}:{port}")
+                try:
+                    while client.running:  # noqa: ASYNC110
+                        # Wait so backlog things happen
+                        await trio.sleep(1)
+                except KeyboardInterrupt:
+                    print("Shutting down client from keyboard interrupt.")
+                    await event_manager.raise_event(
+                        Event("network_stop", None),
+                    )
+        print(f"Disconnected from server {host}:{port}")
         client.unbind_components()
     connected.remove((host, port))
 
@@ -225,13 +239,11 @@ async def run_clients_in_local_servers(
                     )
                 await trio.sleep(1)
     except BaseExceptionGroup as exc:
-        caught = False
         for ex in exc.exceptions:
             if isinstance(ex, KeyboardInterrupt):
                 print("Shutting down from keyboard interrupt.")
-                caught = True
                 break
-        if not caught:
+        else:
             raise
 
 
