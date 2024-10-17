@@ -853,14 +853,14 @@ class GameServer(network.Server):
 
         if piece_pos is not None:
             # Calculate actions if required
-            new_action_set = self.state.get_actions_set(piece_pos)
+            new_action_set = self.state.calculate_actions(piece_pos)
             ignore = new_action_set.ends
 
         ignored: set[Pos] = set()
 
         # Remove outlined tiles from previous selection if existed
         if prev_selection := self.player_selections.get(player):
-            action_set = self.state.get_actions_set(prev_selection)
+            action_set = self.state.calculate_actions(prev_selection)
             ignored = action_set.ends & ignore
             remove = action_set.ends - ignore
             async with trio.open_nursery() as nursery:
@@ -975,7 +975,7 @@ class GameServer(network.Server):
             )
             return
 
-        if tile_pos not in self.state.get_actions_set(piece_pos).ends:
+        if tile_pos not in self.state.calculate_actions(piece_pos).ends:
             print(
                 f"{player = } cannot select tile {piece_pos!r} because not valid move",
             )
