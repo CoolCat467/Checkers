@@ -26,9 +26,9 @@ __version__ = "0.0.0"
 
 import copy
 import math
+from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
-    Any,
     NamedTuple,
     TypeAlias,
     TypeVar,
@@ -106,31 +106,13 @@ def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
     return moves
 
 
+@dataclass(slots=True)
 class State:
     """Represents state of checkers game."""
 
-    __slots__ = ("size", "turn", "pieces", "pre_calculated_actions")
-
-    def __init__(
-        self,
-        size: tuple[int, int],
-        pieces: dict[Pos, int],
-        turn: bool = True,  # Black moves first
-        /,
-        pre_calculated_actions: dict[Pos, ActionSet] | None = None,
-    ) -> None:
-        """Initialize state."""
-        self.size = size
-        self.turn = turn
-        self.pieces = pieces
-
-        if pre_calculated_actions is None:
-            pre_calculated_actions = {}
-        self.pre_calculated_actions = pre_calculated_actions
-
-    def __repr__(self) -> str:
-        """Return representation of self."""
-        return f"{self.__class__.__name__}({self.size}, {self.turn}, {self.pieces})"
+    size: tuple[int, int]
+    pieces: dict[Pos, int]
+    turn: bool = True  # Black moves first
 
     def __str__(self) -> str:
         """Return text representation of game board state."""
@@ -150,28 +132,6 @@ class State:
         ##            lines.append("--+-"*(w-1)+"-")
         return "\n".join(lines)
 
-    @classmethod
-    def from_game_board(cls, board_data: dict[str, Any]) -> Self:
-        """Return new instance from board data."""
-        size = board_data.get("boardsize", (8, 8))
-        turn = True
-        pieces = cls.get_pieces_from_tiles(board_data.get("tiles", {}))
-        return cls(size, pieces, turn)
-
-    @staticmethod
-    def get_pieces_from_tiles(
-        tiles: dict[str, dict[str, Any]],
-    ) -> dict[Pos, int]:
-        """Convert board data from game to internal representation."""
-        pieces: dict[Pos, int] = {}
-        for _tile_name, tile_data in tiles.items():
-            piece_type = tile_data["piece"]
-            if piece_type in {None, "None"}:
-                continue
-            x, y = tile_data["xy"]
-            pieces[(x, y)] = int(piece_type)
-        return pieces
-
     def calculate_actions(self, position: Pos) -> ActionSet:
         """Return actions the piece at given position can make."""
         if MANDATORY_CAPTURE:
@@ -189,39 +149,16 @@ class State:
         ends.update(moves)
         return ActionSet(jumps, moves, ends)
 
-    def get_actions_set(self, piece_position: Pos) -> ActionSet:
-        """Return potentially cached actions."""
-        if piece_position in self.pre_calculated_actions:
-            new_action_set = self.pre_calculated_actions[piece_position]
-        else:
-            new_action_set = self.calculate_actions(piece_position)
-            self.pre_calculated_actions[piece_position] = new_action_set
-        return new_action_set
-
-    def invalidate_location(self, position: Pos) -> None:
-        """Delete pre-calculated actions for a given position if calculated."""
-        if position in self.pre_calculated_actions:
-            del self.pre_calculated_actions[position]
-
-    def invalidate_all_locations(self) -> None:
-        """Clear all pre-calculated actions."""
-        self.pre_calculated_actions.clear()
-
-    ##            print(position)
-
     def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
         """Piece kinged."""
-        ##        print(f'piece_kinged {piece = }')
-        self.invalidate_location(piece_pos)
+        # print(f'piece_kinged {piece = }')
 
     def piece_moved(self, start_pos: Pos, end_pos: Pos) -> None:
         """Piece moved from start_pos to end_pos."""
-        self.invalidate_location(start_pos)
 
     def piece_jumped(self, jumped_piece_pos: Pos) -> None:
         """Piece has been jumped."""
-        ##        print(f'piece_jumped {position = }')
-        self.invalidate_all_locations()
+        # print(f'piece_jumped {position = }')
 
     def preform_action(self, action: Action) -> Self:
         """Return new state after performing action on self."""
@@ -266,32 +203,22 @@ class State:
 
         # Move piece to it's end position
         pieces_copy[to_pos] = piece_type
-        self.invalidate_location(from_pos)
-
-        self.invalidate_all_locations()
 
         # Swap turn
         return self.__class__(
             self.size,
             pieces_copy,
             not self.turn,
-            pre_calculated_actions=self.pre_calculated_actions,
         )
 
     def get_tile_name(self, x: int, y: int) -> str:
         """Return name of a given tile."""
         return chr(65 + x) + str(self.size[1] - y)
 
-    def get_tile_pos(self, name: str) -> Pos:
-        """Return tile position from it's name."""
-        x = ord(name[0]) - 65
-        y = self.size[1] - int(name[1:])
-        return (x, y)
-
     @staticmethod
     def action_from_points(start: Pos, end: Pos) -> Action:
         """Return action from given start and end coordinates."""
-        ##        return Action(self.get_tile_name(*start), self.get_tile_name(*end))
+        # return Action(self.get_tile_name(*start), self.get_tile_name(*end))
         return Action(start, end)
 
     def get_turn(self) -> int:
@@ -441,21 +368,21 @@ class State:
             ],
         )
 
+    @classmethod
     def wrap_actions(
-        self,
+        cls,
         position: Pos,
         calculate_ends: Callable[[Pos], Iterable[Pos]],
     ) -> Generator[Action, None, None]:
         """Yield end calculation function results as Actions."""
         for end in calculate_ends(position):
-            yield self.action_from_points(position, end)
+            yield cls.action_from_points(position, end)
 
     def get_actions(self, position: Pos) -> Generator[Action, None, None]:
         """Yield all moves and jumps the piece at position can make."""
         ends = set(self.get_jumps(position))
         if not (ends and MANDATORY_CAPTURE):
             ends.update(self.get_moves(position))
-        ##        ends = self.get_actions_set(position).ends
         for end in ends:
             yield self.action_from_points(position, end)
 

@@ -58,7 +58,7 @@ from checkers.network_shared import (
     read_position,
     write_position,
 )
-from checkers.state import ActionSet, State, generate_pieces
+from checkers.state import State, generate_pieces
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
@@ -400,11 +400,9 @@ class CheckersState(State):
         size: Pos,
         pieces: dict[Pos, int],
         turn: bool = True,
-        /,
-        pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
         """Initialize Checkers State."""
-        super().__init__(size, pieces, turn, pre_calculated_actions)
+        super().__init__(size, pieces, turn)
         self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
 
     def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:

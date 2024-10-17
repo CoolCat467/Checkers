@@ -65,6 +65,17 @@ def generate_rsa_key() -> RSAPrivateKey:  # pragma: no cover
     )
 
 
+def encrypt_with_rsa(
+    public_key: RSAPublicKey,
+    data: bytes,
+) -> bytes:
+    """Encrypt given data with given RSA public key."""
+    return public_key.encrypt(
+        bytes(data),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
+
+
 def encrypt_token_and_secret(
     public_key: RSAPublicKey,
     verification_token: bytes,
@@ -77,15 +88,20 @@ def encrypt_token_and_secret(
     :param shared_secret: The generated shared secret
     :return: A tuple containing (encrypted token, encrypted secret)
     """
-    encrypted_token = public_key.encrypt(
-        bytes(verification_token),
-        OAEP(MGF1(SHA256()), SHA256(), None),
-    )
-    encrypted_secret = public_key.encrypt(
-        bytes(shared_secret),
-        OAEP(MGF1(SHA256()), SHA256(), None),
-    )
+    encrypted_token = encrypt_with_rsa(public_key, verification_token)
+    encrypted_secret = encrypt_with_rsa(public_key, shared_secret)
     return encrypted_token, encrypted_secret
+
+
+def decrypt_with_rsa(
+    private_key: RSAPrivateKey,
+    data: bytes,
+) -> bytes:
+    """Decrypt given data with given RSA private key."""
+    return private_key.decrypt(
+        bytes(data),
+        OAEP(MGF1(SHA256()), SHA256(), None),
+    )
 
 
 def decrypt_token_and_secret(
@@ -100,14 +116,8 @@ def decrypt_token_and_secret(
     :param shared_secret: The shared secret encrypted and sent by the client
     :return: A tuple containing (decrypted token, decrypted secret)
     """
-    decrypted_token = private_key.decrypt(
-        bytes(verification_token),
-        OAEP(MGF1(SHA256()), SHA256(), None),
-    )
-    decrypted_secret = private_key.decrypt(
-        bytes(shared_secret),
-        OAEP(MGF1(SHA256()), SHA256(), None),
-    )
+    decrypted_token = decrypt_with_rsa(private_key, verification_token)
+    decrypted_secret = decrypt_with_rsa(private_key, shared_secret)
     return decrypted_token, decrypted_secret
 
 
