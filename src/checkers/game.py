@@ -52,6 +52,7 @@ from checkers.component import (
     Event,
     ExternalRaiseManager,
 )
+from checkers.multi_inherit import ConnectionElement, ReturnElement
 from checkers.network_shared import DEFAULT_PORT, Pos, find_ip
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
@@ -1254,60 +1255,6 @@ class PlayInternalHostingState(PlayHostingState):
     internal_server = True
 
 
-class ReturnElement(element_list.Element, objects.Button):
-    """Connection list return to title element sprite."""
-
-    __slots__ = ()
-
-    def __init__(self, name: str, font: pygame.font.Font) -> None:
-        """Initialize return element."""
-        super().__init__(name, font)
-
-        self.update_location_on_resize = False
-        self.border_width = 4
-        self.outline = RED
-        self.text = "Return to Title"
-        self.visible = True
-        self.location = (SCREEN_SIZE[0] // 2, self.location.y + 10)
-
-    async def handle_click(
-        self,
-        _: Event[sprite.PygameMouseButtonEventData],
-    ) -> None:
-        """Handle Click Event."""
-        await self.raise_event(
-            Event("return_to_title", None, 2),
-        )
-
-
-class ConnectionElement(element_list.Element, objects.Button):
-    """Connection list element sprite."""
-
-    __slots__ = ()
-
-    def __init__(
-        self,
-        name: tuple[str, int],
-        font: pygame.font.Font,
-        motd: str,
-    ) -> None:
-        """Initialize connection element."""
-        super().__init__(name, font)
-
-        self.text = f"[{name[0]}:{name[1]}]\n{motd}"
-        self.visible = True
-
-    async def handle_click(
-        self,
-        _: Event[sprite.PygameMouseButtonEventData],
-    ) -> None:
-        """Handle Click Event."""
-        details = self.name
-        await self.raise_event(
-            Event("join_server", details, 2),
-        )
-
-
 class PlayJoiningState(GameState):
     """Start running client."""
 
@@ -1343,6 +1290,8 @@ class PlayJoiningState(GameState):
             30,
         )
         return_button = ReturnElement("return_button", return_font)
+        return_button.outline = RED
+        return_button.location = (SCREEN_SIZE[0] // 2, 10)
         connections.add_element(return_button)
 
         self.manager.register_handlers(

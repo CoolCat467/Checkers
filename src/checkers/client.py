@@ -323,7 +323,9 @@ class GameClient(EncryptedNetworkEventComponent):
                 traceback.print_exception(ex)
             else:
                 self.running = True
-                while not self.not_connected and self.running:
+                while self.running:
+                    if self.not_connected:
+                        break
                     await self.handle_read_event()
                 self.running = False
 
@@ -341,7 +343,7 @@ class GameClient(EncryptedNetworkEventComponent):
 
     async def read_callback_ping(self, event: Event[bytearray]) -> None:
         """Read callback_ping event from server."""
-        ns = int.from_bytes(event.data)
+        ns = int.from_bytes(event.data, byteorder="big")
         now = int(time.time() * 1e9)
         difference = now - ns
 
