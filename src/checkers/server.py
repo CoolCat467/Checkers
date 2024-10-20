@@ -27,14 +27,15 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
+import time
 import traceback
 from collections import deque
 from functools import partial
-from typing import TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, NoReturn, cast
 
 import trio
 
-from checkers.async_clock import Clock
+from checkers import network
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import ComponentManager, Event, ExternalRaiseManager
@@ -46,7 +47,6 @@ from checkers.encryption import (
     generate_verify_token,
     serialize_public_key,
 )
-from checkers.network import NetworkEventComponent, NetworkTimeoutError, Server
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -54,12 +54,11 @@ from checkers.network_shared import (
     ClientBoundEvents,
     Pos,
     ServerBoundEvents,
-    TickEventData,
     find_ip,
     read_position,
     write_position,
 )
-from checkers.state import ActionSet, State, generate_pieces
+from checkers.state import State, generate_pieces
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
@@ -133,6 +132,7 @@ class ServerClient(EncryptedNetworkEventComponent):
                 "action_complete->network": self.handle_action_complete,
                 "initial_config->network": self.handle_initial_config,
                 f"playing_as->network[{self.client_id}]": self.handle_playing_as,
+                f"callback_ping->network[{self.client_id}]": self.handle_callback_ping,
             },
         )
 
@@ -305,6 +305,34 @@ class ServerClient(EncryptedNetworkEventComponent):
         buffer.write_value(StructFormat.UBYTE, playing_as)
         await self.write_event(Event("server[write]->playing_as", buffer))
 
+    async def write_callback_ping(self) -> None:
+        """Write callback_ping packet to client.
+
+        Could raise the following exceptions:
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+            is broken.
+          trio.ClosedResourceError: if stream was previously closed
+
+        Listed as possible but probably not because of write lock:
+          trio.BusyResourceError: if another task is using :meth:`write`
+        """
+        buffer = Buffer()
+
+        # Try to be as accurate with time as possible
+        await self.wait_write_might_not_block()
+        ns = int(time.time() * 1e9)
+        # Use as many bits as time needs, write_buffer handles size for us.
+        buffer.write(ns.to_bytes(-(-ns.bit_length() // 8), "big"))
+
+        await self.write_event(Event("server[write]->callback_ping", buffer))
+
+    async def handle_callback_ping(
+        self,
+        _: Event[None],
+    ) -> None:
+        """Reraise as server[write]->callback_ping."""
+        await self.write_callback_ping()
+
     async def start_encryption_request(self) -> None:
         """Start encryption request and raise as server[write]->encryption_request."""
         if self.encryption_enabled:
@@ -372,11 +400,9 @@ class CheckersState(State):
         size: Pos,
         pieces: dict[Pos, int],
         turn: bool = True,
-        /,
-        pre_calculated_actions: dict[Pos, ActionSet] | None = None,
     ) -> None:
         """Initialize Checkers State."""
-        super().__init__(size, pieces, turn, pre_calculated_actions)
+        super().__init__(size, pieces, turn)
         self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
 
     def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
@@ -407,7 +433,7 @@ class CheckersState(State):
         return self.action_queue
 
 
-class GameServer(Server):
+class GameServer(network.Server):
     """Checkers server.
 
     Handles accepting incoming connections from clients and handles
@@ -463,7 +489,7 @@ class GameServer(Server):
 
         close_methods: deque[Callable[[], Awaitable[object]]] = deque()
         for component in self.get_all_components():
-            if isinstance(component, NetworkEventComponent):
+            if isinstance(component, network.NetworkEventComponent):
                 close_methods.append(component.close)
             print(f"stop_server {component.name = }")
             self.remove_component(component.name)
@@ -580,10 +606,11 @@ class GameServer(Server):
 
         self.players_can_interact = True
 
-    async def start_server(
+    # "Implicit return in function which does not return"
+    async def start_server(  # type: ignore[misc]
         self,
         event: Event[tuple[str | None, int]],
-    ) -> None:
+    ) -> NoReturn:
         """Serve clients."""
         print(f"{self.__class__.__name__}: Closing old server clients")
         await self.stop_server()
@@ -597,6 +624,7 @@ class GameServer(Server):
             # Do not post advertisements when using internal singleplayer mode
             if not self.internal_singleplayer_mode:
                 nursery.start_soon(self.post_advertisements, port)
+            # Serve runs forever until canceled
             nursery.start_soon(partial(self.serve, port, host, backlog=0))
 
     async def transmit_playing_as(self) -> None:
@@ -641,20 +669,39 @@ class GameServer(Server):
         )
 
     async def client_network_loop(self, client: ServerClient) -> None:
-        """Network loop for given ServerClient."""
+        """Network loop for given ServerClient.
+
+        Could raise the following exceptions:
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+            is broken.
+          trio.ClosedResourceError: if stream was previously closed
+
+        Probably couldn't raise because of write lock but still:
+          trio.BusyResourceError: More than one task is trying to write
+            to socket at once.
+        """
         while not self.can_start() and not client.not_connected:
-            await client.write_event(
-                Event("server[write]->callback_ping", bytearray()),
-            )
-        while not client.not_connected:
-            print(f"{client.name} client_network_loop tick")
             try:
-                await client.write_event(
-                    Event("server[write]->callback_ping", bytearray()),
-                )
-                event = await client.read_event()
-            except NetworkTimeoutError:
-                continue
+                await client.write_callback_ping()
+            except (
+                trio.BrokenResourceError,
+                trio.ClosedResourceError,
+                network.NetworkStreamNotConnectedError,
+            ):
+                print(f"{client.name} Disconnected in lobby.")
+                return
+        while not client.not_connected:
+            event: Event[bytearray] | None = None
+            try:
+                await client.write_callback_ping()
+                with trio.move_on_after(2):
+                    event = await client.read_event()
+            except network.NetworkTimeoutError:
+                print(f"{client.name} Timeout")
+                break
+            except network.NetworkEOFError:
+                print(f"{client.name} EOF")
+                break
             except (
                 trio.BrokenResourceError,
                 trio.ClosedResourceError,
@@ -664,7 +711,9 @@ class GameServer(Server):
             except Exception as exc:
                 traceback.print_exception(exc)
                 break
-            else:
+            if event is not None:
+                # print(f"{client.name} client_network_loop tick")
+                # print(f"{client.name} {event = }")
                 await client.raise_event(event)
 
     def can_start(self) -> bool:
@@ -713,7 +762,11 @@ class GameServer(Server):
                 )
 
     async def handler(self, stream: trio.SocketStream) -> None:
-        """Accept clients."""
+        """Accept clients. Called by network.Server.serve."""
+        if self.client_count == 0 and self.game_active():
+            # Old game was running but everyone left, restart
+            self.state.pieces.clear()
+            # self.state = CheckersState(self.board_size, {})
         new_client_id = self.client_count
         print(
             f"{self.__class__.__name__}: client connected [client_id {new_client_id}]",
@@ -755,6 +808,7 @@ class GameServer(Server):
                         f"{self.__class__.__name__}: client disconnected [client_id {new_client_id}]",
                     )
                     self.client_count -= 1
+        # ServerClient's `with` block handles closing stream.
 
     async def handle_network_select_piece(
         self,
@@ -799,14 +853,14 @@ class GameServer(Server):
 
         if piece_pos is not None:
             # Calculate actions if required
-            new_action_set = self.state.get_actions_set(piece_pos)
+            new_action_set = self.state.calculate_actions(piece_pos)
             ignore = new_action_set.ends
 
         ignored: set[Pos] = set()
 
         # Remove outlined tiles from previous selection if existed
         if prev_selection := self.player_selections.get(player):
-            action_set = self.state.get_actions_set(prev_selection)
+            action_set = self.state.calculate_actions(prev_selection)
             ignored = action_set.ends & ignore
             remove = action_set.ends - ignore
             async with trio.open_nursery() as nursery:
@@ -921,7 +975,7 @@ class GameServer(Server):
             )
             return
 
-        if tile_pos not in self.state.get_actions_set(piece_pos).ends:
+        if tile_pos not in self.state.calculate_actions(piece_pos).ends:
             print(
                 f"{player = } cannot select tile {piece_pos!r} because not valid move",
             )
@@ -980,7 +1034,6 @@ async def run_server(
         event_manager = ExternalRaiseManager(
             "checkers",
             main_nursery,
-            "client",
         )
         server = server_class()
         event_manager.add_component(server)
@@ -990,45 +1043,23 @@ async def run_server(
             print("Server starting...")
             await trio.sleep(1)
 
-        print("Server running")
-
-        clock = Clock()
+        print("\nServer running.")
 
         try:
-            while server.running:
-                await clock.tick()
-                await event_manager.raise_event(
-                    Event(
-                        "tick",
-                        TickEventData(
-                            time_passed=clock.get_time()
-                            / 1e9,  # nanoseconds -> seconds
-                            fps=clock.get_fps(),
-                        ),
-                    ),
-                )
+            while server.running:  # noqa: ASYNC110  # sleep in while loop
+                # Process background tasks in the main nursery
                 await trio.sleep(0.01)
-        finally:
-            server.unbind_components()
-
-
-def run_server_sync(
-    server_class: type[GameServer],
-    host: str,
-    port: int,
-) -> None:
-    """Run server given server class and address to host at."""
-    trio.run(run_server, server_class, host, port)
+        except KeyboardInterrupt:
+            print("\nClosing from keyboard interrupt.")
+        await server.stop_server()
+        server.unbind_components()
 
 
 async def cli_run_async() -> None:
     """Run game server."""
     host = await find_ip()
     port = DEFAULT_PORT
-    try:
-        await run_server(GameServer, host, port)
-    except KeyboardInterrupt:
-        print("Closing from keyboard interrupt")
+    await run_server(GameServer, host, port)
 
 
 def cli_run() -> None:

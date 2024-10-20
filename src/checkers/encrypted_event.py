@@ -84,18 +84,45 @@ class EncryptedNetworkEventComponent(NetworkEventComponent):
         self.decryptor = self.cipher.decryptor()
 
     async def write(self, data: bytes) -> None:
-        """Write encrypted data to stream."""
+        """Send the given data, encrypted through the stream, blocking if necessary.
+
+        Args:
+          data (bytes, bytearray, or memoryview): The data to send.
+
+        Raises:
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`send_all`, :meth:`wait_send_all_might_not_block`, or
+              :meth:`HalfCloseableStream.send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`send_all` is running.
+
+        Most low-level operations in Trio provide a guarantee: if they raise
+        :exc:`trio.Cancelled`, this means that they had no effect, so the
+        system remains in a known state. This is **not true** for
+        :meth:`send_all`. If this operation raises :exc:`trio.Cancelled` (or
+        any other exception for that matter), then it may have sent some, all,
+        or none of the requested data, and there is no way to know which.
+
+        Copied from Trio docs.
+
+        """
         if self.encryption_enabled:
             data = self.encryptor.update(data)
         return await super().write(data)
 
     async def read(self, length: int) -> bytearray:
-        """Read `length` encrypted bytes from stream.
+        """Read `length` bytes from stream.
 
         Can raise following exceptions:
             NetworkStreamNotConnectedError
             NetworkTimeoutError - Timeout or no data
-        OSError - Stopped responding
+            OSError - Stopped responding
+            trio.BusyResourceError - Another task is already writing data
+            trio.BrokenResourceError - Something is wrong and stream is broken
+            trio.ClosedResourceError - Stream is closed or another task closes stream
         """
         data = await super().read(length)
         if self.encryption_enabled:

@@ -18,7 +18,7 @@ colorama==0.4.6 ; (implementation_name != 'cpython' and sys_platform == 'win32')
     # via
     #   click
     #   pytest
-coverage==7.6.2
+coverage==7.6.3
     # via
     #   -r test-requirements.in
     #   pytest-cov
@@ -33,7 +33,7 @@ idna==3.10
     # via trio
 iniconfig==2.0.0
     # via pytest
-mypy==1.11.2
+mypy==1.12.0
     # via -r test-requirements.in
 mypy-extensions==1.0.0
     # via
@@ -79,7 +79,7 @@ tomli==2.0.2 ; python_full_version <= '3.11'
     #   coverage
     #   mypy
     #   pytest
-trio==0.26.2
+trio==0.27.0
     # via
     #   -r test-requirements.in
     #   pytest-trio

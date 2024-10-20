@@ -29,7 +29,6 @@ import contextlib
 from typing import (
     TYPE_CHECKING,
     Any,
-    AnyStr,
     Literal,
     NoReturn,
 )
@@ -56,6 +55,12 @@ if TYPE_CHECKING:
 
 class NetworkTimeoutError(Exception):
     """Network Timeout Error."""
+
+    __slots__ = ()
+
+
+class NetworkEOFError(Exception):
+    """Network End of File Error."""
 
     __slots__ = ()
 
@@ -105,7 +110,13 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         return self
 
     async def connect(self, host: str, port: int) -> None:
-        """Connect to host:port on TCP."""
+        """Connect to host:port on TCP.
+
+        Raises:
+          OSError: if the connection fails.
+          RuntimeError: if stream is already connected
+
+        """
         if not self.not_connected:
             raise RuntimeError("Already connected!")
         try:  # pragma: nocover
@@ -118,8 +129,9 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """Read `length` bytes from stream.
 
         Can raise following exceptions:
-            NetworkStreamNotConnectedError
-            NetworkTimeoutError - Timeout or no data
+            NetworkStreamNotConnectedError - Network stream is not connected
+            NetworkTimeoutError - Timeout
+            NetworkEOFError - End of File
             OSError - Stopped responding
             trio.BusyResourceError - Another task is already writing data
             trio.BrokenResourceError - Something is wrong and stream is broken
@@ -129,17 +141,19 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         while max_read_count := length - len(content):
             received = b""
             ##            try:
-            with trio.move_on_after(self.timeout):
+            with trio.move_on_after(self.timeout) as cancel_scope:
                 received = await self.stream.receive_some(max_read_count)
+            cancel_called = cancel_scope.cancel_called
             ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
             ##                await self.close()
             ##                raise
             if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
-                    raise NetworkTimeoutError(
-                        "Server did not respond with any information. "
-                        "This may be from a connection timeout.",
+                    if cancel_called:
+                        raise NetworkTimeoutError("Read timed out.")
+                    raise NetworkEOFError(
+                        "Server did not respond with any information.",
                     )
                 # Only sent a few bytes, but we requested more
                 raise OSError(
@@ -150,8 +164,32 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
             content.extend(received)
         return content
 
-    async def write(self, data: bytes) -> None:
-        """Write data to stream."""
+    async def write(self, data: bytes | bytearray | memoryview) -> None:
+        """Send the given data through the stream, blocking if necessary.
+
+        Args:
+          data (bytes, bytearray, or memoryview): The data to send.
+
+        Raises:
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`send_all`, :meth:`wait_send_all_might_not_block`, or
+              :meth:`HalfCloseableStream.send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`send_all` is running.
+
+        Most low-level operations in Trio provide a guarantee: if they raise
+        :exc:`trio.Cancelled`, this means that they had no effect, so the
+        system remains in a known state. This is **not true** for
+        :meth:`send_all`. If this operation raises :exc:`trio.Cancelled` (or
+        any other exception for that matter), then it may have sent some, all,
+        or none of the requested data, and there is no way to know which.
+
+        Copied from Trio docs.
+
+        """
         await self.stream.send_all(data)
 
     ##        try:
@@ -161,7 +199,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
     ##            raise
 
     async def close(self) -> None:
-        """Close the stream."""
+        """Close the stream, possibly blocking."""
         if self._stream is None:
             await trio.lowlevel.checkpoint()
             return
@@ -169,12 +207,88 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         self._stream = None
 
     async def send_eof(self) -> None:
-        """Close the sending half of the stream."""
+        """Close the sending half of the stream.
+
+        This corresponds to ``shutdown(..., SHUT_WR)`` (`man
+          page <https://linux.die.net/man/2/shutdown>`__).
+
+        If an EOF has already been sent, then this method should silently
+        succeed.
+
+        Raises:
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`~SendStream.send_all`,
+              :meth:`~SendStream.wait_send_all_might_not_block`, or
+              :meth:`send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+
+        Suppresses:
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`send_eof` is running.
+
+        Copied from trio docs.
+
+        """
         with contextlib.suppress(trio.ClosedResourceError):
             await self.stream.send_eof()
 
     async def wait_write_might_not_block(self) -> None:
-        """stream.wait_send_all_might_not_block."""
+        """Block until it's possible that :meth:`write` might not block.
+
+        This method may return early: it's possible that after it returns,
+        :meth:`send_all` will still block. (In the worst case, if no better
+        implementation is available, then it might always return immediately
+        without blocking. It's nice to do better than that when possible,
+        though.)
+
+        This method **must not** return *late*: if it's possible for
+        :meth:`send_all` to complete without blocking, then it must
+        return. When implementing it, err on the side of returning early.
+
+        Raises:
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`send_all`, :meth:`wait_send_all_might_not_block`, or
+              :meth:`HalfCloseableStream.send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`wait_send_all_might_not_block` is running.
+
+        Note:
+          This method is intended to aid in implementing protocols that want
+          to delay choosing which data to send until the last moment. E.g.,
+          suppose you're working on an implementation of a remote display server
+          like `VNC
+          <https://en.wikipedia.org/wiki/Virtual_Network_Computing>`__, and
+          the network connection is currently backed up so that if you call
+          :meth:`send_all` now then it will sit for 0.5 seconds before actually
+          sending anything. In this case it doesn't make sense to take a
+          screenshot, then wait 0.5 seconds, and then send it, because the
+          screen will keep changing while you wait; it's better to wait 0.5
+          seconds, then take the screenshot, and then send it, because this
+          way the data you deliver will be more
+          up-to-date. Using :meth:`wait_send_all_might_not_block` makes it
+          possible to implement the better strategy.
+
+          If you use this method, you might also want to read up on
+          ``TCP_NOTSENT_LOWAT``.
+
+          Further reading:
+
+          * `Prioritization Only Works When There's Pending Data to Prioritize
+            <https://insouciant.org/tech/prioritization-only-works-when-theres-pending-data-to-prioritize/>`__
+
+          * WWDC 2015: Your App and Next Generation Networks: `slides
+            <http://devstreaming.apple.com/videos/wwdc/2015/719ui2k57m/719/719_your_app_and_next_generation_networks.pdf?dl=1>`__,
+            `video and transcript
+            <https://developer.apple.com/videos/play/wwdc2015/719/>`__
+
+        Copied from Trio docs.
+
+        """
         return await self.stream.wait_send_all_might_not_block()
 
     async def __aenter__(self) -> Self:
@@ -187,7 +301,7 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         exc_value: BaseException | None,
         traceback: TracebackType | None,
     ) -> None:
-        """Async context manager exit."""
+        """Async context manager exit. Close connection."""
         await self.close()
 
 
@@ -233,7 +347,12 @@ class NetworkEventComponent(NetworkComponent):
         event_name: str,
         packet_id: int,
     ) -> None:
-        """Map event name to serverbound packet id."""
+        """Map event name to serverbound packet id.
+
+        Raises:
+          ValueError: Event name already registered or infinite network loop.
+
+        """
         if event_name in self._write_event_name_to_packet_id:
             raise ValueError(f"{event_name!r} event already registered!")
         if self._read_packet_id_to_event_name.get(packet_id) == event_name:
@@ -252,7 +371,20 @@ class NetworkEventComponent(NetworkComponent):
             self.register_network_write_event(event_name, packet_id)
 
     async def write_event(self, event: Event[bytearray]) -> None:
-        """Send event to network."""
+        """Send event to network.
+
+        Raises:
+          RuntimeError: if unregistered packet id received from network
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`send_all`, :meth:`wait_send_all_might_not_block`, or
+              :meth:`HalfCloseableStream.send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`send_all` is running.
+
+        """
         packet_id = self._write_event_name_to_packet_id.get(event.name)
         if packet_id is None:
             raise RuntimeError(f"Unhandled network event name {event.name!r}")
@@ -263,7 +395,19 @@ class NetworkEventComponent(NetworkComponent):
             await self.write(buffer)
 
     async def read_event(self) -> Event[bytearray]:
-        """Receive event from network."""
+        """Receive event from network.
+
+        Can raise following exceptions:
+          RuntimeError - Unhandled packet id
+          NetworkStreamNotConnectedError - Network stream is not connected
+          NetworkTimeoutError - Timeout or no data
+          OSError - Stopped responding
+          trio.BrokenResourceError - Something is wrong and stream is broken
+          trio.ClosedResourceError - Stream is closed or another task closes stream
+
+        Shouldn't happen with write lock but still:
+          trio.BusyResourceError - Another task is already writing data
+        """
         async with self.read_lock:
             packet_id = await self.read_value(self.packet_id_format)
             event_data = await self.read_bytearray()
@@ -297,12 +441,12 @@ class NetworkEventComponent(NetworkComponent):
 class Server(ComponentManager):
     """Asynchronous TCP Server."""
 
-    __slots__ = ("cancel_scope",)
+    __slots__ = ("serve_cancel_scope",)
 
     def __init__(self, name: str, own_name: str | None = None) -> None:
         """Initialize Server."""
         super().__init__(name, own_name)
-        self.cancel_scope: trio.CancelScope | None = None
+        self.serve_cancel_scope: trio.CancelScope | None = None
 
     def stop_serving(self) -> None:
         """Cancel serve scope immediately.
@@ -310,19 +454,19 @@ class Server(ComponentManager):
         This method is idempotent, i.e., if the scope was already
         cancelled then this method silently does nothing.
         """
-        if self.cancel_scope is None:
+        if self.serve_cancel_scope is None:
             return
-        self.cancel_scope.cancel()
+        self.serve_cancel_scope.cancel()
 
     # "Implicit return in function which does not return"
     async def serve(  # type: ignore[misc]  # pragma: nocover
         self,
         port: int,
-        host: AnyStr | None = None,
+        host: str | bytes | None = None,
         backlog: int | None = None,
     ) -> NoReturn:
         """Serve over TCP. See trio.open_tcp_listeners for argument details."""
-        self.cancel_scope = trio.CancelScope()
+        self.serve_cancel_scope = trio.CancelScope()
         async with trio.open_nursery() as nursery:
             listeners = await trio.open_tcp_listeners(
                 port,
@@ -333,9 +477,9 @@ class Server(ComponentManager):
             async def handle_serve(
                 task_status: trio.TaskStatus[Any] = trio.TASK_STATUS_IGNORED,
             ) -> None:
-                assert self.cancel_scope is not None
+                assert self.serve_cancel_scope is not None
                 try:
-                    with self.cancel_scope:
+                    with self.serve_cancel_scope:
                         await trio.serve_listeners(
                             self.handler,
                             listeners,

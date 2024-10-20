@@ -25,8 +25,6 @@ if TYPE_CHECKING:
 
 T = TypeVar("T")
 
-PORT = 31613
-
 # Player:
 # 0 = False = Person  = MIN = 0, 2
 # 1 = True  = AI (Us) = MAX = 1, 3

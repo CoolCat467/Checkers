@@ -174,6 +174,8 @@ class BaseAsyncWriter(ABC):
         """Write a 32-bit signed integer in a variable length format.
 
         For more information about variable length format check :meth:`._write_varuint`.
+
+        Raises ValueError if value is outside of the range of a 32-bit signed integer.
         """
         val = to_twos_complement(value, bits=32)
         await self._write_varuint(val, max_bits=32)
@@ -182,12 +184,17 @@ class BaseAsyncWriter(ABC):
         """Write a 64-bit signed integer in a variable length format.
 
         For more information about variable length format check :meth:`._write_varuint`.
+
+        Raises ValueError if value is outside of the range of a 64-bit signed integer.
         """
         val = to_twos_complement(value, bits=64)
         await self._write_varuint(val, max_bits=64)
 
     async def write_bytearray(self, data: bytes, /) -> None:
-        """Write an arbitrary sequence of bytes, prefixed with a varint of it's size."""
+        """Write an arbitrary sequence of bytes, prefixed with a varint of it's size.
+
+        Raises ValueError if length is is outside of the range of a 32-bit signed integer.
+        """
         await self.write_varint(len(data))
         await self.write(data)
 
@@ -321,6 +328,8 @@ class BaseSyncWriter(ABC):
         """Write a 32-bit signed integer in a variable length format.
 
         For more information about variable length format check :meth:`._write_varuint`.
+
+        Raises ValueError if length is is outside of the range of a 32-bit signed integer.
         """
         val = to_twos_complement(value, bits=32)
         self._write_varuint(val, max_bits=32)
@@ -329,12 +338,17 @@ class BaseSyncWriter(ABC):
         """Write a 64-bit signed integer in a variable length format.
 
         For more information about variable length format check :meth:`._write_varuint` docstring.
+
+        Raises ValueError if length is is outside of the range of a 64-bit signed integer.
         """
         val = to_twos_complement(value, bits=64)
         self._write_varuint(val, max_bits=64)
 
     def write_bytearray(self, data: bytes, /) -> None:
-        """Write an arbitrary sequence of bytes, prefixed with a varint of it's size."""
+        """Write an arbitrary sequence of bytes, prefixed with a varint of it's size.
+
+        Raises ValueError if length is is outside of the range of a 32-bit signed integer.
+        """
         self.write_varint(len(data))
         self.write(data)
 
@@ -429,7 +443,7 @@ class BaseAsyncReader(ABC):
         This is a standard way of transmitting ints, and it allows smaller numbers to take less bytes.
 
         Reading will be limited up to integer values of ``max_bits`` bits, and trying to read bigger values will rase
-        an :exc:`IOError`. Note that setting ``max_bits`` to for example 32 bits doesn't mean that at most 4 bytes
+        an :exc:`OSError`. Note that setting ``max_bits`` to for example 32 bits doesn't mean that at most 4 bytes
         will be read, in this case we would actually read at most 5 bytes, due to the variable encoding overhead.
 
         Varints send bytes where 7 least significant bits are value bits, and the most significant bit is continuation

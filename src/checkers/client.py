@@ -25,11 +25,13 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 import struct
+import time
 import traceback
 from typing import TYPE_CHECKING
 
 import trio
 
+from checkers import network
 from checkers.base_io import StructFormat
 from checkers.buffer import Buffer
 from checkers.component import Event
@@ -38,10 +40,6 @@ from checkers.encryption import (
     deserialize_public_key,
     encrypt_token_and_secret,
     generate_shared_secret,
-)
-from checkers.network import (
-    NetworkStreamNotConnectedError,
-    NetworkTimeoutError,
 )
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
@@ -108,7 +106,7 @@ async def read_advertisements(
                 trio.socket.IP_ADD_MEMBERSHIP,
                 mreq,
             )
-        else:
+        else:  # IPv6
             mreq = group_bin + struct.pack("@I", 0)
             udp_socket.setsockopt(
                 trio.socket.IPPROTO_IPV6,
@@ -181,7 +179,7 @@ class GameClient(EncryptedNetworkEventComponent):
         cbe = ClientBoundEvents
         self.register_read_network_events(
             {
-                cbe.callback_ping: "callback_ping->client",
+                cbe.callback_ping: "server->callback_ping",
                 cbe.create_piece: "server->create_piece",
                 cbe.select_piece: "server->select_piece",
                 cbe.create_tile: "server->create_tile",
@@ -206,7 +204,7 @@ class GameClient(EncryptedNetworkEventComponent):
         super().bind_handlers()
         self.register_handlers(
             {
-                # "callback_ping->client": self.print_callback_ping,
+                "server->callback_ping": self.read_callback_ping,
                 "gameboard_piece_clicked": self.write_piece_click,
                 "gameboard_tile_clicked": self.write_tile_click,
                 "server->create_piece": self.read_create_piece,
@@ -249,7 +247,22 @@ class GameClient(EncryptedNetworkEventComponent):
         assert self.not_connected
 
     async def handle_read_event(self) -> None:
-        """Raise events from server."""
+        """Raise events from server.
+
+        Can raise following exceptions:
+          RuntimeError - Unhandled packet id
+          network.NetworkStreamNotConnectedError - Network stream is not connected
+          OSError - Stopped responding
+          trio.BrokenResourceError - Something is wrong and stream is broken
+
+        Shouldn't happen with write lock but still:
+          trio.BusyResourceError - Another task is already writing data
+
+        Handled exceptions:
+          trio.ClosedResourceError - Stream is closed or another task closes stream
+          network.NetworkTimeoutError - Timeout
+          network.NetworkEOFError - Server closed connection
+        """
         ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
             return
@@ -260,34 +273,43 @@ class GameClient(EncryptedNetworkEventComponent):
             # print("handle_read_event start")
             event = await self.read_event()
         except trio.ClosedResourceError:
+            self.running = False
             await self.close()
-            print("Client side socket closed from another task.")
+            print(f"[{self.name}] Socket closed from another task.")
             return
-        except NetworkTimeoutError as exc:
+        except network.NetworkTimeoutError as exc:
             if self.running:
+                self.running = False
+                print(f"[{self.name}] NetworkTimeoutError")
                 await self.close()
                 traceback.print_exception(exc)
                 await self.raise_disconnect(
                     "Failed to read event from server.",
                 )
             return
-        except NetworkStreamNotConnectedError as exc:
+        except network.NetworkStreamNotConnectedError as exc:
+            self.running = False
+            print(f"[{self.name}] NetworkStreamNotConnectedError")
             traceback.print_exception(exc)
             await self.close()
             assert self.not_connected
             raise
-        else:
-            await self.raise_event(event)
-        ##    await self.raise_event(
-        ##        Event(f"client[{self.name}]_read_event", None),
-        ##    )
+        except network.NetworkEOFError:
+            self.running = False
+            print(f"[{self.name}] NetworkEOFError")
+            await self.close()
+            await self.raise_disconnect(
+                "Server closed connection.",
+            )
+            return
+
+        await self.raise_event(event)
 
     async def handle_client_connect(
         self,
         event: Event[tuple[str, int]],
     ) -> None:
         """Have client connect to address specified in event."""
-        print("handle_client_connect event fired")
         if self.connect_event_lock.locked():
             raise RuntimeError("2nd client connect fired!")
         async with self.connect_event_lock:
@@ -310,9 +332,24 @@ class GameClient(EncryptedNetworkEventComponent):
                     await self.raise_event(
                         Event("client_connection_closed", None),
                     )
-
+                else:
+                    print(
+                        "manager does not exist, cannot send client connection closed event.",
+                    )
                 return
             await self.raise_disconnect("Error connecting to server.")
+
+    async def read_callback_ping(self, event: Event[bytearray]) -> None:
+        """Read callback_ping event from server."""
+        ns = int.from_bytes(event.data)
+        now = int(time.time() * 1e9)
+        difference = now - ns
+
+        # print(f'{difference / 1e9 = } seconds')
+
+        await self.raise_event(
+            Event("callback_ping", difference),
+        )
 
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server."""
@@ -360,7 +397,7 @@ class GameClient(EncryptedNetworkEventComponent):
 
         buffer = Buffer()
         write_position(buffer, piece_position)
-        buffer.write_value(StructFormat.UINT, piece_type)
+        # buffer.write_value(StructFormat.UINT, piece_type)
 
         await self.write_event(Event("select_piece->server", buffer))
 
@@ -510,6 +547,7 @@ class GameClient(EncryptedNetworkEventComponent):
         """Send EOF if connected and close socket."""
         if self.not_connected:
             return
+        self.running = False
         try:
             await self.send_eof()
         finally:

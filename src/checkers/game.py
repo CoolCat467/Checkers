@@ -43,7 +43,7 @@ from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 
-from checkers import base2d, objects, sprite
+from checkers import base2d, element_list, objects, sprite
 from checkers.async_clock import Clock
 from checkers.client import GameClient, read_advertisements
 from checkers.component import (
@@ -281,7 +281,7 @@ class Piece(sprite.Sprite):
 class Tile(sprite.Sprite):
     """Outlined tile sprite - Only exists for selecting destination."""
 
-    __slots__ = ("color", "board_position", "position_name")
+    __slots__ = ("color", "board_position")
 
     def __init__(
         self,
@@ -295,7 +295,6 @@ class Tile(sprite.Sprite):
 
         self.color = color
         self.board_position = position
-        self.position_name = position_name
         self.location = location
 
         self.update_location_on_resize = True
@@ -313,7 +312,7 @@ class Tile(sprite.Sprite):
         self.register_handlers(
             {
                 "click": self.handle_click_event,
-                f"self_destruct_tile_{self.position_name}": self.handle_self_destruct_event,
+                f"self_destruct_{self.name}": self.handle_self_destruct_event,
             },
         )
 
@@ -487,10 +486,8 @@ class GameBoard(sprite.Sprite):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle create_piece event."""
-        if not self.visible:
-            # If not visible, re-raise until board is set up right
-            await self.raise_event(event)
-            return
+        while not self.visible:
+            raise RuntimeError("handle_create_piece_event not visible yet.")
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
 
@@ -737,6 +734,7 @@ class GameBoard(sprite.Sprite):
         group.add(piece)  # type: ignore[arg-type]
 
         self.pieces[position] = piece_type
+        assert isinstance(piece.name, str)
         return piece.name
 
     def add_tile(self, position: Pos) -> str:
@@ -751,6 +749,7 @@ class GameBoard(sprite.Sprite):
         self.add_component(tile)
         group.add(tile)  # type: ignore[arg-type]
 
+        assert isinstance(tile.name, str)
         return tile.name
 
     def generate_board_image(self) -> Surface:
@@ -860,10 +859,13 @@ class ClickDestinationComponent(Component):
             assert isinstance(event.data["pos"], tuple)
             target.destination = Vector2.from_iter(event.data["pos"])
 
-    async def move_towards_dest(self, event: Event[dict[str, float]]) -> None:
+    async def move_towards_dest(
+        self,
+        event: Event[sprite.TickEventData],
+    ) -> None:
         """Move closer to destination."""
         target: sprite.TargetingComponent = self.get_component("targeting")
-        await target.move_destination_time(event.data["time_passed"])
+        await target.move_destination_time(event.data.time_passed)
 
 
 class MrFloppy(sprite.Sprite):
@@ -955,12 +957,13 @@ class FPSCounter(objects.Text):
         )
         super().__init__("fps", font)
 
-        self.location = Vector2.from_iter(self.image.get_size()) / 2 + (5, 5)
+        self.location = (20, 20)
 
-    async def on_tick(self, event: Event[dict[str, float]]) -> None:
+    async def on_tick(self, event: Event[sprite.TickEventData]) -> None:
         """Update text."""
-        # self.text = f'FPS: {event.data["fps"]:.2f}'
-        self.text = f'FPS: {event.data["fps"]:.0f}'
+        # self.text = f'FPS: {event.data.fps:.2f}'
+        self.text = f"FPS: {event.data.fps:.0f}"
+        self.visible = True
 
     def bind_handlers(self) -> None:
         """Register tick event handler."""
@@ -1179,6 +1182,21 @@ class TitleState(GameState):
         )
         self.group_add(internal_button)
 
+        quit_button = KwargButton(
+            "quit_button",
+            button_font,
+            visible=True,
+            color=Color(0, 0, 0),
+            text="Quit",
+            location=join_button.location
+            + Vector2(
+                0,
+                join_button.rect.h + 10,
+            ),
+            handle_click=self.change_state("Halt"),
+        )
+        self.group_add(quit_button)
+
         await self.machine.raise_event(Event("init", None))
 
 
@@ -1236,44 +1254,72 @@ class PlayInternalHostingState(PlayHostingState):
     internal_server = True
 
 
-class JoinButton(Button):
-    """Join Button."""
+class ReturnElement(element_list.Element, objects.Button):
+    """Connection list return to title element sprite."""
 
     __slots__ = ()
 
-    def __init__(self, id_: int, font: pygame.font.Font, motd: str) -> None:
-        """Initialize Join Button."""
-        super().__init__(f"join_button_{id_}", font)
-        self.text = motd
-        self.location = [x // 2 for x in SCREEN_SIZE]
+    def __init__(self, name: str, font: pygame.font.Font) -> None:
+        """Initialize return element."""
+        super().__init__(name, font)
+
+        self.update_location_on_resize = False
+        self.border_width = 4
+        self.outline = RED
+        self.text = "Return to Title"
+        self.visible = True
+        self.location = (SCREEN_SIZE[0] // 2, self.location.y + 10)
 
     async def handle_click(
         self,
         _: Event[sprite.PygameMouseButtonEventData],
     ) -> None:
         """Handle Click Event."""
-        print(f"{self!r} handle_click")
+        await self.raise_event(
+            Event("return_to_title", None, 2),
+        )
+
+
+class ConnectionElement(element_list.Element, objects.Button):
+    """Connection list element sprite."""
+
+    __slots__ = ()
+
+    def __init__(
+        self,
+        name: tuple[str, int],
+        font: pygame.font.Font,
+        motd: str,
+    ) -> None:
+        """Initialize connection element."""
+        super().__init__(name, font)
+
+        self.text = f"[{name[0]}:{name[1]}]\n{motd}"
+        self.visible = True
+
+    async def handle_click(
+        self,
+        _: Event[sprite.PygameMouseButtonEventData],
+    ) -> None:
+        """Handle Click Event."""
+        details = self.name
+        await self.raise_event(
+            Event("join_server", details, 2),
+        )
 
 
 class PlayJoiningState(GameState):
     """Start running client."""
 
-    __slots__ = (
-        "font",
-        "buttons",
-        "next_button",
-    )
+    __slots__ = ("font",)
 
     def __init__(self) -> None:
         """Initialize Joining State."""
         super().__init__("play_joining")
 
-        self.next_button = 0
-        self.buttons: dict[tuple[str, int], int] = {}
-
         self.font = pygame.font.Font(
             DATA_FOLDER / "VeraSerif.ttf",
-            28,
+            12,
         )
 
     async def entry_actions(self) -> None:
@@ -1283,14 +1329,28 @@ class PlayJoiningState(GameState):
         self.id = self.machine.new_group("join")
         client = GameClient("network")
 
+        # Add network to higher level manager
         self.machine.manager.add_component(client)
 
-        self.buttons.clear()
-        self.next_button = 0
+        connections = element_list.ElementList("connection_list")
+        self.manager.add_component(connections)
+        group = self.machine.get_group(self.id)
+        assert group is not None
+        group.add(connections)
 
-        self.manager.register_handler(
-            "update_listing",
-            self.handle_update_listing,
+        return_font = pygame.font.Font(
+            DATA_FOLDER / "VeraSerif.ttf",
+            30,
+        )
+        return_button = ReturnElement("return_button", return_font)
+        connections.add_element(return_button)
+
+        self.manager.register_handlers(
+            {
+                "update_listing": self.handle_update_listing,
+                "return_to_title": self.handle_return_to_title,
+                "join_server": self.handle_join_server,
+            },
         )
 
         await self.manager.raise_event(Event("update_listing", None))
@@ -1298,25 +1358,53 @@ class PlayJoiningState(GameState):
     async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
         assert self.machine is not None
-        for advertisement in await read_advertisements():
-            motd, details = advertisement
 
-            if details not in self.buttons:
-                self.buttons[details] = self.next_button
+        connections = self.manager.get_component("connection_list")
 
-                print(f"handle_update_listing {motd = }  {details = }")
-                ##button = JoinButton(self.next_button, self.font, motd, details)
-                ##self.group_add(button)
+        old: list[tuple[str, int]] = []
+        current: list[tuple[str, int]] = []
 
-                self.next_button += 1
-                ####
-                await self.machine.raise_event(
-                    Event("client_connect", details),
+        ##        print(f'{self.machine.active_state = }')
+        ##        print(f'{self.name = }')
+        while (
+            self.machine.active_state is not None
+            and self.machine.active_state is self
+        ):
+            ##            print("handle_update_listing click")
+
+            for motd, details in await read_advertisements():
+                current.append(details)
+                if connections.component_exists(details):
+                    continue
+                element = ConnectionElement(details, self.font, motd)
+                element.rect.topleft = (
+                    connections.get_new_connection_position()
                 )
-                await self.machine.set_state("play")
-                return
-        print("handle_update_listing click")
-        await self.manager.raise_event(Event("update_listing", None))
+                element.rect.topleft = (10, element.location.y + 3)
+                connections.add_element(element)
+            for details in old:
+                if details in current:
+                    continue
+                connections.delete_element(details)
+            old, current = current, []
+
+    async def handle_join_server(self, event: Event[tuple[str, int]]) -> None:
+        """Handle join server event."""
+        details = event.data
+        await self.machine.raise_event(
+            Event("client_connect", details),
+        )
+        await self.machine.set_state("play")
+
+    async def handle_return_to_title(self, _: Event[None]) -> None:
+        """Handle return to title event."""
+        # Fire server stop event so server shuts down if it exists
+        await self.machine.raise_event_internal(Event("network_stop", None))
+
+        if self.machine.manager.component_exists("network"):
+            self.machine.manager.remove_component("network")
+
+        await self.machine.set_state("title")
 
 
 ##    async def check_conditions(self) -> str | None:
@@ -1375,7 +1463,8 @@ class PlayState(GameState):
     async def exit_actions(self) -> None:
         """Raise network stop event and remove components."""
         # Fire server stop event so server shuts down if it exists
-        await self.machine.raise_event(Event("network_stop", None))
+        # await self.machine.raise_event(Event("network_stop", None))
+        await self.machine.raise_event_internal(Event("network_stop", None))
 
         if self.machine.manager.component_exists("network"):
             self.machine.manager.remove_component("network")
@@ -1394,7 +1483,7 @@ class PlayState(GameState):
         winner = event.data
         self.exit_data = (0, f"{PLAYERS[winner]} Won", False)
 
-        await self.machine.raise_event(Event("network_stop", None))
+        await self.machine.raise_event_internal(Event("network_stop", None))
 
     async def handle_client_disconnected(self, event: Event[str]) -> None:
         """Handle client disconnected error."""
@@ -1437,6 +1526,9 @@ class PlayState(GameState):
                 handle_click=self.change_state("title"),
             )
             self.group_add(continue_button)
+            group = continue_button.groups()[0]
+            # LayeredDirty, not just AbstractGroup
+            group.move_to_front(continue_button)  # type: ignore[attr-defined]
         else:
             continue_button = self.manager.get_component("continue_button")
 
@@ -1463,7 +1555,7 @@ class CheckersClient(sprite.GroupProcessor):
 
     __slots__ = ("manager",)
 
-    def __init__(self, manager: ComponentManager) -> None:
+    def __init__(self, manager: ExternalRaiseManager) -> None:
         """Initialize Checkers Client."""
         super().__init__()
         self.manager = manager
@@ -1483,6 +1575,10 @@ class CheckersClient(sprite.GroupProcessor):
     async def raise_event(self, event: Event[Any]) -> None:
         """Raise component event in all groups."""
         await self.manager.raise_event(event)
+
+    async def raise_event_internal(self, event: Event[Any]) -> None:
+        """Raise component event in all groups."""
+        await self.manager.raise_event_internal(event)
 
 
 async def async_run() -> None:

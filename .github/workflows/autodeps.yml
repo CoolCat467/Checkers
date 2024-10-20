@@ -38,7 +38,7 @@ jobs:
 
       # apply newer versions' formatting
       - name: Black
-        run: black src/trio
+        run: black src/checkers
 
       - name: uv
         run: |
