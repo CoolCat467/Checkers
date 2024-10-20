@@ -66,6 +66,7 @@ exclude = [
     "src/checkers/base_io.py",
     "src/checkers/buffer.py",
     "src/checkers/namedtuple_mod.py",
+    "src/checkers/component.py",
 ]
 
 [tool.mypy]
