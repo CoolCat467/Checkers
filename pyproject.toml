@@ -87,7 +87,6 @@ disable_all_dunder_policy = true
 
 [tool.black]
 line-length = 79
-target-version = ['py312']
 
 [tool.ruff]
 line-length = 79
@@ -107,12 +106,16 @@ select = [
     "EXE",   # flake8-executable
     "F",     # pyflakes
     "FA",    # flake8-future-annotations
+    "FLY",   # flynt
+    "FURB",  # refurb
     "I",     # isort
+    "ICN",   # flake8-import-conventions
     "N",     # pep8-naming
     "PIE",   # flake8-pie
     "PT",    # flake8-pytest-style
     "PYI",   # flake8-pyi
     "Q",     # flake8-quotes
+    "R",     # Refactor
     "RET",   # flake8-return
     "RUF",   # Ruff-specific rules
     "S",     # flake8-bandit
