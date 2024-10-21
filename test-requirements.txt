@@ -4,31 +4,20 @@ attrs==24.2.0
     # via
     #   outcome
     #   trio
-black==24.10.0 ; implementation_name == 'cpython'
+black==24.10.0 ; implementation_name == "cpython"
     # via -r test-requirements.in
-cffi==1.17.1 ; (os_name != 'nt' and platform_python_implementation != 'PyPy') or (implementation_name != 'pypy' and os_name == 'nt') or (implementation_name == 'pypy' and platform_python_implementation != 'PyPy')
-    # via
-    #   cryptography
-    #   trio
-click==8.1.7 ; implementation_name == 'cpython'
+cffi==1.17.1
+    # via cryptography
+click==8.1.7
     # via black
 codespell==2.3.0
     # via -r test-requirements.in
-colorama==0.4.6 ; (implementation_name != 'cpython' and sys_platform == 'win32') or (platform_system != 'Windows' and sys_platform == 'win32') or (implementation_name == 'cpython' and platform_system == 'Windows')
-    # via
-    #   click
-    #   pytest
-coverage==7.6.3
+coverage[toml]==7.6.4
     # via
     #   -r test-requirements.in
     #   pytest-cov
 cryptography==43.0.3
     # via -r test-requirements.in
-exceptiongroup==1.2.2 ; python_full_version < '3.11'
-    # via
-    #   -r test-requirements.in
-    #   pytest
-    #   trio
 idna==3.10
     # via trio
 iniconfig==2.0.0
@@ -48,13 +37,13 @@ packaging==24.1
     # via
     #   black
     #   pytest
-pathspec==0.12.1 ; implementation_name == 'cpython'
+pathspec==0.12.1
     # via black
-platformdirs==4.3.6 ; implementation_name == 'cpython'
+platformdirs==4.3.6
     # via black
 pluggy==1.5.0
     # via pytest
-pycparser==2.22 ; (os_name != 'nt' and platform_python_implementation != 'PyPy') or (implementation_name != 'pypy' and os_name == 'nt') or (implementation_name == 'pypy' and platform_python_implementation != 'PyPy')
+pycparser==2.22
     # via cffi
 pygame==2.6.1
     # via -r test-requirements.in
@@ -73,12 +62,6 @@ sniffio==1.3.1
     # via trio
 sortedcontainers==2.4.0
     # via trio
-tomli==2.0.2 ; python_full_version <= '3.11'
-    # via
-    #   black
-    #   coverage
-    #   mypy
-    #   pytest
 trio==0.27.0
     # via
     #   -r test-requirements.in
@@ -86,7 +69,6 @@ trio==0.27.0
 typing-extensions==4.12.2
     # via
     #   -r test-requirements.in
-    #   black
     #   mypy
 uv==0.4.24
     # via -r test-requirements.in
