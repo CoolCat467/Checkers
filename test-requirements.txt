@@ -18,7 +18,7 @@ colorama==0.4.6 ; (implementation_name != 'cpython' and sys_platform == 'win32')
     # via
     #   click
     #   pytest
-coverage==7.6.3
+coverage==7.6.4
     # via
     #   -r test-requirements.in
     #   pytest-cov
@@ -88,5 +88,5 @@ typing-extensions==4.12.2
     #   -r test-requirements.in
     #   black
     #   mypy
-uv==0.4.24
+uv==0.4.25
     # via -r test-requirements.in
