@@ -68,6 +68,7 @@ exclude = [
     "src/checkers/namedtuple_mod.py",
     "src/checkers/component.py",
     "src/checkers/multi_inherit.py",
+    "src/checkers/statemachine.py",
 ]
 
 [tool.mypy]
