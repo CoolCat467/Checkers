@@ -44,7 +44,7 @@ outcome==1.3.0.post0
     # via
     #   pytest-trio
     #   trio
-packaging==24.1
+packaging==24.2
     # via
     #   black
     #   pytest
@@ -67,13 +67,13 @@ pytest-cov==6.0.0
     # via -r test-requirements.in
 pytest-trio==0.8.0
     # via -r test-requirements.in
-ruff==0.7.2
+ruff==0.7.3
     # via -r test-requirements.in
 sniffio==1.3.1
     # via trio
 sortedcontainers==2.4.0
     # via trio
-tomli==2.0.2 ; python_full_version <= '3.11'
+tomli==2.1.0 ; python_full_version <= '3.11'
     # via
     #   black
     #   coverage
@@ -88,5 +88,5 @@ typing-extensions==4.12.2
     #   -r test-requirements.in
     #   black
     #   mypy
-uv==0.4.29
+uv==0.5.1
     # via -r test-requirements.in
