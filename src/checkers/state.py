@@ -361,11 +361,9 @@ class State:
         # then modify results for pawns
         moves = pawn_modify(get_sides(position), piece_type)
         return tuple(
-            [
-                m
-                for m in filter(self.valid_location, moves)
-                if m not in self.pieces
-            ],
+            m
+            for m in filter(self.valid_location, moves)
+            if m not in self.pieces
         )
 
     @classmethod

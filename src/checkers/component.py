@@ -332,7 +332,7 @@ class ComponentManager(Component):
         empty = []
         for event_name, handlers in self.__event_handlers.items():
             for item in tuple(handlers):
-                handler, handler_component = item
+                _handler, handler_component = item
                 if handler_component == component_name:
                     self.__event_handlers[event_name].remove(item)
                     if not self.__event_handlers[event_name]:

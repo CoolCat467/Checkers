@@ -393,7 +393,7 @@ class GameClient(EncryptedNetworkEventComponent):
         """Write piece click event to server."""
         if self.not_connected:
             return
-        piece_position, piece_type = event.data
+        piece_position, _piece_type = event.data
 
         buffer = Buffer()
         write_position(buffer, piece_position)

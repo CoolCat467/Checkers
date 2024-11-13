@@ -84,7 +84,8 @@ class ElementList(sprite.Sprite):
 
     def yield_elements(self) -> Generator[Element, None, None]:
         """Yield bound Element components in order."""
-        for component_name in self._order:
+        for component_name in iter(self._order):
+            # Kind of strange to mutate in yield, maybe shouldn't do that?
             if not self.component_exists(component_name):
                 self._order.remove(component_name)
                 continue
