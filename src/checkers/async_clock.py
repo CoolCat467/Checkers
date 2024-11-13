@@ -42,12 +42,12 @@ class Clock:
     """pygame.time.Clock but with asynchronous tick."""
 
     __slots__ = (
-        "fps_tick",
-        "timepassed",
-        "rawpassed",
-        "last_tick",
         "fps",
         "fps_count",
+        "fps_tick",
+        "last_tick",
+        "rawpassed",
+        "timepassed",
     )
 
     def __init__(self) -> None:

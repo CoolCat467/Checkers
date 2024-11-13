@@ -78,25 +78,25 @@ async def read_advertisements(
 
         await udp_socket.bind(("", ADVERTISEMENT_PORT))
 
-        ##        # Tell the kernel that we are a multicast socket
-        ##        udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
+        # # Tell the kernel that we are a multicast socket
+        # udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
 
         # socket.IPPROTO_IP works on Linux and Windows
-        ##        # IP_MULTICAST_IF: force sending network traffic over specific network adapter
+        # # IP_MULTICAST_IF: force sending network traffic over specific network adapter
         # IP_ADD_MEMBERSHIP: join multicast group
-        ##        udp_socket.setsockopt(
-        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
-        ##            trio.socket.inet_aton(network_adapter)
-        ##        )
-        ##    udp_socket.setsockopt(
-        ##        trio.socket.IPPROTO_IP,
-        ##        trio.socket.IP_ADD_MEMBERSHIP,
-        ##        struct.pack(
-        ##            "4s4s",
-        ##            trio.socket.inet_aton(group),
-        ##            trio.socket.inet_aton(network_adapter),
-        ##        ),
-        ##    )
+        # udp_socket.setsockopt(
+        # trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
+        # trio.socket.inet_aton(network_adapter)
+        # )
+        # udp_socket.setsockopt(
+        # trio.socket.IPPROTO_IP,
+        # trio.socket.IP_ADD_MEMBERSHIP,
+        # struct.pack(
+        # "4s4s",
+        # trio.socket.inet_aton(group),
+        # trio.socket.inet_aton(network_adapter),
+        # ),
+        # )
         group_bin = trio.socket.inet_pton(addrinfo[0], addrinfo[4][0])
         # Join group
         if addrinfo[0] == trio.socket.AF_INET:  # IPv4
@@ -119,8 +119,8 @@ async def read_advertisements(
         with trio.move_on_after(timeout):
             buffer, address = await udp_socket.recvfrom(512)
             host, _port = address
-        ##            print(f"{buffer = }")
-        ##            print(f"{address = }")
+        # print(f"{buffer = }")
+        # print(f"{address = }")
 
         response: list[tuple[str, tuple[str, int]]] = []
 
@@ -263,7 +263,7 @@ class GameClient(EncryptedNetworkEventComponent):
           network.NetworkTimeoutError - Timeout
           network.NetworkEOFError - Server closed connection
         """
-        ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
+        # print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
             return
         if self.not_connected:

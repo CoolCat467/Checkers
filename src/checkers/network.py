@@ -140,13 +140,13 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         content = bytearray()
         while max_read_count := length - len(content):
             received = b""
-            ##            try:
+            # try:
             with trio.move_on_after(self.timeout) as cancel_scope:
                 received = await self.stream.receive_some(max_read_count)
             cancel_called = cancel_scope.cancel_called
-            ##            except (trio.BrokenResourceError, trio.ClosedResourceError):
-            ##                await self.close()
-            ##                raise
+            # except (trio.BrokenResourceError, trio.ClosedResourceError):
+            # await self.close()
+            # raise
             if len(received) == 0:
                 # No information at all
                 if len(content) == 0:
@@ -192,11 +192,11 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         """
         await self.stream.send_all(data)
 
-    ##        try:
-    ##            await self.stream.send_all(data)
-    ##        except (trio.BrokenResourceError, trio.ClosedResourceError):
-    ##            await self.close()
-    ##            raise
+    # try:
+    # await self.stream.send_all(data)
+    # except (trio.BrokenResourceError, trio.ClosedResourceError):
+    # await self.close()
+    # raise
 
     async def close(self) -> None:
         """Close the stream, possibly blocking."""
@@ -305,10 +305,10 @@ class NetworkComponent(Component, BaseAsyncReader, BaseAsyncWriter):
         await self.close()
 
 
-##    async def send_eof_and_close(self) -> None:
-##        """Send EOF and close."""
-##        await self.send_eof()
-##        await self.close()
+# async def send_eof_and_close(self) -> None:
+# """Send EOF and close."""
+# await self.send_eof()
+# await self.close()
 
 
 class NetworkEventComponent(NetworkComponent):
@@ -336,10 +336,10 @@ class NetworkEventComponent(NetworkComponent):
     def bind_handlers(self) -> None:
         """Register serverbound event handlers."""
         self.register_handlers(
-            {
-                name: self.write_event
-                for name in self._write_event_name_to_packet_id
-            },
+            dict.fromkeys(
+                self._write_event_name_to_packet_id,
+                self.write_event,
+            ),
         )
 
     def register_network_write_event(

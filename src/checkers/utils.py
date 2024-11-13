@@ -8,7 +8,7 @@ from __future__ import annotations
 __author__ = "ItsDrike"
 __license__ = "LGPL-3.0-only"
 
-__all__ = ["to_twos_complement", "from_twos_complement"]
+__all__ = ["from_twos_complement", "to_twos_complement"]
 
 
 def to_twos_complement(number: int, bits: int) -> int:

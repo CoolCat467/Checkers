@@ -41,7 +41,7 @@ T = TypeVar("T")
 class Event(Generic[T]):
     """Event with name, data, and re-raise levels."""
 
-    __slots__ = ("name", "data", "level")
+    __slots__ = ("data", "level", "name")
 
     def __init__(
         self,
@@ -68,7 +68,7 @@ class Event(Generic[T]):
 class Component:
     """Component base class."""
 
-    __slots__ = ("name", "__manager")
+    __slots__ = ("__manager", "name")
 
     def __init__(self, name: object) -> None:
         """Initialise with name."""
@@ -190,7 +190,7 @@ ComponentPassthrough = TypeVar("ComponentPassthrough", bound=Component)
 class ComponentManager(Component):
     """Component manager class."""
 
-    __slots__ = ("__event_handlers", "__components", "__weakref__")
+    __slots__ = ("__components", "__event_handlers", "__weakref__")
 
     def __init__(self, name: object, own_name: object | None = None) -> None:
         """If own_name is set, add self to list of components as specified name."""
@@ -266,13 +266,13 @@ class ComponentManager(Component):
         if self.manager_exists and event.pop_level():
             await super().raise_event(event)
             return
-        ### Make sure events not raised twice
-        ##if not self.manager_exists:
-        ##    while event.level > 0:
-        ##        event.pop_level()
+        # Make sure events not raised twice
+        # if not self.manager_exists:
+        # while event.level > 0:
+        # event.pop_level()
 
-        ##if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
-        ##    print(f'''{self.__class__.__name__}({self.name!r}):\n{event = }''')
+        # if not event.name.startswith("Pygame") and event.name not in {"tick", "gameboard_create_piece", "server->create_piece", "create_piece->network"}:
+        # print(f'''{self.__class__.__name__}({self.name!r}):\n{event = }''')
 
         # Call all registered handlers for this event
         if event.name in self.__event_handlers:

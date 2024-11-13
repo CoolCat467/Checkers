@@ -130,7 +130,7 @@ class OutlinedText(Text):
 
     """
 
-    __slots__ = ("outline", "inside")
+    __slots__ = ("inside", "outline")
 
     border_width = 3
     border_radius = 8

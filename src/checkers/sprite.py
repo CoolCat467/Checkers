@@ -73,7 +73,7 @@ class PygameMouseMotion(PygameMouseEventData):
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
-    __slots__ = ("rect", "__image", "mask", "update_location_on_resize")
+    __slots__ = ("__image", "mask", "rect", "update_location_on_resize")
 
     def __init__(self, name: object) -> None:
         """Initialize with name."""
@@ -172,7 +172,7 @@ class ImageComponent(ComponentManager):
 
     """
 
-    __slots__ = ("__surfaces", "__masks", "set_surface", "mask_threshold")
+    __slots__ = ("__masks", "__surfaces", "mask_threshold", "set_surface")
 
     def __init__(self) -> None:
         """Initialize image component."""
@@ -344,12 +344,12 @@ class OutlineComponent(Component):
 
         radius = abs(self.size)
         diameter = radius * 2
-        ##        if self.size < 0:
-        ##            surface = surface_scale(
-        ##                surface, (w - diameter, h - diameter)
-        ##            )
-        ##            offset = 0
-        ##        else:
+        # if self.size < 0:
+        # surface = surface_scale(
+        # surface, (w - diameter, h - diameter)
+        # )
+        # offset = 0
+        # else:
         offset = diameter
         surf = Surface((w + offset, h + offset)).convert_alpha()
         surf.fill(Color(0, 0, 0, 0))
@@ -669,7 +669,7 @@ class DragClickEventComponent(Component):
 class GroupProcessor(AsyncStateMachine):
     """Layered Dirty Sprite group handler."""
 
-    __slots__ = ("groups", "group_names", "new_gid", "_timing", "_clear")
+    __slots__ = ("_clear", "_timing", "group_names", "groups", "new_gid")
     sub_renderer_class: ClassVar = LayeredDirty
     groups: dict[int, sub_renderer_class]
 

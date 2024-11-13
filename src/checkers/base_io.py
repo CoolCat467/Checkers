@@ -20,13 +20,13 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable
 
 __all__ = [
+    "FLOAT_FORMATS_TYPE",
+    "INT_FORMATS_TYPE",
     "BaseAsyncReader",
     "BaseAsyncWriter",
     "BaseSyncReader",
     "BaseSyncWriter",
     "StructFormat",
-    "INT_FORMATS_TYPE",
-    "FLOAT_FORMATS_TYPE",
 ]
 
 T = TypeVar("T")

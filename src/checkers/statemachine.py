@@ -34,7 +34,7 @@ if TYPE_CHECKING:
     from typing_extensions import Self
 import trio
 
-__all__ = ["State", "AsyncState", "StateMachine", "AsyncStateMachine"]
+__all__ = ["AsyncState", "AsyncStateMachine", "State", "StateMachine"]
 
 
 class BaseState:
@@ -143,7 +143,7 @@ class AsyncState(BaseState, Generic[AsyncMachine]):
 class BaseStateMachine:
     """State Machine base class."""
 
-    __slots__ = ("states", "active_state", "__weakref__")
+    __slots__ = ("__weakref__", "active_state", "states")
 
     def __repr__(self) -> str:
         """Return <{class-name} {self.states}>."""

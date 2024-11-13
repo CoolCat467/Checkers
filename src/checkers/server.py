@@ -441,15 +441,15 @@ class GameServer(network.Server):
     """
 
     __slots__ = (
-        "client_count",
-        "state",
-        "client_players",
-        "player_selections",
         "actions_queue",
-        "players_can_interact",
-        "internal_singleplayer_mode",
         "advertisement_scope",
+        "client_count",
+        "client_players",
+        "internal_singleplayer_mode",
+        "player_selections",
+        "players_can_interact",
         "running",
+        "state",
     )
 
     board_size = (8, 8)
@@ -535,14 +535,14 @@ class GameServer(network.Server):
             type=trio.socket.SOCK_DGRAM,  # UDP
             proto=trio.socket.IPPROTO_UDP,  # UDP
         ) as udp_socket:
-            ### Set Time-to-live (optional)
-            ##ttl_bin = struct.pack('@i', MYTTL)
-            ##if addrinfo[0] == trio.socket.AF_INET: # IPv4
-            ##    udp_socket.setsockopt(
-            ##        trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, ttl_bin)
-            ##else:
-            ##    udp_socket.setsockopt(
-            ##        trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
+            # Set Time-to-live (optional)
+            # ttl_bin = struct.pack('@i', MYTTL)
+            # if addrinfo[0] == trio.socket.AF_INET: # IPv4
+            # udp_socket.setsockopt(
+            # trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, ttl_bin)
+            # else:
+            # udp_socket.setsockopt(
+            # trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
             with self.advertisement_scope:
                 print("Starting advertisement posting.")
                 while True:  # not self.can_start():
@@ -775,8 +775,8 @@ class GameServer(network.Server):
 
         can_start = self.can_start()
         game_active = self.game_active()
-        ##        if can_start:
-        ##            self.stop_serving()
+        # if can_start:
+        # self.stop_serving()
 
         if self.client_count > self.max_clients:
             print(

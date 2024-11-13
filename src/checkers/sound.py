@@ -41,8 +41,8 @@ class SoundData(NamedTuple):
     maxtime: int = 0
     fade_ms: int = 0
     volume: int = 100
-    ##    volume_left: int = 100
-    ##    volume_right: int = 100
+    # volume_left: int = 100
+    # volume_right: int = 100
 
 
 def play_sound(  # pragma: nocover
@@ -60,8 +60,8 @@ def play_sound(  # pragma: nocover
         maxtime=sound_data.maxtime,
         fade_ms=sound_data.fade_ms,
     )
-    ##    channel.set_volume(
-    ##        sound_data.volume_left,
-    ##        sound_data.volume_right,
-    ##    )
+    # channel.set_volume(
+    # sound_data.volume_left,
+    # sound_data.volume_right,
+    # )
     return sound_object, seconds
