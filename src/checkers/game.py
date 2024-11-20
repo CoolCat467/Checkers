@@ -1200,10 +1200,6 @@ class TitleState(GameState):
         await self.machine.raise_event(Event("init", None))
 
 
-# async def check_conditions(self) -> str:
-# return "play_hosting"  # "play_hosting" # "play_joining"
-
-
 class PlayHostingState(AsyncState["CheckersClient"]):
     """Start running server."""
 
