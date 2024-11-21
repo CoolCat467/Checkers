@@ -487,6 +487,8 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Handle create_piece event."""
         while not self.visible:
+            await trio.sleep(0.1)
+            continue
             raise RuntimeError("handle_create_piece_event not visible yet.")
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
