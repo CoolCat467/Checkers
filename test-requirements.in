@@ -16,9 +16,11 @@ mypy-extensions
 typing-extensions
 
 # Checker's own dependencies
-pygame~=2.6.0
-typing_extensions>=4.12.2
-mypy_extensions>=1.0.0
-trio~=0.27.0
-cryptography>=43.0.0
+#<TOML_DEPENDENCIES>
 exceptiongroup; python_version < '3.11'
+libcomponent~=0.0.0
+mypy_extensions>=1.0.0
+pygame~=2.6.0
+trio~=0.27.0
+typing_extensions>=4.12.2
+#</TOML_DEPENDENCIES>
