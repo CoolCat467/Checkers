@@ -316,15 +316,19 @@ class ServerClient(EncryptedNetworkEventComponent):
         Listed as possible but probably not because of write lock:
           trio.BusyResourceError: if another task is using :meth:`write`
         """
-        buffer = Buffer()
 
         # Try to be as accurate with time as possible
-        await self.wait_write_might_not_block()
-        ns = int(time.time() * 1e9)
-        # Use as many bits as time needs, write_buffer handles size for us.
-        buffer.write(ns.to_bytes(-(-ns.bit_length() // 8), "big"))
+        def time_data_function() -> bytearray:
+            buffer = Buffer()
+            ns = int(time.time() * 1e9)
+            # Use as many bits as time needs, write_buffer handles size for us.
+            buffer.write(ns.to_bytes(-(-ns.bit_length() // 8), "big"))
+            return buffer
 
-        await self.write_event(Event("server[write]->callback_ping", buffer))
+        await self.write_event_last_minute_data(
+            "server[write]->callback_ping",
+            time_data_function,
+        )
 
     async def handle_callback_ping(
         self,
@@ -650,6 +654,14 @@ class GameServer(network.Server):
         # Using non-cryptographically secure random because it doesn't matter
         self.new_game_init()
 
+        # Raise initial config event with board size and initial turn.
+        await self.raise_event(
+            Event(
+                "initial_config->network",
+                (self.board_size, self.state.turn),
+            ),
+        )
+
         # Send create_piece events for all pieces
         async with trio.open_nursery() as nursery:
             for piece_pos, piece_type in self.state.get_pieces():
@@ -659,14 +671,6 @@ class GameServer(network.Server):
                 )
 
         await self.transmit_playing_as()
-
-        # Raise initial config event with board size and initial turn.
-        await self.raise_event(
-            Event(
-                "initial_config->network",
-                (self.board_size, self.state.turn),
-            ),
-        )
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient.
@@ -693,9 +697,13 @@ class GameServer(network.Server):
         while not client.not_connected:
             event: Event[bytearray] | None = None
             try:
-                await client.write_callback_ping()
+                with trio.fail_after(6):
+                    await client.write_callback_ping()
                 with trio.move_on_after(2):
                     event = await client.read_event()
+            except trio.TooSlowError:
+                print(f"{client.name} Writing callback ping took too long")
+                break
             except network.NetworkTimeoutError:
                 print(f"{client.name} Timeout")
                 break
@@ -738,6 +746,14 @@ class GameServer(network.Server):
         )
         with self.temporary_component(private_events_pocket):
             with private_events_pocket.temporary_component(client):
+                # Raise initial config event with board size and initial turn.
+                await client.raise_event(
+                    Event(
+                        "initial_config->network",
+                        (self.state.size, self.state.turn),
+                    ),
+                )
+
                 # Send create_piece events for all pieces
                 async with trio.open_nursery() as nursery:
                     for piece_pos, piece_type in self.state.get_pieces():
@@ -749,16 +765,9 @@ class GameServer(network.Server):
                             ),
                         )
 
+                # Send who player is playing as
                 await client.raise_event(
                     Event(f"playing_as->network[{client.client_id}]", 255),
-                )
-
-                # Raise initial config event with board size and initial turn.
-                await client.raise_event(
-                    Event(
-                        "initial_config->network",
-                        (self.state.size, self.state.turn),
-                    ),
                 )
 
     async def handler(self, stream: trio.SocketStream) -> None:

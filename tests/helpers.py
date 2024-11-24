@@ -60,7 +60,7 @@ class SynchronizedMixin:
 
     _WRAPPED_ATTRIBUTE: str
 
-    def __getattribute__(self, __name: str) -> Any:
+    def __getattribute__(self, name: str, /) -> Any:
         """Return attributes of the wrapped object, if the attribute is a coroutine function, synchronize it.
 
         The only exception to this behavior is getting the :attr:`._WRAPPED_ATTRIBUTE` variable itself, or the
@@ -69,21 +69,21 @@ class SynchronizedMixin:
         will fallback to regular lookup for variables belonging to this class.
         """
         if (
-            __name == "_WRAPPED_ATTRIBUTE" or __name == self._WRAPPED_ATTRIBUTE
+            name == "_WRAPPED_ATTRIBUTE" or name == self._WRAPPED_ATTRIBUTE
         ):  # Order is important
-            return super().__getattribute__(__name)
+            return super().__getattribute__(name)
 
         wrapped = getattr(self, self._WRAPPED_ATTRIBUTE)
 
-        if hasattr(wrapped, __name):
-            obj = getattr(wrapped, __name)
+        if hasattr(wrapped, name):
+            obj = getattr(wrapped, name)
             if inspect.iscoroutinefunction(obj):
                 return synchronize(obj)
             return obj
 
-        return super().__getattribute__(__name)
+        return super().__getattribute__(name)
 
-    def __setattr__(self, __name: str, __value: object) -> None:
+    def __setattr__(self, name: str, value: object, /) -> None:
         """Allow for changing attributes of the wrapped object.
 
         * If wrapped object isn't yet set, fall back to :meth:`~object.__setattr__` of this class.
@@ -93,12 +93,12 @@ class SynchronizedMixin:
         try:
             wrapped = getattr(self, self._WRAPPED_ATTRIBUTE)
         except AttributeError:
-            return super().__setattr__(__name, __value)
+            return super().__setattr__(name, value)
         else:
-            if hasattr(wrapped, __name):
-                return setattr(wrapped, __name, __value)
+            if hasattr(wrapped, name):
+                return setattr(wrapped, name, value)
 
-        return super().__setattr__(__name, __value)
+        return super().__setattr__(name, value)
 
 
 class UnpropagatingMockMixin(Generic[T_Mock]):

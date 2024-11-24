@@ -48,6 +48,7 @@ from checkers.component import (
 )
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from types import TracebackType
 
     from typing_extensions import Self
@@ -388,10 +389,49 @@ class NetworkEventComponent(NetworkComponent):
         packet_id = self._write_event_name_to_packet_id.get(event.name)
         if packet_id is None:
             raise RuntimeError(f"Unhandled network event name {event.name!r}")
+
         buffer = Buffer()
         buffer.write_value(self.packet_id_format, packet_id)
         buffer.write_bytearray(event.data)
+
         async with self.write_lock:
+            await self.write(buffer)
+
+    async def write_event_last_minute_data(
+        self,
+        event_name: str,
+        event_data_function: Callable[[], bytearray],
+    ) -> None:
+        """Write event to network, but have data to send be generated last minute.
+
+        `event_name` should be a valid registered event name.
+        `event_data_function` should be a synchronous function that returns data to send in event payload.
+
+        Workaround for using wait_write_might_not_block with
+        `self.write_lock` acquired, otherwise can hit trio.BusyResourceError.
+
+        Raises:
+          RuntimeError: if unregistered packet id received from network
+          trio.BusyResourceError: if another task is already executing a
+              :meth:`send_all`, :meth:`wait_send_all_might_not_block`, or
+              :meth:`HalfCloseableStream.send_eof` on this stream.
+          trio.BrokenResourceError: if something has gone wrong, and the stream
+              is broken.
+          trio.ClosedResourceError: if you previously closed this stream
+              object, or if another task closes this stream object while
+              :meth:`send_all` is running.
+
+        """
+        packet_id = self._write_event_name_to_packet_id.get(event_name)
+        if packet_id is None:
+            raise RuntimeError(f"Unhandled network event name {event_name!r}")
+
+        buffer = Buffer()
+        buffer.write_value(self.packet_id_format, packet_id)
+
+        async with self.write_lock:
+            await self.wait_write_might_not_block()
+            buffer.write_bytearray(event_data_function())
             await self.write(buffer)
 
     async def read_event(self) -> Event[bytearray]:

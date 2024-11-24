@@ -462,6 +462,7 @@ class GameBoard(sprite.Sprite):
         # Generate tile data
         self.image = self.generate_board_image()
         self.visible = True
+        await trio.lowlevel.checkpoint()
 
     async def handle_select_piece_event(
         self,
@@ -486,15 +487,17 @@ class GameBoard(sprite.Sprite):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle create_piece event."""
+        await trio.lowlevel.checkpoint()
         while not self.visible:
-            await trio.sleep(0.1)
-            continue
-            raise RuntimeError("handle_create_piece_event not visible yet.")
+            raise RuntimeError(
+                "handle_create_piece_event but not visible yet.",
+            )
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
 
     async def handle_create_tile_event(self, event: Event[Pos]) -> None:
         """Handle create_tile event."""
+        await trio.lowlevel.checkpoint()
         tile_pos = event.data
         self.add_tile(tile_pos)
 
@@ -512,6 +515,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_delete_piece_event(self, event: Event[Pos]) -> None:
         """Handle delete_piece event."""
@@ -530,6 +534,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_update_piece_event(
         self,
@@ -550,6 +555,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_move_piece_event(
         self,
@@ -584,6 +590,8 @@ class GameBoard(sprite.Sprite):
         # Add important start/end block information as an event to the queue
         self.animation_queue.append(Event("animation_state", new_state))
 
+        await trio.lowlevel.checkpoint()
+
         if new_state:
             return
 
@@ -610,6 +618,8 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Start next animation."""
         assert self.processing_animations
+
+        await trio.lowlevel.checkpoint()
 
         if not self.animation_queue:
             self.processing_animations = False
