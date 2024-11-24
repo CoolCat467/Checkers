@@ -30,17 +30,17 @@ import traceback
 from typing import TYPE_CHECKING
 
 import trio
-
-from checkers import network
-from checkers.base_io import StructFormat
-from checkers.buffer import Buffer
-from checkers.component import Event
-from checkers.encrypted_event import EncryptedNetworkEventComponent
-from checkers.encryption import (
+from libcomponent import network
+from libcomponent.base_io import StructFormat
+from libcomponent.buffer import Buffer
+from libcomponent.component import Event
+from libcomponent.encrypted_network import EncryptedNetworkEventComponent
+from libcomponent.encryption import (
     deserialize_public_key,
     encrypt_token_and_secret,
     generate_shared_secret,
 )
+
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,

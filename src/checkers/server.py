@@ -34,19 +34,24 @@ from functools import partial
 from typing import TYPE_CHECKING, NoReturn, cast
 
 import trio
-
-from checkers import network
-from checkers.base_io import StructFormat
-from checkers.buffer import Buffer
-from checkers.component import ComponentManager, Event, ExternalRaiseManager
-from checkers.encrypted_event import EncryptedNetworkEventComponent
-from checkers.encryption import (
+from libcomponent import network
+from libcomponent.base_io import StructFormat
+from libcomponent.buffer import Buffer
+from libcomponent.component import (
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
+)
+from libcomponent.encrypted_network import EncryptedNetworkEventComponent
+from libcomponent.encryption import (
     RSAPrivateKey,
     decrypt_token_and_secret,
     generate_rsa_key,
     generate_verify_token,
     serialize_public_key,
 )
+from libcomponent.network_utils import find_ip
+
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -54,7 +59,6 @@ from checkers.network_shared import (
     ClientBoundEvents,
     Pos,
     ServerBoundEvents,
-    find_ip,
     read_position,
     write_position,
 )

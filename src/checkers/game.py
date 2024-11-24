@@ -39,6 +39,13 @@ from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import pygame
 import trio
+from libcomponent.component import (
+    Component,
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
+)
+from libcomponent.network_utils import find_ip
 from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
@@ -46,13 +53,7 @@ from pygame.rect import Rect
 from checkers import base2d, element_list, objects, sprite
 from checkers.async_clock import Clock
 from checkers.client import GameClient, read_advertisements
-from checkers.component import (
-    Component,
-    ComponentManager,
-    Event,
-    ExternalRaiseManager,
-)
-from checkers.network_shared import DEFAULT_PORT, Pos, find_ip
+from checkers.network_shared import DEFAULT_PORT, Pos
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
 from checkers.sound import SoundData, play_sound as base_play_sound
