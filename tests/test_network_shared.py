@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from checkers.buffer import Buffer
+from libcomponent.buffer import Buffer
+
 from checkers.network_shared import read_position, write_position
 
 
