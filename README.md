@@ -61,3 +61,12 @@ and in a two player game, a button will appear to return to the title.
 
 If you are interested in making an AI for this game, there is a lot
 of information in the game files and in the example checkers AI
+
+
+### Links
+* Source Code - https://github.com/CoolCat467/Checkers.git
+* Issues      - https://github.com/CoolCat467/Checkers/issues
+
+### License
+-------
+Code and documentation are available according to the GNU General Public License v3.0 (see [LICENSE](https://github.com/CoolCat467/Checkers/blob/HEAD/LICENSE)).
