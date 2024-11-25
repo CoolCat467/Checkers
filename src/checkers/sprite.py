@@ -693,13 +693,12 @@ class GroupProcessor(AsyncStateMachine):
 
     __slots__ = ("_clear", "_timing", "group_names", "groups", "new_gid")
     sub_renderer_class: ClassVar = LayeredDirty
-    groups: dict[int, sub_renderer_class]
 
     def __init__(self) -> None:
         """Initialize group processor."""
         super().__init__()
 
-        self.groups = {}
+        self.groups: dict[int, LayeredDirty[Sprite]] = {}
         self.group_names: dict[str, int] = {}
         self.new_gid = 0
         self._timing = 1000 / 80
@@ -751,7 +750,7 @@ class GroupProcessor(AsyncStateMachine):
                     del self.group_names[name]
                     return
 
-    def get_group(self, gid_name: str | int) -> sub_renderer_class | None:
+    def get_group(self, gid_name: str | int) -> LayeredDirty[Sprite] | None:
         """Return group from group ID or name."""
         named = None
         if isinstance(gid_name, str):
