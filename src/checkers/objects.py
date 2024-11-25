@@ -35,9 +35,8 @@ from pygame.surface import Surface
 from checkers import sprite
 
 if TYPE_CHECKING:
+    from libcomponent.component import Event
     from pygame.font import Font
-
-    from checkers.component import Event
 
 
 class Text(sprite.Sprite):

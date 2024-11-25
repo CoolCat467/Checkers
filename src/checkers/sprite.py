@@ -429,7 +429,7 @@ class AnimationComponent(Component):
         await trio.lowlevel.checkpoint()
 
         passed = tick_event.data.time_passed
-        new = None
+        new: int | str | None = None
         if self.update_every == 0:
             new = self.fetch_controller_new_state()
         else:
@@ -501,6 +501,9 @@ class MovementComponent(Component):
 class TargetingComponent(Component):
     """Sprite that moves toward a destination and then stops.
 
+    Registered Component Name:
+        targeting
+
     Requires components:
         Sprite
         MovementComponent
@@ -526,6 +529,7 @@ class TargetingComponent(Component):
         """Update the heading of the movement component."""
         movement = cast(MovementComponent, self.get_component("movement"))
         to_dest = self.to_destination()
+        # If magnitude is zero
         if to_dest @ to_dest == 0:
             movement.heading = Vector2(0, 0)
             return
@@ -555,6 +559,7 @@ class TargetingComponent(Component):
     async def move_destination_time(self, time_passed: float) -> None:
         """Move with time_passed."""
         if self.__reached:
+            await trio.lowlevel.checkpoint()
             return
 
         sprite, movement = cast(
@@ -566,16 +571,33 @@ class TargetingComponent(Component):
             self.__reached = True
             await self.raise_event(Event(self.event_raise_name, None))
             return
-        await trio.lowlevel.checkpoint()
 
+        to_destination = self.to_destination()
         travel_distance = min(
-            self.to_destination().magnitude(),
+            to_destination @ to_destination,
             movement.speed * time_passed,
         )
 
         if travel_distance > 0:
             movement.move_heading_distance(travel_distance)
-            self.update_heading()  # Fix imprecision
+        # Fix imprecision
+        self.update_heading()
+        await trio.lowlevel.checkpoint()
+
+    async def move_destination_time_ticks(
+        self,
+        event: Event[TickEventData],
+    ) -> None:
+        """Move with tick data."""
+        await self.move_destination_time(event.data.time_passed)
+
+
+class DragEvent(NamedTuple):
+    """Drag event data."""
+
+    pos: tuple[int, int]
+    rel: tuple[int, int]
+    button: int
 
 
 class DragClickEventComponent(Component):
@@ -657,11 +679,11 @@ class DragClickEventComponent(Component):
                     self.raise_event,
                     Event(
                         "drag",
-                        {
-                            "pos": event.data["pos"],
-                            "rel": event.data["rel"],
-                            "button": button,
-                        },
+                        DragEvent(
+                            event.data["pos"],
+                            event.data["rel"],
+                            button,
+                        ),
                     ),
                 )
 
