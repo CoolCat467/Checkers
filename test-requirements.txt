@@ -61,7 +61,7 @@ pycparser==2.22 ; (os_name != 'nt' and platform_python_implementation != 'PyPy')
     # via cffi
 pygame==2.6.1
     # via -r test-requirements.in
-pytest==8.3.3
+pytest==8.3.4
     # via
     #   -r test-requirements.in
     #   pytest-cov
