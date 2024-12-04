@@ -39,6 +39,13 @@ from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import pygame
 import trio
+from libcomponent.component import (
+    Component,
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
+)
+from libcomponent.network_utils import find_ip
 from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
@@ -46,14 +53,8 @@ from pygame.rect import Rect
 from checkers import base2d, element_list, objects, sprite
 from checkers.async_clock import Clock
 from checkers.client import GameClient, read_advertisements
-from checkers.component import (
-    Component,
-    ComponentManager,
-    Event,
-    ExternalRaiseManager,
-)
 from checkers.multi_inherit import ConnectionElement, ReturnElement
-from checkers.network_shared import DEFAULT_PORT, Pos, find_ip
+from checkers.network_shared import DEFAULT_PORT, Pos
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
 from checkers.sound import SoundData, play_sound as base_play_sound
@@ -133,11 +134,11 @@ class Piece(sprite.Sprite):
     """Piece Sprite."""
 
     __slots__ = (
-        "piece_type",
         "board_position",
+        "destination_tiles",
+        "piece_type",
         "position_name",
         "selected",
-        "destination_tiles",
     )
 
     def __init__(
@@ -282,7 +283,7 @@ class Piece(sprite.Sprite):
 class Tile(sprite.Sprite):
     """Outlined tile sprite - Only exists for selecting destination."""
 
-    __slots__ = ("color", "board_position")
+    __slots__ = ("board_position", "color")
 
     def __init__(
         self,
@@ -380,16 +381,16 @@ class GameBoard(sprite.Sprite):
     """Entity that stores data about the game board and renders it."""
 
     __slots__ = (
+        "animation_queue",
         "board_size",
+        "pieces",
+        "processing_animations",
         "tile_size",
         "tile_surfs",
-        "pieces",
-        "animation_queue",
-        "processing_animations",
     )
 
     # Define Tile Color Map and Piece Map
-    ##    tile_color_map = (BLACK, RED)
+    # tile_color_map = (BLACK, RED)
     tile_color_map = ((18, 18, 18), RED)
 
     # Define Black Pawn color to be more of a dark grey so you can see it
@@ -463,6 +464,7 @@ class GameBoard(sprite.Sprite):
         # Generate tile data
         self.image = self.generate_board_image()
         self.visible = True
+        await trio.lowlevel.checkpoint()
 
     async def handle_select_piece_event(
         self,
@@ -487,13 +489,17 @@ class GameBoard(sprite.Sprite):
         event: Event[tuple[Pos, int]],
     ) -> None:
         """Handle create_piece event."""
+        await trio.lowlevel.checkpoint()
         while not self.visible:
-            raise RuntimeError("handle_create_piece_event not visible yet.")
+            raise RuntimeError(
+                "handle_create_piece_event but not visible yet.",
+            )
         piece_pos, piece_type = event.data
         self.add_piece(piece_type, piece_pos)
 
     async def handle_create_tile_event(self, event: Event[Pos]) -> None:
         """Handle create_tile event."""
+        await trio.lowlevel.checkpoint()
         tile_pos = event.data
         self.add_tile(tile_pos)
 
@@ -511,6 +517,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_delete_piece_event(self, event: Event[Pos]) -> None:
         """Handle delete_piece event."""
@@ -529,6 +536,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_update_piece_event(
         self,
@@ -549,6 +557,7 @@ class GameBoard(sprite.Sprite):
         self.animation_queue.append(
             Event(event.name.removesuffix("_animation"), event.data),
         )
+        await trio.lowlevel.checkpoint()
 
     async def handle_move_piece_event(
         self,
@@ -583,6 +592,8 @@ class GameBoard(sprite.Sprite):
         # Add important start/end block information as an event to the queue
         self.animation_queue.append(Event("animation_state", new_state))
 
+        await trio.lowlevel.checkpoint()
+
         if new_state:
             return
 
@@ -609,6 +620,8 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Start next animation."""
         assert self.processing_animations
+
+        await trio.lowlevel.checkpoint()
 
         if not self.animation_queue:
             self.processing_animations = False
@@ -698,7 +711,7 @@ class GameBoard(sprite.Sprite):
                 image.add_image_and_mask(
                     name,
                     surface,
-                    f"piece_{piece_type-1}",
+                    f"piece_{piece_type - 1}",
                 )
 
             outline_color = YELLOW
@@ -773,16 +786,16 @@ class GameBoard(sprite.Sprite):
                 color = (x + y + 1) % len(self.tile_color_map)
                 # Blit the tile image to the surface at the tile's location
                 surf.blit(image.get_image(f"tile_{color}"), (loc_x, loc_y))
-                ### Blit the id of the tile at the tile's location
-                ##surf.blit(
-                ##    render_text(
-                ##        DATA_FOLDER / "VeraSerif.ttf",
-                ##        20,
-                ##        "".join(map(str, (x, y))),
-                ##        GREEN
-                ##    ),
-                ##    (loc_x, loc_y)
-                ##)
+                # Blit the id of the tile at the tile's location
+                # surf.blit(
+                # render_text(
+                # DATA_FOLDER / "VeraSerif.ttf",
+                # 20,
+                # "".join(map(str, (x, y))),
+                # GREEN
+                # ),
+                # (loc_x, loc_y)
+                # )
                 loc_x += self.tile_size
             # Increment the y counter by tile_size
             loc_y += self.tile_size
@@ -1201,10 +1214,6 @@ class TitleState(GameState):
         await self.machine.raise_event(Event("init", None))
 
 
-##    async def check_conditions(self) -> str:
-##        return "play_hosting"  # "play_hosting" # "play_joining"
-
-
 class PlayHostingState(AsyncState["CheckersClient"]):
     """Start running server."""
 
@@ -1313,13 +1322,13 @@ class PlayJoiningState(GameState):
         old: list[tuple[str, int]] = []
         current: list[tuple[str, int]] = []
 
-        ##        print(f'{self.machine.active_state = }')
-        ##        print(f'{self.name = }')
+        # print(f'{self.machine.active_state = }')
+        # print(f'{self.name = }')
         while (
             self.machine.active_state is not None
             and self.machine.active_state is self
         ):
-            ##            print("handle_update_listing click")
+            # print("handle_update_listing click")
 
             for motd, details in await read_advertisements():
                 current.append(details)
@@ -1356,8 +1365,8 @@ class PlayJoiningState(GameState):
         await self.machine.set_state("title")
 
 
-##    async def check_conditions(self) -> str | None:
-##        return None
+# async def check_conditions(self) -> str | None:
+# return None
 
 
 class PlayState(GameState):
@@ -1441,7 +1450,7 @@ class PlayState(GameState):
 
         self.exit_data = (1, f"Client Disconnected$${error}", False)
 
-    ##        await self.do_actions()
+    # await self.do_actions()
 
     async def do_actions(self) -> None:
         """Perform actions for this State."""

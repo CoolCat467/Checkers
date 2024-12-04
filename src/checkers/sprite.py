@@ -27,6 +27,7 @@ __version__ = "0.0.0"
 from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, TypedDict, cast
 
 import trio
+from libcomponent.component import Component, ComponentManager, Event
 from pygame.color import Color
 from pygame.event import Event as PygameEvent, event_name
 from pygame.mask import Mask, from_surface as mask_from_surface
@@ -34,7 +35,6 @@ from pygame.rect import Rect
 from pygame.sprite import LayeredDirty, LayeredUpdates, WeakDirtySprite
 from pygame.surface import Surface
 
-from checkers.component import Component, ComponentManager, Event
 from checkers.statemachine import AsyncStateMachine
 from checkers.vector import Vector2
 
@@ -73,7 +73,7 @@ class PygameMouseMotion(PygameMouseEventData):
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
-    __slots__ = ("rect", "__image", "mask", "update_location_on_resize")
+    __slots__ = ("__image", "mask", "rect", "update_location_on_resize")
 
     def __init__(self, name: object) -> None:
         """Initialize with name."""
@@ -172,7 +172,7 @@ class ImageComponent(ComponentManager):
 
     """
 
-    __slots__ = ("__surfaces", "__masks", "set_surface", "mask_threshold")
+    __slots__ = ("__masks", "__surfaces", "mask_threshold", "set_surface")
 
     def __init__(self) -> None:
         """Initialize image component."""
@@ -344,12 +344,12 @@ class OutlineComponent(Component):
 
         radius = abs(self.size)
         diameter = radius * 2
-        ##        if self.size < 0:
-        ##            surface = surface_scale(
-        ##                surface, (w - diameter, h - diameter)
-        ##            )
-        ##            offset = 0
-        ##        else:
+        # if self.size < 0:
+        # surface = surface_scale(
+        # surface, (w - diameter, h - diameter)
+        # )
+        # offset = 0
+        # else:
         offset = diameter
         surf = Surface((w + offset, h + offset)).convert_alpha()
         surf.fill(Color(0, 0, 0, 0))
@@ -429,7 +429,7 @@ class AnimationComponent(Component):
         await trio.lowlevel.checkpoint()
 
         passed = tick_event.data.time_passed
-        new = None
+        new: int | str | None = None
         if self.update_every == 0:
             new = self.fetch_controller_new_state()
         else:
@@ -501,6 +501,9 @@ class MovementComponent(Component):
 class TargetingComponent(Component):
     """Sprite that moves toward a destination and then stops.
 
+    Registered Component Name:
+        targeting
+
     Requires components:
         Sprite
         MovementComponent
@@ -526,6 +529,7 @@ class TargetingComponent(Component):
         """Update the heading of the movement component."""
         movement = cast(MovementComponent, self.get_component("movement"))
         to_dest = self.to_destination()
+        # If magnitude is zero
         if to_dest @ to_dest == 0:
             movement.heading = Vector2(0, 0)
             return
@@ -555,6 +559,7 @@ class TargetingComponent(Component):
     async def move_destination_time(self, time_passed: float) -> None:
         """Move with time_passed."""
         if self.__reached:
+            await trio.lowlevel.checkpoint()
             return
 
         sprite, movement = cast(
@@ -566,16 +571,33 @@ class TargetingComponent(Component):
             self.__reached = True
             await self.raise_event(Event(self.event_raise_name, None))
             return
-        await trio.lowlevel.checkpoint()
 
+        to_destination = self.to_destination()
         travel_distance = min(
-            self.to_destination().magnitude(),
+            to_destination @ to_destination,
             movement.speed * time_passed,
         )
 
         if travel_distance > 0:
             movement.move_heading_distance(travel_distance)
-            self.update_heading()  # Fix imprecision
+        # Fix imprecision
+        self.update_heading()
+        await trio.lowlevel.checkpoint()
+
+    async def move_destination_time_ticks(
+        self,
+        event: Event[TickEventData],
+    ) -> None:
+        """Move with tick data."""
+        await self.move_destination_time(event.data.time_passed)
+
+
+class DragEvent(NamedTuple):
+    """Drag event data."""
+
+    pos: tuple[int, int]
+    rel: tuple[int, int]
+    button: int
 
 
 class DragClickEventComponent(Component):
@@ -657,11 +679,11 @@ class DragClickEventComponent(Component):
                     self.raise_event,
                     Event(
                         "drag",
-                        {
-                            "pos": event.data["pos"],
-                            "rel": event.data["rel"],
-                            "button": button,
-                        },
+                        DragEvent(
+                            event.data["pos"],
+                            event.data["rel"],
+                            button,
+                        ),
                     ),
                 )
 
@@ -669,15 +691,14 @@ class DragClickEventComponent(Component):
 class GroupProcessor(AsyncStateMachine):
     """Layered Dirty Sprite group handler."""
 
-    __slots__ = ("groups", "group_names", "new_gid", "_timing", "_clear")
+    __slots__ = ("_clear", "_timing", "group_names", "groups", "new_gid")
     sub_renderer_class: ClassVar = LayeredDirty
-    groups: dict[int, sub_renderer_class]
 
     def __init__(self) -> None:
         """Initialize group processor."""
         super().__init__()
 
-        self.groups = {}
+        self.groups: dict[int, LayeredDirty[Sprite]] = {}
         self.group_names: dict[str, int] = {}
         self.new_gid = 0
         self._timing = 1000 / 80
@@ -729,7 +750,7 @@ class GroupProcessor(AsyncStateMachine):
                     del self.group_names[name]
                     return
 
-    def get_group(self, gid_name: str | int) -> sub_renderer_class | None:
+    def get_group(self, gid_name: str | int) -> LayeredDirty[Sprite] | None:
         """Return group from group ID or name."""
         named = None
         if isinstance(gid_name, str):

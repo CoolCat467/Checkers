@@ -128,8 +128,8 @@ class State:
                     continue
                 line.append(map_[self.pieces.get((x, y))])
             lines.append("".join(line))
-        ##            lines.append(" | ".join(line))
-        ##            lines.append("--+-"*(w-1)+"-")
+        # lines.append(" | ".join(line))
+        # lines.append("--+-"*(w-1)+"-")
         return "\n".join(lines)
 
     def calculate_actions(self, position: Pos) -> ActionSet:
@@ -361,11 +361,9 @@ class State:
         # then modify results for pawns
         moves = pawn_modify(get_sides(position), piece_type)
         return tuple(
-            [
-                m
-                for m in filter(self.valid_location, moves)
-                if m not in self.pieces
-            ],
+            m
+            for m in filter(self.valid_location, moves)
+            if m not in self.pieces
         )
 
     @classmethod
@@ -459,5 +457,5 @@ def generate_pieces(
             if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
                 # Set the piece to White Pawn or Black Pawn depending on the current y pos
                 piece_type = int(y <= z_to_1)
-                pieces[(x, y)] = piece_type
+                pieces[x, y] = piece_type
     return pieces

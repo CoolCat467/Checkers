@@ -25,6 +25,7 @@ class Player(IntEnum):
     __slots__ = ()
     MIN = auto()
     MAX = auto()
+    CHANCE = auto()
 
 
 State = TypeVar("State")
@@ -43,10 +44,16 @@ class Minimax(ABC, Generic[State, Action]):
 
     __slots__ = ()
 
+    LOWEST = -1
+    HIGHEST = 1
+
     @classmethod
     @abstractmethod
     def value(cls, state: State) -> int | float:
-        """Return the value of a given game state."""
+        """Return the value of a given game state.
+
+        Should be in range [cls.LOWEST, cls.HIGHEST].
+        """
 
     @classmethod
     @abstractmethod
@@ -58,7 +65,8 @@ class Minimax(ABC, Generic[State, Action]):
     def player(cls, state: State) -> Player:
         """Return player status given the state of the game.
 
-        Must return either Player.MIN or Player.MAX
+        Must return either Player.MIN or Player.MAX, or Player.CHANCE
+        if there is a random action.
         """
 
     @classmethod
@@ -70,6 +78,14 @@ class Minimax(ABC, Generic[State, Action]):
     @abstractmethod
     def result(cls, state: State, action: Action) -> State:
         """Return new game state after performing action on given state."""
+
+    @classmethod
+    def probability(cls, action: Action) -> float:
+        """Return probability that given chance node action will happen.
+
+        Should be in range [0.0, 1.0] for 0% and 100% chance respectively.
+        """
+        raise NotImplementedError()
 
     @classmethod
     def minimax(
@@ -94,15 +110,24 @@ class Minimax(ABC, Generic[State, Action]):
         if current_player == Player.MAX:
             value = -infinity
             best = max
-        else:
+        elif current_player == Player.MIN:
             value = infinity
             best = min
+        elif current_player == Player.CHANCE:
+            value = 0
+            best = sum
+        else:
+            raise ValueError(f"Unexpected player type {current_player!r}")
 
         best_action: Action | None = None
         for action in cls.actions(state):
             result = cls.minimax(cls.result(state, action), next_down)
-            new_value = best(value, result.value)
-            if new_value != value:
+            result_value = result.value
+            if current_player == Player.CHANCE:
+                # Probability[action]
+                result_value *= cls.probability(action)
+            new_value = best(value, result_value)
+            if new_value != value and current_player != Player.CHANCE:
                 best_action = action
             value = new_value
         return MinimaxResult(value, best_action)
@@ -136,14 +161,47 @@ class Minimax(ABC, Generic[State, Action]):
             best = max
             compare = operator.gt  # greater than (>)
             set_idx = 0
-        else:
+        elif current_player == Player.MIN:
             value = infinity
             best = min
             compare = operator.lt  # less than (<)
             set_idx = 1
+        elif current_player == Player.CHANCE:
+            value = 0
+            best = sum
+        else:
+            raise ValueError(f"Unexpected player type {current_player!r}")
+
+        actions = tuple(cls.actions(state))
+        successors = len(actions)
+        expect_a = successors * (a - cls.HIGHEST) + cls.HIGHEST
+        expect_b = successors * (b - cls.LOWEST) + cls.LOWEST
 
         best_action: Action | None = None
-        for action in cls.actions(state):
+        for action in actions:
+            if current_player == Player.CHANCE:
+                # Limit child a, b to a valid range
+                ax = max(expect_a, cls.LOWEST)
+                bx = min(expect_b, cls.HIGHEST)
+                # Search the child with new cutoff values
+                result = cls.alphabeta(
+                    cls.result(state, action),
+                    next_down,
+                    ax,
+                    bx,
+                )
+                score = result.value
+                # Check for a, b cutoff conditions
+                if score <= expect_a:
+                    return MinimaxResult(a, None)
+                if score >= expect_b:
+                    return MinimaxResult(b, None)
+                value += score
+                # Adjust a, b for the next child
+                expect_a += cls.HIGHEST - score
+                expect_b += cls.LOWEST - score
+                continue
+
             result = cls.alphabeta(cls.result(state, action), next_down, a, b)
             new_value = best(value, result.value)
 
@@ -163,77 +221,9 @@ class Minimax(ABC, Generic[State, Action]):
                 alpha_beta_list = [a, b]
                 alpha_beta_list[set_idx] = new_alpha_beta_value
                 a, b = alpha_beta_list
-        return MinimaxResult(value, best_action)
-
-
-class AsyncMinimax(ABC, Generic[State, Action]):
-    """Base class for Minimax AIs."""
-
-    __slots__ = ()
-
-    @classmethod
-    @abstractmethod
-    async def value(cls, state: State) -> int | float:
-        """Return the value of a given game state."""
-
-    @classmethod
-    @abstractmethod
-    async def terminal(cls, state: State) -> bool:
-        """Return if given game state is terminal."""
-
-    @classmethod
-    @abstractmethod
-    async def player(cls, state: State) -> Player:
-        """Return player status given the state of the game.
-
-        Must return either Player.MIN or Player.MAX
-        """
-
-    @classmethod
-    @abstractmethod
-    async def actions(cls, state: State) -> Iterable[Action]:
-        """Return a collection of all possible actions in a given game state."""
-
-    @classmethod
-    @abstractmethod
-    async def result(cls, state: State, action: Action) -> State:
-        """Return new game state after performing action on given state."""
-
-    @classmethod
-    async def minimax(
-        cls,
-        state: State,
-        depth: int | None = 5,
-    ) -> MinimaxResult[Action]:
-        """Return minimax result best action for a given state for the current player."""
-        if await cls.terminal(state):
-            return MinimaxResult(await cls.value(state), None)
-        if depth is not None and depth <= 0:
-            return MinimaxResult(
-                await cls.value(state),
-                next(iter(await cls.actions(state))),
-            )
-        next_down = None if depth is None else depth - 1
-
-        current_player = await cls.player(state)
-        value: int | float
-        if current_player == Player.MAX:
-            value = -infinity
-            best = max
-        else:
-            value = infinity
-            best = min
-
-        best_action: Action | None = None
-        for action in await cls.actions(state):
-            result = await cls.minimax(
-                await cls.result(state, action),
-                next_down,
-            )
-            new_value = best(value, result.value)
-            if new_value != value:
-                best_action = action
-            value = new_value
+        if current_player == Player.CHANCE:
+            # No cutoff occurred, return score
+            return MinimaxResult(value / successors, None)
         return MinimaxResult(value, best_action)
 
 

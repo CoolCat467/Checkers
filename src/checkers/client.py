@@ -25,22 +25,16 @@ __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
 import struct
-import time
 import traceback
 from typing import TYPE_CHECKING
 
 import trio
+from libcomponent import network
+from libcomponent.base_io import StructFormat
+from libcomponent.buffer import Buffer
+from libcomponent.component import Event
+from libcomponent.network_utils import ClientNetworkEventComponent
 
-from checkers import network
-from checkers.base_io import StructFormat
-from checkers.buffer import Buffer
-from checkers.component import Event
-from checkers.encrypted_event import EncryptedNetworkEventComponent
-from checkers.encryption import (
-    deserialize_public_key,
-    encrypt_token_and_secret,
-    generate_shared_secret,
-)
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -78,25 +72,25 @@ async def read_advertisements(
 
         await udp_socket.bind(("", ADVERTISEMENT_PORT))
 
-        ##        # Tell the kernel that we are a multicast socket
-        ##        udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
+        # # Tell the kernel that we are a multicast socket
+        # udp_socket.setsockopt(trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, 255)
 
         # socket.IPPROTO_IP works on Linux and Windows
-        ##        # IP_MULTICAST_IF: force sending network traffic over specific network adapter
+        # # IP_MULTICAST_IF: force sending network traffic over specific network adapter
         # IP_ADD_MEMBERSHIP: join multicast group
-        ##        udp_socket.setsockopt(
-        ##            trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
-        ##            trio.socket.inet_aton(network_adapter)
-        ##        )
-        ##    udp_socket.setsockopt(
-        ##        trio.socket.IPPROTO_IP,
-        ##        trio.socket.IP_ADD_MEMBERSHIP,
-        ##        struct.pack(
-        ##            "4s4s",
-        ##            trio.socket.inet_aton(group),
-        ##            trio.socket.inet_aton(network_adapter),
-        ##        ),
-        ##    )
+        # udp_socket.setsockopt(
+        # trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_IF,
+        # trio.socket.inet_aton(network_adapter)
+        # )
+        # udp_socket.setsockopt(
+        # trio.socket.IPPROTO_IP,
+        # trio.socket.IP_ADD_MEMBERSHIP,
+        # struct.pack(
+        # "4s4s",
+        # trio.socket.inet_aton(group),
+        # trio.socket.inet_aton(network_adapter),
+        # ),
+        # )
         group_bin = trio.socket.inet_pton(addrinfo[0], addrinfo[4][0])
         # Join group
         if addrinfo[0] == trio.socket.AF_INET:  # IPv4
@@ -119,8 +113,8 @@ async def read_advertisements(
         with trio.move_on_after(timeout):
             buffer, address = await udp_socket.recvfrom(512)
             host, _port = address
-        ##            print(f"{buffer = }")
-        ##            print(f"{address = }")
+        # print(f"{buffer = }")
+        # print(f"{address = }")
 
         response: list[tuple[str, tuple[str, int]]] = []
 
@@ -151,7 +145,7 @@ async def read_advertisements(
         return response
 
 
-class GameClient(EncryptedNetworkEventComponent):
+class GameClient(ClientNetworkEventComponent):
     """Game Client Network Event Component.
 
     This class handles connecting to the game server, transmitting events
@@ -263,7 +257,7 @@ class GameClient(EncryptedNetworkEventComponent):
           network.NetworkTimeoutError - Timeout
           network.NetworkEOFError - Server closed connection
         """
-        ##print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
+        # print(f"{self.__class__.__name__}[{self.name}]: handle_read_event")
         if not self.manager_exists:
             return
         if self.not_connected:
@@ -341,18 +335,6 @@ class GameClient(EncryptedNetworkEventComponent):
                 return
             await self.raise_disconnect("Error connecting to server.")
 
-    async def read_callback_ping(self, event: Event[bytearray]) -> None:
-        """Read callback_ping event from server."""
-        ns = int.from_bytes(event.data, byteorder="big")
-        now = int(time.time() * 1e9)
-        difference = now - ns
-
-        # print(f'{difference / 1e9 = } seconds')
-
-        await self.raise_event(
-            Event("callback_ping", difference),
-        )
-
     async def read_create_piece(self, event: Event[bytearray]) -> None:
         """Read create_piece event from server."""
         buffer = Buffer(event.data)
@@ -395,7 +377,7 @@ class GameClient(EncryptedNetworkEventComponent):
         """Write piece click event to server."""
         if self.not_connected:
             return
-        piece_position, piece_type = event.data
+        piece_position, _piece_type = event.data
 
         buffer = Buffer()
         write_position(buffer, piece_position)
@@ -510,40 +492,6 @@ class GameClient(EncryptedNetworkEventComponent):
         await self.raise_event(
             Event("game_playing_as", playing_as),
         )
-
-    async def write_encryption_response(
-        self,
-        shared_secret: bytes,
-        verify_token: bytes,
-    ) -> None:
-        """Write encryption response to server."""
-        buffer = Buffer()
-        buffer.write_bytearray(shared_secret)
-        buffer.write_bytearray(verify_token)
-
-        await self.write_event(Event("encryption_response->server", buffer))
-
-    async def read_encryption_request(self, event: Event[bytearray]) -> None:
-        """Read and handle encryption request from server."""
-        buffer = Buffer(event.data)
-
-        serialized_public_key = buffer.read_bytearray()
-        verify_token = buffer.read_bytearray()
-
-        public_key = deserialize_public_key(serialized_public_key)
-
-        shared_secret = generate_shared_secret()
-
-        encrypted_token, encrypted_secret = encrypt_token_and_secret(
-            public_key,
-            verify_token,
-            shared_secret,
-        )
-
-        await self.write_encryption_response(encrypted_secret, encrypted_token)
-
-        # Start encrypting all future data
-        self.enable_encryption(shared_secret, verify_token)
 
     async def handle_network_stop(self, event: Event[None]) -> None:
         """Send EOF if connected and close socket."""

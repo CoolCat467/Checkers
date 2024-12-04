@@ -25,39 +25,58 @@ will start the game.
 checkers_game
 ```
 
-## How to play
-In a two player game, the starting player is randomly selected, and that
-player will be able to make a move.
+## Types of Play
+On the title screen there are 3 play options:
+1. Singleplayer
+2. Host Networked Game
+3. Join Networked Game
 
-Making a move:
-All valid moves are pre-calculated by the game, and only a valid
-move is able to be played successfully.
+In a singleplayer game, the program hosts an internal server and the client can control both players.
 
-To move a piece, the user selects a game tile with a piece on it
-by moving the mouse cursor over the tile and pressing the left click
-button on the mouse/track pad.
+In Host Networked Game, program hosts the server on the local network and posts advertisements every 2 seconds or so until two clients connect (includes hosting computer)
 
-Once a piece is selected, it will gain a yellow outline and all
-valid tiles that the piece is able to be moved to gain a blue
-outline. If no valid moves are found, no tiles will gain a blue
-outline. The piece will now follow the mouse cursor, but the
-tile selected's piece will remain.
+In Join Networked Game, program will listen for server advertisements on the local network and display said servers, and when you click on a discovered LAN server client will connect and game should begin.
 
-If a piece is selected and one of the empty tiles are selected,
-if that tile is a valid move, the selected piece will be played
-to that empty tile, the original selected tile will vanish,
-valid tiles will lose their blue outline, the cursor will no
-longer be carrying the piece, and it will now be the other
-player's turn.
+Once game has begun, if server was hosted, LAN server advertisements stop and play begins
 
-If an AI is playing against the player, the player will make
-plays as described above, but the AI (which is always the black
-player) will make it's move instantly. While the opponent is making
-it's play, the game will cease to run, and if the AI takes a
-while to make it's play, the screen will freeze.
+## How to Play
+As per official American Checkers rules, Black plays first.
 
-Once the game has been won, the game will display the winner
-and in a two player game, a button will appear to return to the title.
+To perform a turn, click on the piece you would like to move with the mouse cursor.
+Once this happens, all valid move destinations will be displayed via tiles with green outlines.
 
-If you are interested in making an AI for this game, there is a lot
-of information in the game files and in the example checkers AI
+Following official American Checkers rules, note that if a capture (jumping over an opponent's piece, taking that piece out of play) is available, it must be taken and otherwise valid moves non-capture moves will not be available.
+
+Once green outline tiles appear, you can either click one of the valid destination tiles to complete your turn or click a different piece to select that piece instead.
+
+Once you click a valid destination, that move is performed, a movement animation will be shown, and it is now the other player's turn.
+
+Play continues indefinitely until either a player no longer has pieces they are able to move or there is no valid move they are able to complete. In these events, said player's opponent wins.
+
+Initially, all player have pawns, which are only able to move forward towards the player's opponent's side of the board.
+
+In the event a pawn reaches the opposite side of the board, it is "kinged" and is now able to move in all directions.
+
+In American Checkers, pawns can only capture in the forward direction, just like their movement. Kings do not have this limitation, likewise like their movement.
+
+
+## Playing Against A Computer Player (AI)
+There are two computer players I have made for this game. Both connect to all discovered LAN servers and play until the game is over.
+To start playing against Minimax AI:
+```bash
+python computer_players/MiniMax_AI.py
+```
+
+To start playing against Max Y Position Jumping AI (very dumb):
+```bash
+python computer_players/Y_Max_Jumper_AI.py
+```
+
+
+### Links
+* Source Code - https://github.com/CoolCat467/Checkers.git
+* Issues      - https://github.com/CoolCat467/Checkers/issues
+
+### License
+-------
+Code and documentation are available according to the GNU General Public License v3.0 (see [LICENSE](https://github.com/CoolCat467/Checkers/blob/HEAD/LICENSE)).

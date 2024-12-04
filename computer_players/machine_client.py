@@ -40,7 +40,7 @@ class RemoteState(Component, metaclass=ABCMeta):
     turn.
     """
 
-    __slots__ = ("state", "pieces", "has_initial", "playing_as", "moves")
+    __slots__ = ("has_initial", "moves", "pieces", "playing_as", "state")
 
     def __init__(self) -> None:
         """Initialize remote state."""
@@ -108,14 +108,17 @@ class RemoteState(Component, metaclass=ABCMeta):
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
         """Update internal pieces if we haven't had the initial setup event."""
-        if self.has_initial:
-            return
+        assert self.has_initial
         pos, type_ = event.data
         self.pieces[pos] = type_
 
     async def handle_playing_as(self, event: Event[int]) -> None:
         """Handle playing as event."""
         self.playing_as = event.data
+
+        assert self.has_initial
+        if self.state.turn == self.playing_as:
+            await self.base_preform_turn()
 
     async def handle_initial_config(
         self,
@@ -125,8 +128,6 @@ class RemoteState(Component, metaclass=ABCMeta):
         board_size, turn = event.data
         self.state = State(board_size, self.pieces, bool(turn))
         self.has_initial = True
-        if turn == self.playing_as:
-            await self.base_preform_turn()
 
     async def handle_game_over(self, event: Event[int]) -> None:
         """Raise network_stop event so we disconnect from server."""

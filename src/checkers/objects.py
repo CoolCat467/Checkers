@@ -35,9 +35,8 @@ from pygame.surface import Surface
 from checkers import sprite
 
 if TYPE_CHECKING:
+    from libcomponent.component import Event
     from pygame.font import Font
-
-    from checkers.component import Event
 
 
 class Text(sprite.Sprite):
@@ -130,7 +129,7 @@ class OutlinedText(Text):
 
     """
 
-    __slots__ = ("outline", "inside")
+    __slots__ = ("inside", "outline")
 
     border_width = 3
     border_radius = 8

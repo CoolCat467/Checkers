@@ -27,26 +27,25 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
-import time
 import traceback
 from collections import deque
 from functools import partial
 from typing import TYPE_CHECKING, NoReturn, cast
 
 import trio
-
-from checkers import network
-from checkers.base_io import StructFormat
-from checkers.buffer import Buffer
-from checkers.component import ComponentManager, Event, ExternalRaiseManager
-from checkers.encrypted_event import EncryptedNetworkEventComponent
-from checkers.encryption import (
-    RSAPrivateKey,
-    decrypt_token_and_secret,
-    generate_rsa_key,
-    generate_verify_token,
-    serialize_public_key,
+from libcomponent import network
+from libcomponent.base_io import StructFormat
+from libcomponent.buffer import Buffer
+from libcomponent.component import (
+    ComponentManager,
+    Event,
+    ExternalRaiseManager,
 )
+from libcomponent.network_utils import (
+    ServerClientNetworkEventComponent,
+    find_ip,
+)
+
 from checkers.network_shared import (
     ADVERTISEMENT_IP,
     ADVERTISEMENT_PORT,
@@ -54,7 +53,6 @@ from checkers.network_shared import (
     ClientBoundEvents,
     Pos,
     ServerBoundEvents,
-    find_ip,
     read_position,
     write_position,
 )
@@ -64,7 +62,7 @@ if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
 
 
-class ServerClient(EncryptedNetworkEventComponent):
+class ServerClient(ServerClientNetworkEventComponent):
     """Server Client Network Event Component.
 
     When clients connect to server, this class handles the incoming
@@ -108,9 +106,6 @@ class ServerClient(EncryptedNetworkEventComponent):
                 sbe.encryption_response: f"client[{self.client_id}]->encryption_response",
             },
         )
-
-        self.rsa_key: RSAPrivateKey | None = None
-        self.verify_token: bytes | None = None
 
     def bind_handlers(self) -> None:
         """Bind event handlers."""
@@ -305,27 +300,6 @@ class ServerClient(EncryptedNetworkEventComponent):
         buffer.write_value(StructFormat.UBYTE, playing_as)
         await self.write_event(Event("server[write]->playing_as", buffer))
 
-    async def write_callback_ping(self) -> None:
-        """Write callback_ping packet to client.
-
-        Could raise the following exceptions:
-          trio.BrokenResourceError: if something has gone wrong, and the stream
-            is broken.
-          trio.ClosedResourceError: if stream was previously closed
-
-        Listed as possible but probably not because of write lock:
-          trio.BusyResourceError: if another task is using :meth:`write`
-        """
-        buffer = Buffer()
-
-        # Try to be as accurate with time as possible
-        await self.wait_write_might_not_block()
-        ns = int(time.time() * 1e9)
-        # Use as many bits as time needs, write_buffer handles size for us.
-        buffer.write(ns.to_bytes(-(-ns.bit_length() // 8), "big"))
-
-        await self.write_event(Event("server[write]->callback_ping", buffer))
-
     async def handle_callback_ping(
         self,
         _: Event[None],
@@ -334,23 +308,8 @@ class ServerClient(EncryptedNetworkEventComponent):
         await self.write_callback_ping()
 
     async def start_encryption_request(self) -> None:
-        """Start encryption request and raise as server[write]->encryption_request."""
-        if self.encryption_enabled:
-            raise RuntimeError("Encryption is already set up!")
-        self.rsa_key = generate_rsa_key()
-        self.verify_token = generate_verify_token()
-
-        public_key = self.rsa_key.public_key()
-
-        serialized_public_key = serialize_public_key(public_key)
-
-        buffer = Buffer()
-        buffer.write_bytearray(serialized_public_key)
-        buffer.write_bytearray(self.verify_token)
-
-        await self.write_event(
-            Event("server[write]->encryption_request", buffer),
-        )
+        """Start encryption request and raise as `server[write]->encryption_request`."""
+        await super().start_encryption_request()
 
         event = await self.read_event()
         if event.name != f"client[{self.client_id}]->encryption_response":
@@ -358,36 +317,6 @@ class ServerClient(EncryptedNetworkEventComponent):
                 f"Expected encryption response, got but {event.name!r}",
             )
         await self.handle_encryption_response(event)
-
-    async def handle_encryption_response(
-        self,
-        event: Event[bytearray],
-    ) -> None:
-        """Read encryption response."""
-        if self.rsa_key is None or self.verify_token is None:
-            raise RuntimeError(
-                "Was not expecting encryption response, request start not sent!",
-            )
-        if self.encryption_enabled:
-            raise RuntimeError("Encryption is already set up!")
-        buffer = Buffer(event.data)
-
-        encrypted_shared_secret = buffer.read_bytearray()
-        encrypted_verify_token = buffer.read_bytearray()
-
-        verify_token, shared_secret = decrypt_token_and_secret(
-            self.rsa_key,
-            encrypted_verify_token,
-            encrypted_shared_secret,
-        )
-
-        if verify_token != self.verify_token:
-            raise RuntimeError(
-                "Received verify token does not match sent verify token!",
-            )
-
-        # Start encrypting all future data
-        self.enable_encryption(shared_secret, verify_token)
 
 
 class CheckersState(State):
@@ -441,15 +370,15 @@ class GameServer(network.Server):
     """
 
     __slots__ = (
-        "client_count",
-        "state",
-        "client_players",
-        "player_selections",
         "actions_queue",
-        "players_can_interact",
-        "internal_singleplayer_mode",
         "advertisement_scope",
+        "client_count",
+        "client_players",
+        "internal_singleplayer_mode",
+        "player_selections",
+        "players_can_interact",
         "running",
+        "state",
     )
 
     board_size = (8, 8)
@@ -535,14 +464,14 @@ class GameServer(network.Server):
             type=trio.socket.SOCK_DGRAM,  # UDP
             proto=trio.socket.IPPROTO_UDP,  # UDP
         ) as udp_socket:
-            ### Set Time-to-live (optional)
-            ##ttl_bin = struct.pack('@i', MYTTL)
-            ##if addrinfo[0] == trio.socket.AF_INET: # IPv4
-            ##    udp_socket.setsockopt(
-            ##        trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, ttl_bin)
-            ##else:
-            ##    udp_socket.setsockopt(
-            ##        trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
+            # Set Time-to-live (optional)
+            # ttl_bin = struct.pack('@i', MYTTL)
+            # if addrinfo[0] == trio.socket.AF_INET: # IPv4
+            # udp_socket.setsockopt(
+            # trio.socket.IPPROTO_IP, trio.socket.IP_MULTICAST_TTL, ttl_bin)
+            # else:
+            # udp_socket.setsockopt(
+            # trio.socket.IPPROTO_IPV6, trio.socket.IPV6_MULTICAST_HOPS, ttl_bin)
             with self.advertisement_scope:
                 print("Starting advertisement posting.")
                 while True:  # not self.can_start():
@@ -650,6 +579,14 @@ class GameServer(network.Server):
         # Using non-cryptographically secure random because it doesn't matter
         self.new_game_init()
 
+        # Raise initial config event with board size and initial turn.
+        await self.raise_event(
+            Event(
+                "initial_config->network",
+                (self.board_size, self.state.turn),
+            ),
+        )
+
         # Send create_piece events for all pieces
         async with trio.open_nursery() as nursery:
             for piece_pos, piece_type in self.state.get_pieces():
@@ -659,14 +596,6 @@ class GameServer(network.Server):
                 )
 
         await self.transmit_playing_as()
-
-        # Raise initial config event with board size and initial turn.
-        await self.raise_event(
-            Event(
-                "initial_config->network",
-                (self.board_size, self.state.turn),
-            ),
-        )
 
     async def client_network_loop(self, client: ServerClient) -> None:
         """Network loop for given ServerClient.
@@ -693,9 +622,13 @@ class GameServer(network.Server):
         while not client.not_connected:
             event: Event[bytearray] | None = None
             try:
-                await client.write_callback_ping()
+                with trio.fail_after(6):
+                    await client.write_callback_ping()
                 with trio.move_on_after(2):
                     event = await client.read_event()
+            except trio.TooSlowError:
+                print(f"{client.name} Writing callback ping took too long")
+                break
             except network.NetworkTimeoutError:
                 print(f"{client.name} Timeout")
                 break
@@ -738,6 +671,14 @@ class GameServer(network.Server):
         )
         with self.temporary_component(private_events_pocket):
             with private_events_pocket.temporary_component(client):
+                # Raise initial config event with board size and initial turn.
+                await client.raise_event(
+                    Event(
+                        "initial_config->network",
+                        (self.state.size, self.state.turn),
+                    ),
+                )
+
                 # Send create_piece events for all pieces
                 async with trio.open_nursery() as nursery:
                     for piece_pos, piece_type in self.state.get_pieces():
@@ -749,16 +690,9 @@ class GameServer(network.Server):
                             ),
                         )
 
+                # Send who player is playing as
                 await client.raise_event(
                     Event(f"playing_as->network[{client.client_id}]", 255),
-                )
-
-                # Raise initial config event with board size and initial turn.
-                await client.raise_event(
-                    Event(
-                        "initial_config->network",
-                        (self.state.size, self.state.turn),
-                    ),
                 )
 
     async def handler(self, stream: trio.SocketStream) -> None:
@@ -775,8 +709,8 @@ class GameServer(network.Server):
 
         can_start = self.can_start()
         game_active = self.game_active()
-        ##        if can_start:
-        ##            self.stop_serving()
+        # if can_start:
+        # self.stop_serving()
 
         if self.client_count > self.max_clients:
             print(
