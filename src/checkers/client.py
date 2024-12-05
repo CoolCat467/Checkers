@@ -317,7 +317,9 @@ class GameClient(ClientNetworkEventComponent):
                 traceback.print_exception(ex)
             else:
                 self.running = True
-                while not self.not_connected and self.running:
+                while self.running:
+                    if self.not_connected:
+                        break
                     await self.handle_read_event()
                 self.running = False
 
