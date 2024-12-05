@@ -93,5 +93,5 @@ typing-extensions==4.12.2
     #   black
     #   libcomponent
     #   mypy
-uv==0.5.5
+uv==0.5.6
     # via -r test-requirements.in
