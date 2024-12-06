@@ -67,6 +67,10 @@ def test_mul() -> None:
     assert Vector2(5, 10) * 3 == Vector2(15, 30)
 
 
+def test_rmul() -> None:
+    assert 3 * Vector2(5, 10) == Vector2(15, 30)
+
+
 def test_truediv() -> None:
     assert Vector2(10, 5) / 2 == Vector2(5, 2.5)
 
