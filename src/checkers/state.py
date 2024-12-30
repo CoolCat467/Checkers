@@ -101,7 +101,7 @@ def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
         return moves[:2]
     if (
         piece_type == 1
-    ):  # If it's a black pawn, it can only move to bottom left anf bottom right
+    ):  # If it's a black pawn, it can only move to bottom left and bottom right
         return moves[2:]
     return moves
 
@@ -183,7 +183,7 @@ class State:
                 self.piece_jumped(jumped_pos)
                 # See if piece kinged
                 jumped_x, jumped_y = jumped_pos
-                # Rightshift 1 is more efficiant way to multiply by 2
+                # Rightshift 1 is more efficient way to multiply by 2
                 cur_x += (jumped_x - cur_x) << 1
                 cur_y += (jumped_y - cur_y) << 1
 

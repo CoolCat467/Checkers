@@ -2,7 +2,7 @@ ci:
   autofix_prs: true
   autoupdate_schedule: quarterly
   submodules: false
-  skip: [badgie, project-requirements]
+  skip: [badgie]
 
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
@@ -28,6 +28,7 @@ repos:
       - id: ruff
         types: [file]
         types_or: [python, pyi, toml]
+        args: ["--show-fixes"]
   - repo: https://github.com/CoolCat467/badgie
     rev: v0.9.6
     hooks:
@@ -36,11 +37,21 @@ repos:
     rev: v2.3.0
     hooks:
       - id: codespell
+        additional_dependencies:
+          - tomli
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.28.4
+    hooks:
+      - id: typos
+  - repo: https://github.com/woodruffw/zizmor-pre-commit
+    rev: v0.10.0
+    hooks:
+      - id: zizmor
   - repo: local
     hooks:
       - id: project-requirements
         name: regenerate requirements.in
-        language: system
-        entry: python tools/project_requirements.py
+        language: python
+        entry: tools/project_requirements.py
         pass_filenames: false
         files: ^(test-requirements.in)|(pyproject.toml)$
