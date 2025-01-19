@@ -134,7 +134,7 @@ requires-dist = [
     { name = "codespell", marker = "extra == 'tools'", specifier = ">=2.3.0" },
     { name = "coverage", marker = "extra == 'tests'", specifier = ">=7.2.5" },
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
-    { name = "libcomponent", specifier = "~=0.0.0" },
+    { name = "libcomponent", specifier = "~=0.0.1" },
     { name = "mypy", marker = "extra == 'tests'", specifier = ">=1.14.1" },
     { name = "mypy-extensions", specifier = ">=1.0.0" },
     { name = "pygame", specifier = "~=2.6.0" },

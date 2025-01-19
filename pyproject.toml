@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools >= 64"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling >= 1.20.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "checkers"
@@ -37,7 +37,7 @@ keywords = [
     "checkers-game", "ai-support", "networked-game"
 ]
 dependencies = [
-    "libcomponent~=0.0.0",
+    "libcomponent~=0.0.1",
     "pygame~=2.6.0",
     "typing_extensions>=4.12.2",
     "mypy_extensions>=1.0.0",
@@ -45,8 +45,8 @@ dependencies = [
     "exceptiongroup; python_version < '3.11'",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "checkers.game.__version__"}
+[tool.hatch.version]
+path = "src/checkers/game.py"
 
 [project.urls]
 "Source" = "https://github.com/CoolCat467/Checkers"
@@ -70,8 +70,18 @@ tools = [
     "codespell>=2.3.0",
 ]
 
-[tool.setuptools.package-data]
-checkers = ["py.typed", "data/*"]
+[tool.hatch.build.targets.wheel.hooks.mypyc]
+dependencies = [
+    "hatch-mypyc>=0.16.0",
+    "mypy>=1.14.1",
+]
+require-runtime-dependencies = true
+exclude = [
+    "src/checkers/vector.py",
+    "src/checkers/namedtuple_mod.py",
+    "src/checkers/multi_inherit.py",
+    "src/checkers/statemachine.py",
+]
 
 [tool.uv]
 package = true
