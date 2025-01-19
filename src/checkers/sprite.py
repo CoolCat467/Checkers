@@ -325,7 +325,7 @@ class OutlineComponent(Component):
         assert manager.set_surface is not None
         manager.set_image(manager.set_surface)
 
-    def get_outline_discriptor(self, identifier: str | int) -> str:
+    def get_outline_descriptor(self, identifier: str | int) -> str:
         """Return outlined identifier for given original identifier."""
         color = "_".join(map(str, self.__color))
         return f"{identifier}{self.mod}{color}_{self.size}"
@@ -334,7 +334,7 @@ class OutlineComponent(Component):
         """Save outlined version of given identifier image."""
         manager = cast(ImageComponent, self.manager)
 
-        outlined = self.get_outline_discriptor(identifier)
+        outlined = self.get_outline_descriptor(identifier)
         if manager.image_exists(outlined):
             return
 
@@ -367,7 +367,7 @@ class OutlineComponent(Component):
     def get_outline(self, identifier: str | int) -> str:
         """Return saved outline effect identifier."""
         self.save_outline(identifier)
-        return self.get_outline_discriptor(identifier)
+        return self.get_outline_descriptor(identifier)
 
     def precalculate_outline(
         self,

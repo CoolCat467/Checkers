@@ -41,7 +41,7 @@ if TYPE_CHECKING:
 # As a forward to the madness below, we are doing something incredibly sneeky.
 # We have BaseVector, which we want to have all of the shared functionality
 # of all Vector subclasses. We also want each Vector class to be a NamedTuple
-# so we can let Python handle storing data in the most efficiant way and
+# so we can let Python handle storing data in the most efficient way and
 # make Vectors immutable.
 #
 # Problem is, we can't have Vector classes be
@@ -128,7 +128,12 @@ class BaseVector:
     # Make sure to override right multiply, otherwise tuple's __rmul__
     # is still set, which can lead to unexpected results,
     # eg 3 * Vector2(1, 2) -> (1, 2, 1, 2, 1, 2)
-    __rmul__ = __mul__
+    def __rmul__(
+        self: Self,
+        scalar: float,
+    ) -> Self:
+        """Return result of multiplying lhs scalar by self components."""
+        return self.from_iter(scalar * c for c in self)
 
     def __truediv__(
         self: Self,

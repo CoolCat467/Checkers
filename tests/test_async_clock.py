@@ -28,7 +28,7 @@ def test_get_time(clock: Clock) -> None:
 
 
 @pytest.mark.trio
-async def test_tick_elasped(clock: Clock) -> None:
+async def test_tick_elapsed(clock: Clock) -> None:
     time_passed = await clock.tick()
     assert time_passed >= 0
 

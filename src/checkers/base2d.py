@@ -1,4 +1,4 @@
-"""Two-Dimentional Game Base Module."""
+"""Two-Dimensional Game Base Module."""
 
 # Programmed by CoolCat467
 
@@ -430,9 +430,9 @@ class WorldBase:
     def process(self, time_passed: float) -> None:
         """Process every entity stored the world."""
         # process every entity in the world
-        time_passed_secconds = time_passed / 1000
+        time_passed_seconds = time_passed / 1000
         for entity in list(self.entities.values()):
-            entity.process(time_passed_secconds)
+            entity.process(time_passed_seconds)
 
     def render(self, surface: pygame.surface.Surface) -> None:
         """Draw the background and render all entities."""

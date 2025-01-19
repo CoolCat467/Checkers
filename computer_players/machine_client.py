@@ -12,14 +12,14 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING
 
 import trio
-
-from checkers.client import GameClient, read_advertisements
-from checkers.component import (
+from libcomponent.component import (
     Component,
     ComponentManager,
     Event,
     ExternalRaiseManager,
 )
+
+from checkers.client import GameClient, read_advertisements
 from checkers.state import Action, Pos, State
 
 if TYPE_CHECKING:
