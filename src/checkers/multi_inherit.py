@@ -1,10 +1,10 @@
-"""Objects that inherit from multipls base classes because mypyc is dumb."""
+"""Objects that inherit from multiples base classes because mypyc is dumb."""
 
 # Programmed by CoolCat467
 
 from __future__ import annotations
 
-# Objects that inherit from multipls base classes because mypyc is dumb
+# Objects that inherit from multiples base classes because mypyc is dumb
 # Copyright (C) 2024  CoolCat467
 #
 # This program is free software: you can redistribute it and/or modify
