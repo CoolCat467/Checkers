@@ -28,8 +28,9 @@ __license__ = "GNU General Public License Version 3"
 
 from typing import TYPE_CHECKING
 
-from checkers import element_list, objects
-from checkers.component import Event
+from libcomponent.component import Event
+
+from checkers import element_list, objects, sprite
 
 if TYPE_CHECKING:
     import pygame

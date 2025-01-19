@@ -78,10 +78,7 @@ dependencies = [
 require-runtime-dependencies = true
 exclude = [
     "src/checkers/vector.py",
-    "src/checkers/base_io.py",
-    "src/checkers/buffer.py",
     "src/checkers/namedtuple_mod.py",
-    "src/checkers/component.py",
     "src/checkers/multi_inherit.py",
     "src/checkers/statemachine.py",
 ]
