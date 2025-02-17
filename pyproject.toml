@@ -37,11 +37,11 @@ keywords = [
     "checkers-game", "ai-support", "networked-game"
 ]
 dependencies = [
-    "libcomponent~=0.0.0",
+    "libcomponent~=0.0.3",
     "pygame~=2.6.0",
     "typing_extensions>=4.12.2",
     "mypy_extensions>=1.0.0",
-    "trio~=0.28.0",
+    "trio~=0.29.0",
     "exceptiongroup; python_version < '3.11'",
 ]
 
