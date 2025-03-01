@@ -58,11 +58,11 @@ checkers_game = "checkers.game:cli_run"
 [project.optional-dependencies]
 tests = [
     "pytest>=5.0",
-    "pytest-cov",
-    "pytest-trio",
+    "pytest-cov>=6.0.0",
+    "pytest-trio>=0.8.0",
     "coverage>=7.2.5",
     "uv>=0.5.21",
-    "mypy>=1.15.0",
+    "mypy>=1.14.1",
 ]
 tools = [
     'black>=24.10.0; implementation_name == "cpython"',
