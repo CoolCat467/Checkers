@@ -87,7 +87,7 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
             sides.append((nx, ny))
     tuple_sides = tuple(sides)
     assert len(tuple_sides) == 4
-    return cast(tuple[Pos, Pos, Pos, Pos], tuple_sides)
+    return cast("tuple[Pos, Pos, Pos, Pos]", tuple_sides)
 
 
 def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
