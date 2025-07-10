@@ -450,6 +450,7 @@ class GameBoard(sprite.Sprite):
                 "game_winner": self.handle_game_winner,
                 "fire_next_animation": self.handle_fire_next_animation,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
+                "gameboard_update_player_text": self.handle_update_player_text,
             },
         )
 
@@ -482,6 +483,13 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Handle piece finishing one part of it's movement animation."""
         await self.raise_event(Event("fire_next_animation", None))
+
+    async def handle_update_player_text(
+        self,
+        event: Event[None],
+    ) -> None:
+        """Handle update_player_text event."""
+        raise NotImplementedError()
 
     async def handle_create_piece_event(
         self,

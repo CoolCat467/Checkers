@@ -32,7 +32,6 @@ from typing import (
     NamedTuple,
     TypeAlias,
     TypeVar,
-    cast,
 )
 
 from mypy_extensions import u8
@@ -87,14 +86,14 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
             sides.append((nx, ny))
     tuple_sides = tuple(sides)
     assert len(tuple_sides) == 4
-    return cast("tuple[Pos, Pos, Pos, Pos]", tuple_sides)
+    return tuple_sides
 
 
 def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
     """Return moves but remove invalid moves for pawns."""
-    assert (
-        len(moves) == 4
-    ), "Tuple size MUST be four for this to return valid results!"
+    assert len(moves) == 4, (
+        "Tuple size MUST be four for this to return valid results!"
+    )
     if (
         piece_type == 0
     ):  # If it's a white pawn, it can only move to top left and top right
