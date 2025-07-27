@@ -18,7 +18,10 @@ __ver_patch__ = 0
 import random
 from typing import TYPE_CHECKING, TypeVar
 
-from machine_client import RemoteState, run_clients_in_local_servers_sync
+from checkers_computer_players.machine_client import (
+    RemoteState,
+    run_clients_in_local_servers_sync,
+)
 
 if TYPE_CHECKING:
     from checkers.state import Action, Pos, State
@@ -117,9 +120,9 @@ class MaxYJumperPlayer(RemoteState):
 
 def run() -> None:
     """Run MaxYJumperPlayer clients in local servers."""
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run_clients_in_local_servers_sync(MaxYJumperPlayer)
 
 
 if __name__ == "__main__":
-    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run()

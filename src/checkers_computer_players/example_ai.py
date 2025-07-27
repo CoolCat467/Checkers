@@ -17,7 +17,10 @@ __ver_patch__ = 0
 import random
 from typing import TYPE_CHECKING
 
-from machine_client import RemoteState, run_clients_in_local_servers_sync
+from checkers_computer_players.machine_client import (
+    RemoteState,
+    run_clients_in_local_servers_sync,
+)
 
 if TYPE_CHECKING:
     from checkers.state import Action, State
@@ -88,8 +91,9 @@ class ComputerPlayer(RemoteState):
 
 def run() -> None:
     """Run ComputerPlayer clients in local servers."""
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run_clients_in_local_servers_sync(ComputerPlayer)
 
 
-print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
-run()
+if __name__ == "__main__":
+    run()

@@ -15,10 +15,12 @@ import math
 from collections import Counter
 from typing import TYPE_CHECKING, TypeVar
 
-from machine_client import RemoteState, run_clients_in_local_servers_sync
-from minimax import Minimax, MinimaxResult, Player
-
 from checkers.state import Action, State
+from checkers_computer_players.machine_client import (
+    RemoteState,
+    run_clients_in_local_servers_sync,
+)
+from checkers_computer_players.minimax import Minimax, MinimaxResult, Player
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -116,9 +118,9 @@ class MinimaxPlayer(RemoteState):
 
 def run() -> None:
     """Run MinimaxPlayer clients in local server."""
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run_clients_in_local_servers_sync(MinimaxPlayer)
 
 
 if __name__ == "__main__":
-    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run()

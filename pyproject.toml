@@ -54,6 +54,7 @@ version = {attr = "checkers.game.__version__"}
 
 [project.gui-scripts]
 checkers_game = "checkers.game:cli_run"
+checkers_game_minimax_ai_client = "checkers_computer_players.minimax_ai:run"
 
 [project.optional-dependencies]
 tests = [
