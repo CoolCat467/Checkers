@@ -16,7 +16,7 @@ from math import inf as infinity
 from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable
+    from collections.abc import Callable, Iterable
 
 
 class Player(IntEnum):
@@ -107,6 +107,7 @@ class Minimax(ABC, Generic[State, Action]):
 
         current_player = cls.player(state)
         value: int | float
+        best: Callable[[int | float, int | float], int | float]
         if current_player == Player.MAX:
             value = -infinity
             best = max
@@ -115,7 +116,7 @@ class Minimax(ABC, Generic[State, Action]):
             best = min
         elif current_player == Player.CHANCE:
             value = 0
-            best = sum
+            best = sum  # type: ignore[assignment]
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
 
@@ -156,6 +157,7 @@ class Minimax(ABC, Generic[State, Action]):
 
         current_player = cls.player(state)
         value: int | float
+        best: Callable[[int | float, int | float], int | float]
         if current_player == Player.MAX:
             value = -infinity
             best = max
@@ -168,7 +170,7 @@ class Minimax(ABC, Generic[State, Action]):
             set_idx = 1
         elif current_player == Player.CHANCE:
             value = 0
-            best = sum
+            best = sum  # type: ignore[assignment]
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
 

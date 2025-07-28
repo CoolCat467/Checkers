@@ -12,15 +12,23 @@ __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
 import math
+import random
+import time
+import traceback
 from collections import Counter
-from typing import TYPE_CHECKING, TypeVar
+from math import inf as infinity
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
 from checkers.state import Action, State
 from checkers_computer_players.machine_client import (
     RemoteState,
     run_clients_in_local_servers_sync,
 )
-from checkers_computer_players.minimax import Minimax, MinimaxResult, Player
+from checkers_computer_players.minimax import (
+    Minimax,
+    MinimaxResult,
+    Player,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
@@ -32,10 +40,200 @@ T = TypeVar("T")
 # 1 = True  = AI (Us) = MAX = 1, 3
 
 
-class CheckersMinimax(Minimax[State, Action]):
+class MinimaxWithID(Minimax[State, Action]):
+    """Minimax with ID."""
+
+    __slots__ = ()
+
+    # Simple Transposition Table:
+    # key → (stored_depth, value, action, flag)
+    # flag: 'EXACT', 'LOWERBOUND', 'UPPERBOUND'
+    TRANSPOSITION_TABLE: ClassVar[
+        dict[int, tuple[int, MinimaxResult[Any], str]]
+    ] = {}
+
+    @classmethod
+    def _transposition_table_lookup(
+        cls,
+        state_hash: int,
+        depth: int,
+        alpha: float,
+        beta: float,
+    ) -> MinimaxResult[Action] | None:
+        """Lookup in transposition_table.  Return (value, action) or None."""
+        entry = cls.TRANSPOSITION_TABLE.get(state_hash)
+        if entry is None:
+            return None
+
+        stored_depth, result, flag = entry
+        # only use if stored depth is deep enough
+        if stored_depth >= depth and (
+            (flag == "EXACT")
+            or (flag == "LOWERBOUND" and result.value > alpha)
+            or (flag == "UPPERBOUND" and result.value < beta)
+        ):
+            return result
+        return None
+
+    @classmethod
+    def _transposition_table_store(
+        cls,
+        state_hash: int,
+        depth: int,
+        result: MinimaxResult[Action],
+        alpha: float,
+        beta: float,
+    ) -> None:
+        """Store in transposition_table with proper flag."""
+        if result.value <= alpha:
+            flag = "UPPERBOUND"
+        elif result.value >= beta:
+            flag = "LOWERBOUND"
+        else:
+            flag = "EXACT"
+        cls.TRANSPOSITION_TABLE[state_hash] = (depth, result, flag)
+
+    @classmethod
+    def hash_state(cls, state: State) -> int:
+        """Your state-to-hash function.  Must be consistent."""
+        # For small games you might do: return hash(state)
+        # For larger, use Zobrist or custom.
+        return hash(state)
+
+    @classmethod
+    def alphabeta_transposition_table(
+        cls,
+        state: State,
+        depth: int = 5,
+        a: int | float = -infinity,
+        b: int | float = infinity,
+    ) -> MinimaxResult[Action]:
+        """AlphaBeta with transposition table."""
+        if cls.terminal(state):
+            return MinimaxResult(cls.value(state), None)
+        if depth <= 0:
+            # Choose a random action
+            # No need for cryptographic secure random
+            return MinimaxResult(
+                cls.value(state),
+                random.choice(tuple(cls.actions(state))),  # noqa: S311
+            )
+        next_down = depth - 1
+
+        state_h = cls.hash_state(state)
+        # 1) Try transposition_table lookup
+        transposition_table_hit = cls._transposition_table_lookup(
+            state_h,
+            depth,
+            a,
+            b,
+        )
+        if transposition_table_hit is not None:
+            return transposition_table_hit
+        next_down = None if depth is None else depth - 1
+
+        current_player = cls.player(state)
+        value: int | float
+
+        best_action: Action | None = None
+
+        if current_player == Player.MAX:
+            value = -infinity
+            for action in cls.actions(state):
+                child = cls.alphabeta_transposition_table(
+                    cls.result(state, action),
+                    next_down,
+                    a,
+                    b,
+                )
+                if child.value > value:
+                    value = child.value
+                    best_action = action
+                a = max(a, value)
+                if a >= b:
+                    break
+
+        elif current_player == Player.MIN:
+            value = infinity
+            for action in cls.actions(state):
+                child = cls.alphabeta_transposition_table(
+                    cls.result(state, action),
+                    next_down,
+                    a,
+                    b,
+                )
+                if child.value < value:
+                    value = child.value
+                    best_action = action
+                b = min(b, value)
+                if b <= a:
+                    break
+        else:
+            raise NotImplementedError(f"{current_player = }")
+
+        # 2) Store in transposition_table
+        result = MinimaxResult(value, best_action)
+        cls._transposition_table_store(state_h, depth, result, a, b)
+        return result
+
+    @classmethod
+    def iterative_deepening(
+        cls,
+        state: State,
+        start_depth: int = 5,
+        max_depth: int = 7,
+        time_limit_ns: int | float | None = None,
+    ) -> MinimaxResult[Action]:
+        """Run alpha-beta with increasing depth up to max_depth.
+
+        If time_limit_ns is None, do all depths. Otherwise stop early.
+        """
+        best_result: MinimaxResult[Action] = MinimaxResult(0, None)
+        start_t = time.perf_counter_ns()
+
+        for depth in range(start_depth, max_depth + 1):
+            # clear or keep transposition_table between depths? often you keep it
+            # cls.TRANSPOSITION_TABLE.clear()
+
+            result = cls.alphabeta_transposition_table(
+                state,
+                depth,
+            )
+            best_result = result
+
+            # Optional: if you find a forced win/loss you can stop
+            if abs(result.value) == cls.HIGHEST:
+                print(f"reached terminal state stop {depth=}")
+                break
+
+            # optional time check
+            if (
+                time_limit_ns
+                and (time.perf_counter_ns() - start_t) > time_limit_ns
+            ):
+                print(
+                    f"break from time expired {depth=} ({(time.perf_counter_ns() - start_t) / 1e9} seconds elaped)",
+                )
+                break
+            print(
+                f"{depth=} ({(time.perf_counter_ns() - start_t) / 1e9} seconds elaped)",
+            )
+
+        return best_result
+
+
+# Minimax[State, Action]
+class CheckersMinimax(MinimaxWithID):
     """Minimax Algorithm for Checkers."""
 
     __slots__ = ()
+
+    @classmethod
+    def hash_state(cls, state: State) -> int:
+        """Return state hash value."""
+        # For small games you might do: return hash(state)
+        # For larger, use Zobrist or custom.
+        return hash((state.size, tuple(state.pieces.items()), state.turn))
 
     @staticmethod
     def value(state: State) -> int | float:
@@ -109,7 +307,13 @@ class MinimaxPlayer(RemoteState):
         ##    self.state, 4, 5
         ##)
         ##value, action = CheckersMinimax.minimax(self.state, 4)
-        value, action = CheckersMinimax.alphabeta(self.state, 4)
+        ##value, action = CheckersMinimax.alphabeta(self.state, 4)
+        value, action = CheckersMinimax.iterative_deepening(
+            self.state,
+            4,
+            20,
+            int(5 * 1e9),
+        )
         if action is None:
             raise ValueError("action is None")
         print(f"{value = }")
@@ -119,7 +323,10 @@ class MinimaxPlayer(RemoteState):
 def run() -> None:
     """Run MinimaxPlayer clients in local server."""
     print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
-    run_clients_in_local_servers_sync(MinimaxPlayer)
+    try:
+        run_clients_in_local_servers_sync(MinimaxPlayer)
+    except Exception:
+        traceback.print_exc()
 
 
 if __name__ == "__main__":
