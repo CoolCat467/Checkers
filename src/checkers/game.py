@@ -752,7 +752,7 @@ class GameBoard(sprite.Sprite):
             location=location,
         )
         self.add_component(piece)
-        group.add(piece)  # type: ignore[arg-type]
+        group.add(piece)
 
         self.pieces[position] = piece_type
         assert isinstance(piece.name, str)
@@ -768,7 +768,7 @@ class GameBoard(sprite.Sprite):
 
         tile = Tile(color, position, name, self.get_tile_location(position))
         self.add_component(tile)
-        group.add(tile)  # type: ignore[arg-type]
+        group.add(tile)
 
         assert isinstance(tile.name, str)
         return tile.name

@@ -66,7 +66,7 @@ class ElementList(sprite.Sprite):
     def add_element(self, element: Element) -> None:
         """Add element to this list."""
         group = self.groups()[-1]
-        group.add(element)  # type: ignore[arg-type]
+        group.add(element)
         self.add_component(element)
         self._order.append(element.name)
 

@@ -70,6 +70,7 @@ class BaseVector:
         # typing issues
         def __iter__(self) -> Iterator[float]: ...  # noqa: D105
         def __getitem__(self, value: int) -> float: ...  # noqa: D105
+        def __len__(self) -> int: ...  # noqa: D105
 
     @classmethod
     def from_iter(cls: type[Self], iterable: Iterable[float]) -> Self:

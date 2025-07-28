@@ -489,7 +489,7 @@ class MovementComponent(Component):
         """Move distance in heading direction."""
         sprite = cast("Sprite", self.get_component("sprite"))
         change = self.heading * distance
-        if change:
+        if change.dot(change) > 0:
             sprite.location += change
             sprite.dirty = 1
 

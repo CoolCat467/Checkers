@@ -11,7 +11,7 @@ from checkers.statemachine import (
 
 
 def test_state() -> None:
-    state = State("waffle_time")
+    state = State[StateMachine]("waffle_time")
 
     assert state.name == "waffle_time"
 
@@ -23,12 +23,12 @@ def test_state() -> None:
 
 
 def test_state_repr() -> None:
-    state = State("waffle_time")
+    state = State[StateMachine]("waffle_time")
     assert repr(state) == "State('waffle_time')"
 
 
 def test_async_state() -> None:
-    state = AsyncState("waffle_time")
+    state = AsyncState[AsyncStateMachine]("waffle_time")
 
     assert state.name == "waffle_time"
 
@@ -43,17 +43,17 @@ def test_state_machine_add() -> None:
     machine = StateMachine()
     add_actions_run = False
 
-    class TestState(State):
+    class TestState(State[StateMachine]):
         def add_actions(self) -> None:
             nonlocal add_actions_run
             add_actions_run = True
 
     machine.add_state(TestState("test"))
-    bob = State("bob")
+    bob = State[StateMachine]("bob")
     with pytest.raises(RuntimeError, match="State has no statemachine bound"):
-        assert bob.machine
+        assert bob.machine is not None
     with pytest.raises(TypeError, match="is not an instance of State!"):
-        machine.add_state(AsyncState("test"))
+        machine.add_state(AsyncState("test"))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="is not a registered State."):
         machine.remove_state("waffle")
     machine.add_state(bob)
@@ -67,7 +67,7 @@ def test_state_machine_add() -> None:
         gc.collect()
 
     with pytest.raises(RuntimeError, match="State has no statemachine bound"):
-        assert bob.machine
+        assert bob.machine is not None
 
 
 def test_state_machine_think() -> None:
@@ -89,7 +89,7 @@ def test_state_machine_think() -> None:
         machine.set_state("bob")
     machine.add_state(State("bob"))
 
-    class ToBob(State):
+    class ToBob(State[StateMachine]):
         __slots__ = ()
 
         def check_conditions(self) -> str:
@@ -105,11 +105,11 @@ async def test_async_state_machine_add() -> None:
     machine = AsyncStateMachine()
 
     machine.add_state(AsyncState("test"))
-    bob = AsyncState("bob")
+    bob = AsyncState[AsyncStateMachine]("bob")
     with pytest.raises(RuntimeError, match="State has no statemachine bound"):
-        assert bob.machine
+        assert bob.machine is not None
     with pytest.raises(TypeError, match="is not an instance of AsyncState!"):
-        machine.add_state(State("test"))
+        machine.add_state(State("test"))  # type: ignore[arg-type]
     with pytest.raises(ValueError, match="is not a registered AsyncState."):
         machine.remove_state("waffle")
     machine.add_state(bob)
@@ -122,7 +122,7 @@ async def test_async_state_machine_add() -> None:
         gc.collect()
 
     with pytest.raises(RuntimeError, match="State has no statemachine bound"):
-        assert bob.machine
+        assert bob.machine is not None
 
 
 @pytest.mark.trio
@@ -130,7 +130,7 @@ async def test_async_state_machine_think() -> None:
     machine = AsyncStateMachine()
     await machine.think()
     machine.add_states(())
-    jerald = AsyncState("jerald")
+    jerald = AsyncState[AsyncStateMachine]("jerald")
     machine.add_states((jerald,))
     machine.add_state(AsyncState("bob"))
     await machine.set_state("jerald")
@@ -145,7 +145,7 @@ async def test_async_state_machine_think() -> None:
         await machine.set_state("bob")
     machine.add_state(AsyncState("bob"))
 
-    class ToBob(AsyncState):
+    class ToBob(AsyncState[AsyncStateMachine]):
         __slots__ = ()
 
         async def check_conditions(self) -> str:
