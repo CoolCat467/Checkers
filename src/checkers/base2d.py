@@ -143,7 +143,7 @@ def get_colors(
     colors = set()
     for x in range(width):
         for y in range(height):
-            color = cast(tuple[int, int, int], surface.get_at((x, y))[:3])
+            color = cast("tuple[int, int, int]", surface.get_at((x, y))[:3])
             if color not in colors:
                 colors.add(color)
     return colors
@@ -178,7 +178,7 @@ def replace_color(
     surface.lock()
     for x in range(w):
         for y in range(h):
-            data = cast(tuple[int, int, int, int], surface.get_at((x, y)))
+            data = cast("tuple[int, int, int, int]", surface.get_at((x, y)))
             if data[:3] == targetcolor:
                 a = data[3]
                 surface.set_at((x, y), pygame.Color(r, g, b, a))

@@ -457,7 +457,7 @@ class GameServer(network.Server):
 
         # Look up multicast group address in name server and find out IP version
         addrinfo = (await trio.socket.getaddrinfo(ADVERTISEMENT_IP, None))[0]
-        send_to_ip = addrinfo[4][0]
+        send_to_ip = str(addrinfo[4][0])
 
         with trio.socket.socket(
             family=trio.socket.AF_INET,  # IPv4

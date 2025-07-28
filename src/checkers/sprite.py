@@ -262,14 +262,14 @@ class ImageComponent(ComponentManager):
 
     def set_image(self, identifier: int | str) -> None:
         """Set sprite component's image by identifier."""
-        outline = cast(OutlineComponent, self.get_component("outline"))
+        outline = cast("OutlineComponent", self.get_component("outline"))
         if outline.active and outline.mod not in str(identifier):
             identifier = outline.get_outline(identifier)
 
         if identifier == self.set_surface:
             return
 
-        sprite = cast(Sprite, self.manager.get_component("sprite"))
+        sprite = cast("Sprite", self.manager.get_component("sprite"))
         sprite.image = self.get_image(identifier)
         sprite.mask = self.get_mask(identifier)
 
@@ -308,7 +308,7 @@ class OutlineComponent(Component):
 
     def set_color(self, color: Color | None) -> None:
         """Set color. If None, disable, otherwise enable."""
-        manager = cast(ImageComponent, self.manager)
+        manager = cast("ImageComponent", self.manager)
         prev = self.active
         self.__active = color is not None
         if color is None:
@@ -332,7 +332,7 @@ class OutlineComponent(Component):
 
     def save_outline(self, identifier: str | int) -> None:
         """Save outlined version of given identifier image."""
-        manager = cast(ImageComponent, self.manager)
+        manager = cast("ImageComponent", self.manager)
 
         outlined = self.get_outline_descriptor(identifier)
         if manager.image_exists(outlined):
@@ -385,7 +385,7 @@ class OutlineComponent(Component):
         color: Color | tuple[int, int, int],
     ) -> None:
         """Precalculate all images outlined."""
-        manager = cast(ImageComponent, self.manager)
+        manager = cast("ImageComponent", self.manager)
 
         for image in manager.list_images():
             self.precalculate_outline(image, color)
@@ -411,7 +411,7 @@ class AnimationComponent(Component):
         super().__init__("animation")
 
         def default() -> Iterator[int | str | None]:
-            manager = cast(ImageComponent, self.manager)
+            manager = cast("ImageComponent", self.manager)
             while True:
                 yield manager.set_surface
 
@@ -440,7 +440,7 @@ class AnimationComponent(Component):
             for _ in range(int(updates)):
                 new = self.fetch_controller_new_state()
         if new is not None:
-            manager = cast(ImageComponent, self.manager)
+            manager = cast("ImageComponent", self.manager)
             manager.set_image(new)
 
     def bind_handlers(self) -> None:
@@ -479,7 +479,7 @@ class MovementComponent(Component):
 
     def point_toward(self, position: Iterable[int | float]) -> None:
         """Change self.heading to point toward a given position."""
-        sprite = cast(Sprite, self.get_component("sprite"))
+        sprite = cast("Sprite", self.get_component("sprite"))
         self.heading = Vector2.from_points(
             sprite.location,
             position,
@@ -487,9 +487,9 @@ class MovementComponent(Component):
 
     def move_heading_distance(self, distance: float) -> None:
         """Move distance in heading direction."""
-        sprite = cast(Sprite, self.get_component("sprite"))
+        sprite = cast("Sprite", self.get_component("sprite"))
         change = self.heading * distance
-        if change:
+        if change.dot(change) > 0:
             sprite.location += change
             sprite.dirty = 1
 
@@ -527,7 +527,7 @@ class TargetingComponent(Component):
 
     def update_heading(self) -> None:
         """Update the heading of the movement component."""
-        movement = cast(MovementComponent, self.get_component("movement"))
+        movement = cast("MovementComponent", self.get_component("movement"))
         to_dest = self.to_destination()
         # If magnitude is zero
         if to_dest @ to_dest == 0:
@@ -553,7 +553,7 @@ class TargetingComponent(Component):
 
     def to_destination(self) -> Vector2:
         """Return vector of self.location to self.destination."""
-        sprite = cast(Sprite, self.get_component("sprite"))
+        sprite = cast("Sprite", self.get_component("sprite"))
         return Vector2.from_points(sprite.location, self.destination)
 
     async def move_destination_time(self, time_passed: float) -> None:
@@ -563,7 +563,7 @@ class TargetingComponent(Component):
             return
 
         sprite, movement = cast(
-            tuple[Sprite, MovementComponent],
+            "tuple[Sprite, MovementComponent]",
             self.get_components(("sprite", "movement")),
         )
 
@@ -642,7 +642,7 @@ class DragClickEventComponent(Component):
 
         if not self.manager_exists:
             return
-        sprite = cast(Sprite, self.get_component("sprite"))
+        sprite = cast("Sprite", self.get_component("sprite"))
 
         pos = event.data["pos"]
         button = event.data["button"]

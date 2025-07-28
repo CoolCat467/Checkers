@@ -18,7 +18,10 @@ __ver_patch__ = 0
 import random
 from typing import TYPE_CHECKING, TypeVar
 
-from machine_client import RemoteState, run_clients_in_local_servers_sync
+from checkers_computer_players.machine_client import (
+    RemoteState,
+    run_clients_in_local_servers_sync,
+)
 
 if TYPE_CHECKING:
     from checkers.state import Action, Pos, State
@@ -36,18 +39,18 @@ def turn(state: State) -> Action:
     for piece_pos, piece_type in state.get_pieces():
         # If the tile's piece is one of ours,
         if piece_type in {state.turn, state.turn + 2}:
-            action_set = state.get_actions_set(piece_pos)
+            jumps = state.get_jumps(piece_pos)
             # If this our piece can make jumps,
-            if action_set.jumps:
+            if jumps:
                 # Get the number of jumps each end point would make
-                v = [len(v) for v in list(action_set.jumps.values())]
+                v = [len(v) for v in list(jumps.values())]
                 # Get the end point with the most jumps
-                k = list(action_set.jumps.keys())[v.index(max(v))]
+                k = list(jumps.keys())[v.index(max(v))]
                 # Store the target tile id and the end point with the most jumps in dictionary
                 # with the number of jumps that moves makes
                 jump_tiles[max(v)] = [piece_pos, k]
             # Get the moves our piece can make
-            moves = action_set.moves
+            moves = state.get_moves(piece_pos)
             # If our piece can move,
             if moves:
                 # Add it's moves to the dictionary of movable pieces at key of target tile id
@@ -117,9 +120,9 @@ class MaxYJumperPlayer(RemoteState):
 
 def run() -> None:
     """Run MaxYJumperPlayer clients in local servers."""
+    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run_clients_in_local_servers_sync(MaxYJumperPlayer)
 
 
 if __name__ == "__main__":
-    print(f"{__title__} v{__version__}\nProgrammed by {__author__}.\n")
     run()

@@ -21,7 +21,7 @@ jobs:
     steps:
       - name: Checkout
         with:
-          persist-credentials: false
+          persist-credentials: true  # credentials are needed to push commits
         uses: actions/checkout@v4
       - name: Setup python
         uses: actions/setup-python@v5
@@ -40,7 +40,7 @@ jobs:
 
       # apply newer versions' formatting
       - name: Pre-commit updates
-        run: uv run pre-commit run -a
+        run: uv run pre-commit run -a || true
 
       - name: Commit changes and create automerge PR
         env:

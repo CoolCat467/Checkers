@@ -17,7 +17,6 @@
 #     You should have received a copy of the GNU General Public License
 #     along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-
 if __name__ == "__main__":
     from checkers.game import cli_run as cli_run
 

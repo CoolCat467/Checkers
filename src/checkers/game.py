@@ -39,6 +39,7 @@ from typing import TYPE_CHECKING, Any, Final, TypeVar
 
 import pygame
 import trio
+from libcomponent.async_clock import Clock
 from libcomponent.component import (
     Component,
     ComponentManager,
@@ -51,7 +52,6 @@ from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
 from pygame.rect import Rect
 
 from checkers import base2d, element_list, objects, sprite
-from checkers.async_clock import Clock
 from checkers.client import GameClient, read_advertisements
 from checkers.multi_inherit import ConnectionElement, ReturnElement
 from checkers.network_shared import DEFAULT_PORT, Pos
@@ -451,6 +451,7 @@ class GameBoard(sprite.Sprite):
                 "game_winner": self.handle_game_winner,
                 "fire_next_animation": self.handle_fire_next_animation,
                 "gameboard_piece_moved": self.handle_piece_moved_event,
+                "gameboard_update_player_text": self.handle_update_player_text,
             },
         )
 
@@ -483,6 +484,13 @@ class GameBoard(sprite.Sprite):
     ) -> None:
         """Handle piece finishing one part of it's movement animation."""
         await self.raise_event(Event("fire_next_animation", None))
+
+    async def handle_update_player_text(
+        self,
+        event: Event[None],
+    ) -> None:
+        """Handle update_player_text event."""
+        raise NotImplementedError()
 
     async def handle_create_piece_event(
         self,
@@ -745,7 +753,7 @@ class GameBoard(sprite.Sprite):
             location=location,
         )
         self.add_component(piece)
-        group.add(piece)  # type: ignore[arg-type]
+        group.add(piece)
 
         self.pieces[position] = piece_type
         assert isinstance(piece.name, str)
@@ -761,7 +769,7 @@ class GameBoard(sprite.Sprite):
 
         tile = Tile(color, position, name, self.get_tile_location(position))
         self.add_component(tile)
-        group.add(tile)  # type: ignore[arg-type]
+        group.add(tile)
 
         assert isinstance(tile.name, str)
         return tile.name
