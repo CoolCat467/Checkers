@@ -74,18 +74,45 @@ tools = [
     "attrs>=25.3.0",
 ]
 
+[tool.hatch.build.targets.wheel]
+packages = ["src/checkers", "src/checkers_computer_players"]
+
 [tool.hatch.build.targets.wheel.hooks.mypyc]
 dependencies = [
     "hatch-mypyc>=0.16.0",
-    "mypy>=1.14.1",
+    "mypy>=1.17.0",
 ]
 require-runtime-dependencies = true
-exclude = [
-    "src/checkers/vector.py",
-    "src/checkers/namedtuple_mod.py",
-    "src/checkers/multi_inherit.py",
-    "src/checkers/statemachine.py",
+include = [
+    "src/checkers/base2d.py",
+    "src/checkers/network_shared.py",
+    "src/checkers/sound.py",
+    "src/checkers/state.py",
+    "src/checkers/server_state.py",
+    "src/checkers_computer_players/minimax.py",
+    "src/checkers_computer_players/checkers_minimax.py",
 ]
+exclude = [
+    "src/checkers/client.py",
+    "src/checkers/element_list.py",
+    "src/checkers/game.py",
+    "src/checkers/multi_inherit.py",
+    "src/checkers/namedtuple_mod.py",
+    "src/checkers/objects.py",
+    "src/checkers/server.py",
+    "src/checkers/sprite.py",
+    "src/checkers/statemachine.py",
+    "src/checkers/vector.py",
+    "src/checkers_computer_players/example_ai.py",
+    "src/checkers_computer_players/max_y_jumper_ai.py",
+    "src/checkers_computer_players/machine_client.py",
+    "src/checkers_computer_players/minimax_ai.py",
+]
+
+[tool.hatch.build.targets.wheel.hooks.mypyc.options]
+# 2025-07-28 Mypy v1.17.0 Compilation fails if I increase this value
+opt_level = "1"
+#multi_file = true
 
 [tool.uv]
 package = true
