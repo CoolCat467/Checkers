@@ -55,6 +55,7 @@ path = "src/checkers/game.py"
 
 [project.gui-scripts]
 checkers_game = "checkers.game:cli_run"
+checkers_game_server = "checkers.server:cli_run"
 checkers_game_minimax_ai_client = "checkers_computer_players.minimax_ai:run"
 
 [project.optional-dependencies]
@@ -64,12 +65,13 @@ tests = [
     "pytest-trio>=0.8.0",
     "coverage>=7.2.5",
     "uv>=0.5.21",
-    "mypy>=1.14.1",
 ]
 tools = [
-    'black>=24.10.0; implementation_name == "cpython"',
+    "mypy>=1.17.0",
     "ruff>=0.9.2",
     "codespell>=2.3.0",
+    "pre-commit>=4.2.0",
+    "attrs>=25.3.0",
 ]
 
 [tool.hatch.build.targets.wheel.hooks.mypyc]
