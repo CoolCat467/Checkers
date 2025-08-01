@@ -109,9 +109,8 @@ exclude = [
     "src/checkers_computer_players/minimax_ai.py",
 ]
 
-[tool.hatch.build.targets.wheel.hooks.mypyc.options]
-# 2025-07-28 Mypy v1.17.0 Compilation fails if I increase this value
-opt_level = "1"
+#[tool.hatch.build.targets.wheel.hooks.mypyc.options]
+#opt_level = "1"
 #multi_file = true
 
 [tool.uv]

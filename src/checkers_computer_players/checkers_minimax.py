@@ -132,7 +132,6 @@ class MinimaxWithTT(Minimax[State, Action]):
                 self.value(state),
                 random.choice(tuple(self.actions(state))),  # noqa: S311
             )
-        next_down = depth - 1
 
         state_h = self.hash_state(state)
         # 1) Try transposition_table lookup
@@ -144,7 +143,8 @@ class MinimaxWithTT(Minimax[State, Action]):
         )
         if transposition_table_hit is not None:
             return transposition_table_hit
-        next_down = None if depth is None else depth - 1
+
+        next_down = depth - 1
 
         current_player = self.player(state)
         value: float
