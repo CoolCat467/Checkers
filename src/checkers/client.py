@@ -64,11 +64,12 @@ async def read_advertisements(
         # SO_REUSEADDR: allows binding to port potentially already in use
         # Allow multiple copies of this program on one machine
         # (not strictly needed)
-        udp_socket.setsockopt(
-            trio.socket.SOL_SOCKET,
-            trio.socket.SO_REUSEADDR,
-            1,
-        )
+        if hasattr(trio.socket, "SO_REUSEADDR"):
+            udp_socket.setsockopt(
+                trio.socket.SOL_SOCKET,
+                trio.socket.SO_REUSEADDR,
+                1,
+            )
 
         await udp_socket.bind(("", ADVERTISEMENT_PORT))
 
@@ -101,7 +102,15 @@ async def read_advertisements(
                 mreq,
             )
         else:  # IPv6
-            mreq = group_bin + struct.pack("@I", 0)
+            # print(
+            #     "\n".join(
+            #         f"{iface_index}: {iface_name}"
+            #         for iface_index, iface_name in trio.socket.if_nameindex()
+            #     )
+            # )
+            # iface_index = socket.if_nametoindex(iface_name)
+            iface_index = 0
+            mreq = group_bin + struct.pack("@I", iface_index)
             udp_socket.setsockopt(
                 trio.socket.IPPROTO_IPV6,
                 trio.socket.IPV6_JOIN_GROUP,
