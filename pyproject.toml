@@ -1,6 +1,6 @@
 [build-system]
-requires = ["setuptools >= 64"]
-build-backend = "setuptools.build_meta"
+requires = ["hatchling >= 1.20.0"]
+build-backend = "hatchling.build"
 
 [project]
 name = "checkers"
@@ -46,8 +46,8 @@ dependencies = [
     "exceptiongroup; python_version < '3.11'",
 ]
 
-[tool.setuptools.dynamic]
-version = {attr = "checkers.game.__version__"}
+[tool.hatch.version]
+path = "src/checkers/game.py"
 
 [project.urls]
 "Source" = "https://github.com/CoolCat467/Checkers"
@@ -74,8 +74,44 @@ tools = [
     "attrs>=25.3.0",
 ]
 
-[tool.setuptools.package-data]
-checkers = ["py.typed", "data/*"]
+[tool.hatch.build.targets.wheel]
+packages = ["src/checkers", "src/checkers_computer_players"]
+
+[tool.hatch.build.targets.wheel.hooks.mypyc]
+dependencies = [
+    "hatch-mypyc>=0.16.0",
+    "mypy>=1.17.0",
+]
+require-runtime-dependencies = true
+include = [
+    "src/checkers/base2d.py",
+    "src/checkers/network_shared.py",
+    "src/checkers/sound.py",
+    "src/checkers/state.py",
+    "src/checkers/server_state.py",
+    "src/checkers_computer_players/minimax.py",
+    "src/checkers_computer_players/checkers_minimax.py",
+]
+exclude = [
+    "src/checkers/client.py",
+    "src/checkers/element_list.py",
+    "src/checkers/game.py",
+    "src/checkers/multi_inherit.py",
+    "src/checkers/namedtuple_mod.py",
+    "src/checkers/objects.py",
+    "src/checkers/server.py",
+    "src/checkers/sprite.py",
+    "src/checkers/statemachine.py",
+    "src/checkers/vector.py",
+    "src/checkers_computer_players/example_ai.py",
+    "src/checkers_computer_players/max_y_jumper_ai.py",
+    "src/checkers_computer_players/machine_client.py",
+    "src/checkers_computer_players/minimax_ai.py",
+]
+
+#[tool.hatch.build.targets.wheel.hooks.mypyc.options]
+#opt_level = "1"
+#multi_file = true
 
 [tool.uv]
 package = true
