@@ -271,7 +271,7 @@ class CheckersMinimax(MinimaxWithID):
     @staticmethod
     def result(state: State, action: Action) -> State:
         """Return new state after performing given action on given current state."""
-        return state.preform_action(action)
+        return state.perform_action(action)
 
     @classmethod
     def adaptive_depth_minimax(
@@ -300,9 +300,9 @@ class MinimaxPlayer(RemoteState):
 
     __slots__ = ()
 
-    async def preform_turn(self) -> Action:
+    async def perform_turn(self) -> Action:
         """Perform turn."""
-        print("preform_turn")
+        print("perform_turn")
         ##value, action = CheckersMinimax.adaptive_depth_minimax(
         ##    self.state, 4, 5
         ##)
