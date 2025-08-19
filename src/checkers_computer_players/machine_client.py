@@ -157,7 +157,7 @@ class MachineClient(ComponentManager):
 
     __slots__ = ("running",)
 
-    def __init__(self, remote_state_class: type[RemoteState]) -> None:
+    def __init__(self, remote_state_class: type[BaseRemoteState]) -> None:
         """Initialize machine client."""
         super().__init__("machine_client")
 
@@ -195,7 +195,7 @@ class MachineClient(ComponentManager):
 async def run_client(
     host: str,
     port: int,
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
     connected: set[tuple[str, int]],
 ) -> None:
     """Run machine client and raise tick events."""
@@ -229,14 +229,14 @@ async def run_client(
 def run_client_sync(
     host: str,
     port: int,
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run client and connect to server at host:port."""
     trio.run(run_client, host, port, remote_state_class, set())
 
 
 async def run_clients_in_local_servers(
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run clients in local servers."""
     connected: set[tuple[str, int]] = set()
@@ -266,7 +266,7 @@ async def run_clients_in_local_servers(
 
 
 def run_clients_in_local_servers_sync(
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run clients in local servers."""
     trio.run(run_clients_in_local_servers, remote_state_class)
