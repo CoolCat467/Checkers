@@ -46,7 +46,7 @@ class NamedTupleMeta(type):
             module=ns["__module__"],
         )
         nm_tpl.__bases__ = bases
-        if typing.Generic in bases:  # type: ignore[comparison-overlap]
+        if typing.Generic in bases:
             class_getitem = typing._generic_class_getitem  # type: ignore[attr-defined]
             nm_tpl.__class_getitem__ = classmethod(class_getitem)
         # update from user namespace without overriding special namedtuple attributes
@@ -57,7 +57,7 @@ class NamedTupleMeta(type):
                 )
             if key not in typing._special and key not in nm_tpl._fields:  # type: ignore[attr-defined]
                 setattr(nm_tpl, key, ns[key])
-        if typing.Generic in bases:  # type: ignore[comparison-overlap]
+        if typing.Generic in bases:
             nm_tpl.__init_subclass__()
         return nm_tpl
 
