@@ -1308,7 +1308,7 @@ class PlayJoiningState(GameState):
         )
         return_button = ReturnElement("return_button", return_font)
         return_button.outline = RED
-        return_button.location = (SCREEN_SIZE[0] // 2, 10)
+        return_button.location = (SCREEN_SIZE[0] // 2, 30)
         connections.add_element(return_button)
 
         self.manager.register_handlers(
