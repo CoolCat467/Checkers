@@ -123,7 +123,7 @@ class State:
         for y in range(h):
             line = []
             for x in range(w):
-                if (x + y + 1) % 2 != 0:
+                if (x + y + 1) & 1 != 0:
                     # line.append("_")
                     line.append(" ")
                     continue
