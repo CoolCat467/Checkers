@@ -13,10 +13,12 @@ import random
 from abc import ABC, abstractmethod
 from enum import IntEnum, auto
 from math import inf as infinity
-from typing import TYPE_CHECKING, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, NamedTuple, TypeVar
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
+
+    from mypy_extensions import u8
 
 
 class Player(IntEnum):
@@ -35,7 +37,7 @@ Action = TypeVar("Action")
 class MinimaxResult(NamedTuple, Generic[Action]):
     """Minimax Result."""
 
-    value: int | float
+    value: float
     action: Action | None
 
 
@@ -44,12 +46,12 @@ class Minimax(ABC, Generic[State, Action]):
 
     __slots__ = ()
 
-    LOWEST = -1
-    HIGHEST = 1
+    LOWEST: ClassVar[float] = -1.0
+    HIGHEST: ClassVar[float] = 1.0
 
     @classmethod
     @abstractmethod
-    def value(cls, state: State) -> int | float:
+    def value(cls, state: State) -> float:
         """Return the value of a given game state.
 
         Should be in range [cls.LOWEST, cls.HIGHEST].
@@ -91,7 +93,7 @@ class Minimax(ABC, Generic[State, Action]):
     def minimax(
         cls,
         state: State,
-        depth: int | None = 5,
+        depth: u8 | None = 5,
     ) -> MinimaxResult[Action]:
         """Return minimax result best action for a given state for the current player."""
         if cls.terminal(state):
@@ -106,8 +108,8 @@ class Minimax(ABC, Generic[State, Action]):
         next_down = None if depth is None else depth - 1
 
         current_player = cls.player(state)
-        value: int | float
-        best: Callable[[int | float, int | float], int | float]
+        value: float
+        best: Callable[[float, float], float]
         if current_player == Player.MAX:
             value = -infinity
             best = max
@@ -115,7 +117,7 @@ class Minimax(ABC, Generic[State, Action]):
             value = infinity
             best = min
         elif current_player == Player.CHANCE:
-            value = 0
+            value = 0.0
             best = sum  # type: ignore[assignment]
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
@@ -123,8 +125,9 @@ class Minimax(ABC, Generic[State, Action]):
         best_action: Action | None = None
         for action in cls.actions(state):
             result = cls.minimax(cls.result(state, action), next_down)
-            result_value = result.value
+            result_value: float = result.value
             if current_player == Player.CHANCE:
+                result_value = float(result_value)
                 # Probability[action]
                 result_value *= cls.probability(action)
             new_value = best(value, result_value)
@@ -137,9 +140,9 @@ class Minimax(ABC, Generic[State, Action]):
     def alphabeta(
         cls,
         state: State,
-        depth: int | None = 5,
-        a: int | float = -infinity,
-        b: int | float = infinity,
+        depth: u8 | None = 5,
+        a: float = -infinity,
+        b: float = infinity,
     ) -> MinimaxResult[Action]:
         """Return minimax alphabeta pruning result best action for given current state."""
         # print(f'alphabeta {depth = } {a = } {b = }')
@@ -156,8 +159,9 @@ class Minimax(ABC, Generic[State, Action]):
         next_down = None if depth is None else depth - 1
 
         current_player = cls.player(state)
-        value: int | float
+        value: float
         best: Callable[[int | float, int | float], int | float]
+        set_idx: u8
         if current_player == Player.MAX:
             value = -infinity
             best = max
@@ -169,15 +173,15 @@ class Minimax(ABC, Generic[State, Action]):
             compare = operator.lt  # less than (<)
             set_idx = 1
         elif current_player == Player.CHANCE:
-            value = 0
+            value = 0.0
             best = sum  # type: ignore[assignment]
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
 
         actions = tuple(cls.actions(state))
         successors = len(actions)
-        expect_a = successors * (a - cls.HIGHEST) + cls.HIGHEST
-        expect_b = successors * (b - cls.LOWEST) + cls.LOWEST
+        expect_a = successors * (float(a) - cls.HIGHEST) + cls.HIGHEST
+        expect_b = successors * (float(b) - cls.LOWEST) + cls.LOWEST
 
         best_action: Action | None = None
         for action in actions:
@@ -192,7 +196,7 @@ class Minimax(ABC, Generic[State, Action]):
                     ax,
                     bx,
                 )
-                score = result.value
+                score = float(result.value)
                 # Check for a, b cutoff conditions
                 if score <= expect_a:
                     return MinimaxResult(a, None)
