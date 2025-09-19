@@ -692,7 +692,7 @@ class GameBoard(sprite.Sprite):
             else:
                 image.add_image_and_mask(name, surface, "tile_0")
 
-            if index % 2 != 0:
+            if index & 1 != 0:
                 continue
 
             outline_color = GREEN
@@ -713,7 +713,7 @@ class GameBoard(sprite.Sprite):
                 color,
             )
 
-            if piece_type % 2 == 0:
+            if piece_type & 1 == 0:
                 image.add_image(name, surface)
             else:
                 image.add_image_and_mask(

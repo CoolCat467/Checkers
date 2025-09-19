@@ -243,13 +243,13 @@ class State:
         """Return enemy pawn piece type."""
         # If we are kinged, get a pawn version of ourselves.
         # Take that plus one mod 2 to get the pawn of the enemy
-        return (self_type + 1) % 2
+        return (self_type + 1) & 1
 
     @staticmethod
     def get_piece_types(self_type: u8) -> tuple[u8, u8]:
         """Return piece types of given piece type."""
         # If we are kinged, get a pawn version of ourselves.
-        self_pawn = self_type % 2
+        self_pawn = self_type & 1
         return (self_pawn, self_pawn + 2)
 
     def get_jumps(
@@ -424,7 +424,7 @@ class State:
             if not has_move and self.turn == bool(player):
                 # Continued without break, so player either has no moves
                 # or no possible moves, so their opponent wins
-                return (player + 1) % 2
+                return (player + 1) & 1
         return None
 
     def can_player_select_piece(self, player: u8, tile_pos: Pos) -> bool:
@@ -432,7 +432,7 @@ class State:
         piece_at_pos = self.pieces.get(tile_pos)
         if piece_at_pos is None:
             return False
-        return (piece_at_pos % 2) == player
+        return (piece_at_pos & 1) == player
 
     def get_pieces(self) -> tuple[tuple[Pos, u8], ...]:
         """Return all pieces."""

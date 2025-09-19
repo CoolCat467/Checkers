@@ -465,7 +465,7 @@ class GameServer(network.Server):
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
             if idx < 2:
-                players[client_id] = idx % 2
+                players[client_id] = idx & 1
             else:
                 players[client_id] = 0xFF  # Spectator
         return players
