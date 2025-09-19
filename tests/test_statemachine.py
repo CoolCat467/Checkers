@@ -17,7 +17,7 @@ def test_state() -> None:
 
     with pytest.raises(
         RuntimeError,
-        match="^State has no statemachine bound$",
+        match=r"^State has no statemachine bound$",
     ):
         print(state.machine)
 
@@ -34,7 +34,7 @@ def test_async_state() -> None:
 
     with pytest.raises(
         RuntimeError,
-        match="^State has no statemachine bound$",
+        match=r"^State has no statemachine bound$",
     ):
         print(state.machine)
 
@@ -54,7 +54,7 @@ def test_state_machine_add() -> None:
         assert bob.machine is not None
     with pytest.raises(TypeError, match="is not an instance of State!"):
         machine.add_state(AsyncState("test"))  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="is not a registered State."):
+    with pytest.raises(ValueError, match=r"is not a registered State\."):
         machine.remove_state("waffle")
     machine.add_state(bob)
     assert add_actions_run
@@ -110,7 +110,7 @@ async def test_async_state_machine_add() -> None:
         assert bob.machine is not None
     with pytest.raises(TypeError, match="is not an instance of AsyncState!"):
         machine.add_state(State("test"))  # type: ignore[arg-type]
-    with pytest.raises(ValueError, match="is not a registered AsyncState."):
+    with pytest.raises(ValueError, match=r"is not a registered AsyncState\."):
         machine.remove_state("waffle")
     machine.add_state(bob)
 

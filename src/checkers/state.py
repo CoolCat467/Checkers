@@ -161,7 +161,7 @@ class State:
         """Piece has been jumped."""
         # print(f'piece_jumped {position = }')
 
-    def preform_action(self, action: Action) -> Self:
+    def perform_action(self, action: Action) -> Self:
         """Return new state after performing action on self."""
         from_pos, to_pos = action
 

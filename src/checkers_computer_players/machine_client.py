@@ -33,18 +33,18 @@ if sys.version_info < (3, 11):
 # 1 = True  = AI (Us) = MAX = 1, 3
 
 
-class RemoteState(Component, metaclass=ABCMeta):
+class BaseRemoteState(Component, metaclass=ABCMeta):
     """Remote State.
 
-    Keeps track of game state and call preform_action when it's this clients
-    turn.
+    Keeps track of game state and call handle_perform_turn when it's
+    this clients turn.
     """
 
     __slots__ = ("has_initial", "moves", "pieces", "playing_as", "state")
 
-    def __init__(self) -> None:
+    def __init__(self, name: str = "remote_state") -> None:
         """Initialize remote state."""
-        super().__init__("remote_state")
+        super().__init__(name)
 
         self.state = State((8, 8), {})
         self.has_initial = False
@@ -65,7 +65,7 @@ class RemoteState(Component, metaclass=ABCMeta):
             },
         )
 
-    async def preform_action(self, action: Action) -> None:
+    async def perform_action(self, action: Action) -> None:
         """Raise events to perform game action."""
         await self.raise_event(
             Event(
@@ -79,10 +79,10 @@ class RemoteState(Component, metaclass=ABCMeta):
         await self.raise_event(Event("gameboard_tile_clicked", action.to_pos))
 
     @abstractmethod
-    async def preform_turn(self) -> Action:
-        """Perform turn, return action to perform."""
+    async def handle_perform_turn(self) -> None:
+        """Handle perform turn. Should call await self.perform_action(action)."""
 
-    async def base_preform_turn(self) -> None:
+    async def base_perform_turn(self) -> None:
         """Perform turn."""
         self.moves += 1
         winner = self.state.check_for_win()
@@ -91,8 +91,7 @@ class RemoteState(Component, metaclass=ABCMeta):
             value = ("Lost", "Won")[winner == self.playing_as]
             print(f"{value} after {self.moves}")
             return
-        action = await self.preform_turn()
-        await self.preform_action(action)
+        await self.handle_perform_turn()
 
     async def handle_action_complete(
         self,
@@ -101,10 +100,10 @@ class RemoteState(Component, metaclass=ABCMeta):
         """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
         action = self.state.action_from_points(from_pos, to_pos)
-        self.state = self.state.preform_action(action)
+        self.state = self.state.perform_action(action)
         ##        print(f'{turn = }')
         if turn == self.playing_as:
-            await self.base_preform_turn()
+            await self.base_perform_turn()
 
     async def handle_create_piece(self, event: Event[tuple[Pos, int]]) -> None:
         """Update internal pieces if we haven't had the initial setup event."""
@@ -118,7 +117,7 @@ class RemoteState(Component, metaclass=ABCMeta):
 
         assert self.has_initial
         if self.state.turn == self.playing_as:
-            await self.base_preform_turn()
+            await self.base_perform_turn()
 
     async def handle_initial_config(
         self,
@@ -135,12 +134,30 @@ class RemoteState(Component, metaclass=ABCMeta):
         await self.raise_event(Event("network_stop", None))
 
 
+class RemoteState(BaseRemoteState):
+    """Remote State.
+
+    Keeps track of game state and call perform_action when it's this clients
+    turn.
+    """
+
+    __slots__ = ()
+
+    @abstractmethod
+    async def perform_turn(self) -> Action:
+        """Perform turn, return action to perform."""
+
+    async def handle_perform_turn(self) -> None:
+        """Perform turn."""
+        await self.perform_action(await self.perform_turn())
+
+
 class MachineClient(ComponentManager):
     """Manager that runs until client_disconnected event fires."""
 
     __slots__ = ("running",)
 
-    def __init__(self, remote_state_class: type[RemoteState]) -> None:
+    def __init__(self, remote_state_class: type[BaseRemoteState]) -> None:
         """Initialize machine client."""
         super().__init__("machine_client")
 
@@ -178,7 +195,7 @@ class MachineClient(ComponentManager):
 async def run_client(
     host: str,
     port: int,
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
     connected: set[tuple[str, int]],
 ) -> None:
     """Run machine client and raise tick events."""
@@ -212,14 +229,14 @@ async def run_client(
 def run_client_sync(
     host: str,
     port: int,
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run client and connect to server at host:port."""
     trio.run(run_client, host, port, remote_state_class, set())
 
 
 async def run_clients_in_local_servers(
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run clients in local servers."""
     connected: set[tuple[str, int]] = set()
@@ -249,7 +266,7 @@ async def run_clients_in_local_servers(
 
 
 def run_clients_in_local_servers_sync(
-    remote_state_class: type[RemoteState],
+    remote_state_class: type[BaseRemoteState],
 ) -> None:
     """Run clients in local servers."""
     trio.run(run_clients_in_local_servers, remote_state_class)

@@ -112,9 +112,9 @@ class MaxYJumperPlayer(RemoteState):
 
     __slots__ = ()
 
-    async def preform_turn(self) -> Action:
+    async def perform_turn(self) -> Action:
         """Perform turn."""
-        print("preform_turn")
+        print("perform_turn")
         return turn(self.state)
 
 

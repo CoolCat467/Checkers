@@ -133,12 +133,12 @@ def test_image_component_add_image_and_mask_invalid_image(
 ) -> None:
     with pytest.raises(
         ValueError,
-        match="^Expected surface to be a valid identifier$",
+        match=r"^Expected surface to be a valid identifier$",
     ):
         image_component.add_image_and_mask("test_image", None, None)  # type: ignore[arg-type]
     with pytest.raises(
         ValueError,
-        match="^Expected surface to be a valid identifier$",
+        match=r"^Expected surface to be a valid identifier$",
     ):
         image_component.add_image_and_mask("test_image", "copy_from", None)  # type: ignore[arg-type]
 
@@ -149,12 +149,12 @@ def test_image_component_add_image_and_mask_invalid_mask(
     image = Surface((1, 1))
     with pytest.raises(
         ValueError,
-        match="^Expected mask to be a valid identifier$",
+        match=r"^Expected mask to be a valid identifier$",
     ):
         image_component.add_image_and_mask("test_image", image, None)  # type: ignore[arg-type]
     with pytest.raises(
         ValueError,
-        match="^Expected mask to be a valid identifier$",
+        match=r"^Expected mask to be a valid identifier$",
     ):
         image_component.add_image_and_mask("test_image", image, "copy_from")
 

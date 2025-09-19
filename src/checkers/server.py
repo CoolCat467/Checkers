@@ -884,7 +884,7 @@ class GameServer(network.Server):
         # print(f"{action = }")
 
         # Get new state after performing valid action
-        new_state = self.state.preform_action(action)
+        new_state = self.state.perform_action(action)
         # Get action queue from old state
         action_queue = self.state.get_action_queue()
         self.state = new_state

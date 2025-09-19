@@ -15,7 +15,7 @@ def test_run() -> None:
     while not minimax.terminal(state):
         print(f"\nTurn {turns}")
         start = time.perf_counter_ns()
-        value, action = minimax.alphabeta(state, 4)
+        _value, action = minimax.alphabeta(state, 4)
         end = time.perf_counter_ns()
         print(f"Took {(end - start) / 1e9:.2} seconds")
         state = minimax.result(state, action)
