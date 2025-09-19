@@ -284,7 +284,7 @@ class CheckersMinimax(MinimaxWithTT):
     @classmethod
     def result(cls, state: State, action: Action) -> State:
         """Return new state after performing given action on given current state."""
-        return state.preform_action(action)
+        return state.perform_action(action)
 
     @classmethod
     def adaptive_depth_minimax(

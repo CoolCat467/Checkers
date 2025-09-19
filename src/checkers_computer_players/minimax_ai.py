@@ -27,17 +27,25 @@ __title__ = "Minimax AI"
 __author__ = "CoolCat467"
 __version__ = "0.0.0"
 
+import math
+import random
+import time
 import traceback
-from typing import TYPE_CHECKING, TypeVar
+from collections import Counter
+from math import inf as infinity
+from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
+from checkers.state import Action, State
 from checkers_computer_players.checkers_minimax import CheckersMinimax
 from checkers_computer_players.machine_client import (
     RemoteState,
     run_clients_in_local_servers_sync,
 )
+from checkers_computer_players.minimax import Minimax, MinimaxResult, Player
 
 if TYPE_CHECKING:
-    from checkers.state import Action
+    from collections.abc import Iterable
+
 
 T = TypeVar("T")
 
