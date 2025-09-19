@@ -122,7 +122,7 @@ class MinimaxWithID(Minimax[State, Action]):
             # No need for cryptographic secure random
             return MinimaxResult(
                 cls.value(state),
-                random.choice(tuple(cls.actions(state))),  # noqa: S311
+                random.choice(tuple(cls.actions(state))),
             )
         next_down = depth - 1
 
