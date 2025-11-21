@@ -161,7 +161,7 @@ class GameClient(ClientNetworkEventComponent):
     to the server, and reading and raising incoming events from the server.
     """
 
-    __slots__ = ("connect_event_lock", "running")
+    # __slots__ = ("connect_event_lock", "running")
 
     def __init__(self, name: str) -> None:
         """Initialize GameClient."""

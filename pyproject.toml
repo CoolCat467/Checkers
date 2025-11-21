@@ -10,13 +10,11 @@ authors = [
 ]
 description = "Graphical Checkers Game with AI support"
 readme = {file = "README.md", content-type = "text/markdown"}
-license = {file = "LICENSE"}
+license = "GPL-3.0"
 requires-python = ">=3.10"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: End Users/Desktop",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
-    "License :: OSI Approved :: GNU Lesser General Public License v3 (LGPLv3)",
     "Natural Language :: English",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.10",
@@ -93,20 +91,21 @@ include = [
     "src/checkers_computer_players/checkers_minimax.py",
 ]
 exclude = [
+    "tests/test_statemachine.py",
     "src/checkers/client.py",
-    "src/checkers/element_list.py",
-    "src/checkers/game.py",
+##    "src/checkers/element_list.py",
+##    "src/checkers/game.py",
     "src/checkers/multi_inherit.py",
-    "src/checkers/namedtuple_mod.py",
-    "src/checkers/objects.py",
+##    "src/checkers/namedtuple_mod.py",
+##    "src/checkers/objects.py",
     "src/checkers/server.py",
-    "src/checkers/sprite.py",
-    "src/checkers/statemachine.py",
+##    "src/checkers/sprite.py",
+##    "src/checkers/statemachine.py",
     "src/checkers/vector.py",
-    "src/checkers_computer_players/example_ai.py",
-    "src/checkers_computer_players/max_y_jumper_ai.py",
+##    "src/checkers_computer_players/example_ai.py",
+##    "src/checkers_computer_players/max_y_jumper_ai.py",
     "src/checkers_computer_players/machine_client.py",
-    "src/checkers_computer_players/minimax_ai.py",
+##    "src/checkers_computer_players/minimax_ai.py",
 ]
 
 #[tool.hatch.build.targets.wheel.hooks.mypyc.options]
