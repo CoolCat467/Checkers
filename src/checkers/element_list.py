@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 class Element(sprite.Sprite):
     """Element sprite."""
 
-    __slots__ = ()
+    # __slots__ = ()
 
     def self_destruct(self) -> None:
         """Remove this element."""
@@ -55,7 +55,7 @@ class Element(sprite.Sprite):
 class ElementList(sprite.Sprite):
     """Element List sprite."""
 
-    __slots__ = ("_order",)
+    # __slots__ = ("_order",)
 
     def __init__(self, name: object) -> None:
         """Initialize connection list."""

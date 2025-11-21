@@ -56,7 +56,8 @@ from checkers.network_shared import (
     read_position,
     write_position,
 )
-from checkers.state import State, generate_pieces
+from checkers.server_state import CheckersState
+from checkers.state import generate_pieces
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
@@ -319,49 +320,6 @@ class ServerClient(ServerClientNetworkEventComponent):
         await self.handle_encryption_response(event)
 
 
-class CheckersState(State):
-    """Subclass of State that keeps track of actions in `action_queue`."""
-
-    __slots__ = ("action_queue",)
-
-    def __init__(
-        self,
-        size: Pos,
-        pieces: dict[Pos, int],
-        turn: bool = True,
-    ) -> None:
-        """Initialize Checkers State."""
-        super().__init__(size, pieces, turn)
-        self.action_queue: deque[tuple[str, Iterable[Pos | int]]] = deque()
-
-    def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
-        """Add king event to action queue."""
-        super().piece_kinged(piece_pos, new_type)
-        self.action_queue.append(("king", (piece_pos, new_type)))
-
-    def piece_moved(self, start_pos: Pos, end_pos: Pos) -> None:
-        """Add move event to action queue."""
-        super().piece_moved(start_pos, end_pos)
-        self.action_queue.append(
-            (
-                "move",
-                (
-                    start_pos,
-                    end_pos,
-                ),
-            ),
-        )
-
-    def piece_jumped(self, jumped_piece_pos: Pos) -> None:
-        """Add jump event to action queue."""
-        super().piece_jumped(jumped_piece_pos)
-        self.action_queue.append(("jump", (jumped_piece_pos,)))
-
-    def get_action_queue(self) -> deque[tuple[str, Iterable[Pos | int]]]:
-        """Return action queue."""
-        return self.action_queue
-
-
 class GameServer(network.Server):
     """Checkers server.
 
@@ -507,7 +465,7 @@ class GameServer(network.Server):
         players: dict[int, int] = {}
         for idx, client_id in enumerate(client_ids):
             if idx < 2:
-                players[client_id] = idx % 2
+                players[client_id] = idx & 1
             else:
                 players[client_id] = 0xFF  # Spectator
         return players

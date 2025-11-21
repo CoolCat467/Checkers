@@ -73,7 +73,7 @@ class PygameMouseMotion(PygameMouseEventData):
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
-    __slots__ = ("__image", "mask", "rect", "update_location_on_resize")
+    # __slots__ = ("__image", "mask", "rect", "update_location_on_resize")
 
     def __init__(self, name: object) -> None:
         """Initialize with name."""

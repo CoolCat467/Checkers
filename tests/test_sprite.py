@@ -194,7 +194,7 @@ def test_movement_component_point_toward(
 def test_movement_component_move_heading_time(
     movement_component: MovementComponent,
 ) -> None:
-    movement_component.speed = 5
+    movement_component.speed = 5.0
     movement_component.move_heading_time(1)
     assert movement_component.heading * 5 == movement_component.heading
 

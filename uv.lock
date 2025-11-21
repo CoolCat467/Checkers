@@ -137,7 +137,7 @@ requires-dist = [
     { name = "coverage", marker = "extra == 'tests'", specifier = ">=7.2.5" },
     { name = "exceptiongroup", marker = "python_full_version < '3.11'" },
     { name = "libcomponent", specifier = "~=0.0.3" },
-    { name = "mypy", marker = "extra == 'tools'", specifier = ">=1.17.0" },
+    { name = "mypy", marker = "extra == 'tools'", specifier = ">=1.18.2" },
     { name = "mypy-extensions", specifier = ">=1.0.0" },
     { name = "pre-commit", marker = "extra == 'tools'", specifier = ">=4.2.0" },
     { name = "pygame", specifier = "~=2.6.0" },
