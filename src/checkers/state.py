@@ -24,7 +24,6 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
-import copy
 import math
 from dataclasses import dataclass
 from typing import (
@@ -271,7 +270,8 @@ class State:
             piece_type = self.pieces[position]
         if _pieces is None:
             _pieces = self.pieces
-        _pieces = copy.deepcopy(_pieces)
+        # _pieces = copy.deepcopy(_pieces)
+        _pieces = dict(_pieces)
 
         enemy_pieces = self.get_piece_types(self.get_enemy(piece_type))
 
