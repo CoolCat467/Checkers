@@ -77,10 +77,10 @@ def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
     cx, cy = xy
     sides = []
     for raw_dy in range(2):
-        dy = raw_dy * 2 - 1
+        dy = (raw_dy << 1) - 1
         ny = cy + dy
         for raw_dx in range(2):
-            dx = raw_dx * 2 - 1
+            dx = (raw_dx << 1) - 1
             nx = cx + dx
             sides.append((nx, ny))
     tuple_sides = tuple(sides)
@@ -102,6 +102,20 @@ def pawn_modify(moves: tuple[T, ...], piece_type: u8) -> tuple[T, ...]:
     ):  # If it's a black pawn, it can only move to bottom left and bottom right
         return moves[2:]
     return moves
+
+
+def get_sides_pawn(xy: Pos, piece_type: u8) -> tuple[Pos, Pos]:
+    """Return moves for pawns."""
+    cx, cy = xy
+    sides = []
+
+    dy = (piece_type << 1) - 1
+    ny = cy + dy
+    for raw_dx in range(2):
+        dx = (raw_dx << 1) - 1
+        nx = cx + dx
+        sides.append((nx, ny))
+    return tuple(sides)
 
 
 @dataclass(slots=True)
@@ -352,7 +366,7 @@ class State:
         piece_type = self.pieces[position]
         # Get the side xy choords of the tile's xy pos,
         # then modify results for pawns
-        moves = pawn_modify(get_sides(position), piece_type)
+        moves = get_sides_pawn(position, piece_type)
         return tuple(
             m
             for m in filter(self.valid_location, moves)
