@@ -115,7 +115,9 @@ def get_sides_pawn(xy: Pos, piece_type: u8) -> tuple[Pos, Pos]:
         dx = (raw_dx << 1) - 1
         nx = cx + dx
         sides.append((nx, ny))
-    return tuple(sides)
+    tuple_sides = tuple(sides)
+    assert len(tuple_sides) == 2
+    return tuple_sides
 
 
 @dataclass(slots=True)
