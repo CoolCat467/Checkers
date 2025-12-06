@@ -368,7 +368,10 @@ class State:
         piece_type = self.pieces[position]
         # Get the side xy choords of the tile's xy pos,
         # then modify results for pawns
-        moves = get_sides_pawn(position, piece_type)
+        if piece_type < 2:
+            moves = get_sides_pawn(position, piece_type)
+        else:
+            moves = get_sides(position)
         return tuple(
             m
             for m in filter(self.valid_location, moves)
