@@ -99,7 +99,7 @@ class BaseRemoteState(Component, metaclass=ABCMeta):
     ) -> None:
         """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
-        action = self.state.action_from_points(from_pos, to_pos)
+        action = Action(from_pos, to_pos)
         self.state = self.state.perform_action(action)
         ##        print(f'{turn = }')
         if turn == self.playing_as:
