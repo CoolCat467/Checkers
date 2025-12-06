@@ -56,7 +56,7 @@ from checkers.network_shared import (
     read_position,
     write_position,
 )
-from checkers.state import State, generate_pieces
+from checkers.state import Action, State, generate_pieces
 
 if TYPE_CHECKING:
     from collections.abc import Awaitable, Callable, Iterable
@@ -922,7 +922,7 @@ class GameServer(network.Server):
         # Remove tile sprites and glowing effect
         await self.player_select_piece(player, None)
 
-        action = self.state.action_from_points(piece_pos, tile_pos)
+        action = Action(piece_pos, tile_pos)
         # print(f"{action = }")
 
         # Get new state after performing valid action

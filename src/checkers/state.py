@@ -114,15 +114,15 @@ class State:
 
     def __str__(self) -> str:
         """Return text representation of game board state."""
-        map_ = {None: " ", 0: "-", 1: "+", 2: "O", 3: "X"}
+        map_ = {None: "▒▒", 0: "()", 1: "><", 2: "O┤", 3: "X┤"}
         w, h = self.size
         lines = []
         for y in range(h):
             line = []
             for x in range(w):
-                if (x + y + 1) % 2:
+                if not (x + y) & 1:
                     # line.append("_")
-                    line.append(" ")
+                    line.append("░░")
                     continue
                 line.append(map_[self.pieces.get((x, y))])
             lines.append("".join(line))
@@ -213,12 +213,6 @@ class State:
         """Return name of a given tile."""
         return chr(65 + x) + str(self.size[1] - y)
 
-    @staticmethod
-    def action_from_points(start: Pos, end: Pos) -> Action:
-        """Return action from given start and end coordinates."""
-        # return Action(self.get_tile_name(*start), self.get_tile_name(*end))
-        return Action(start, end)
-
     def get_turn(self) -> int:
         """Return whose turn it is. 0 = red, 1 = black."""
         return int(self.turn)
@@ -246,8 +240,8 @@ class State:
     def get_piece_types(self_type: int) -> tuple[int, int]:
         """Return piece types of given piece type."""
         # If we are kinged, get a pawn version of ourselves.
-        self_pawn = self_type % 2
-        return (self_pawn, self_pawn + 2)
+        self_type %= 2
+        return (self_type, self_type + 2)
 
     def get_jumps(
         self,
@@ -373,39 +367,32 @@ class State:
     ) -> Generator[Action, None, None]:
         """Yield end calculation function results as Actions."""
         for end in calculate_ends(position):
-            yield cls.action_from_points(position, end)
-
-    def get_actions(self, position: Pos) -> Generator[Action, None, None]:
-        """Yield all moves and jumps the piece at position can make."""
-        ends = set(self.get_jumps(position))
-        if not (ends and MANDATORY_CAPTURE):
-            ends.update(self.get_moves(position))
-        for end in ends:
-            yield self.action_from_points(position, end)
+            yield Action(position, end)
 
     def get_all_actions(self, player: int) -> Generator[Action, None, None]:
         """Yield all actions for given player."""
-        player_pieces = {player, player + 2}
-        if not MANDATORY_CAPTURE:
-            for position, piece_type in self.pieces.items():
-                if piece_type not in player_pieces:
-                    continue
-                yield from self.get_actions(position)
-            return
-        jumps_available = False
+        player_pieces = self.get_piece_types(player)
+
+        # Precalculate positions belonging to given player
+        player_positions: list[Pos] = []
         for position, piece_type in self.pieces.items():
-            if piece_type not in player_pieces:
-                continue
-            if not jumps_available:
-                for jump in self.wrap_actions(position, self.get_jumps):
-                    yield jump
-                    jumps_available = True
-            else:
+            if piece_type in player_pieces:
+                player_positions.append(position)
+
+        if not MANDATORY_CAPTURE:
+            for position in player_positions:
                 yield from self.wrap_actions(position, self.get_jumps)
+                yield from self.wrap_actions(position, self.get_moves)
+            return
+
+        jumps_available = False
+        for position in player_positions:
+            for jump in self.wrap_actions(position, self.get_jumps):
+                yield jump
+                jumps_available = True
+
         if not jumps_available:
-            for position, piece_type in self.pieces.items():
-                if piece_type not in player_pieces:
-                    continue
+            for position in player_positions:
                 yield from self.wrap_actions(position, self.get_moves)
 
     def check_for_win(self) -> int | None:
@@ -421,7 +408,7 @@ class State:
             if not has_move and self.turn == bool(player):
                 # Continued without break, so player either has no moves
                 # or no possible moves, so their opponent wins
-                return (player + 1) % 2
+                return self.get_enemy(player)
         return None
 
     def can_player_select_piece(self, player: int, tile_pos: Pos) -> bool:
@@ -444,8 +431,8 @@ def generate_pieces(
     """Generate data about each piece."""
     pieces: dict[Pos, int] = {}
     # Get where pieces should be placed
-    z_to_1 = round(board_height / 3)  # White
-    z_to_2 = (board_height - (z_to_1 * 2)) + z_to_1  # Black
+    row_size = math.ceil(board_height / 3)
+    opposite_row_start = board_height - row_size
     # For each xy position in the area of where tiles should be,
     for y in range(board_height):
         # Reset the x pos to 0
@@ -453,8 +440,10 @@ def generate_pieces(
             # Get the color of that spot by adding x and y mod the number of different colors
             color = (x + y + 1) % colors
             # If a piece should be placed on that tile and the tile is not Red,
-            if (not color) and ((y <= z_to_1 - 1) or (y >= z_to_2)):
+            if (not color) and (
+                (y <= row_size - 1) or (y >= opposite_row_start)
+            ):
                 # Set the piece to White Pawn or Black Pawn depending on the current y pos
-                piece_type = int(y <= z_to_1)
+                piece_type = int(y <= row_size)
                 pieces[x, y] = piece_type
     return pieces
