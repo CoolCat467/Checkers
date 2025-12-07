@@ -62,6 +62,10 @@ In American Checkers, pawns can only capture in the forward direction, just like
 There are two computer players I have made for this game. Both connect to all discovered LAN servers and play until the game is over.
 To start playing against Minimax AI:
 ```bash
+checkers_game_minimax_ai_client
+```
+OR
+```bash
 python computer_players/MiniMax_AI.py
 ```
 
