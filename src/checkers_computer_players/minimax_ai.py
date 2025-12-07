@@ -16,6 +16,7 @@ import random
 import time
 import traceback
 from collections import Counter
+from enum import IntEnum, auto
 from math import inf as infinity
 from typing import TYPE_CHECKING, Any, ClassVar, TypeVar
 
@@ -40,6 +41,14 @@ T = TypeVar("T")
 # 1 = True  = AI (Us) = MAX = 1, 3
 
 
+class TranspositionFlag(IntEnum):
+    """Flag enum for transposition table."""
+
+    LOWERBOUND = 0
+    EXACT = auto()
+    UPPERBOUND = auto()
+
+
 class MinimaxWithID(Minimax[State, Action]):
     """Minimax with ID."""
 
@@ -47,9 +56,9 @@ class MinimaxWithID(Minimax[State, Action]):
 
     # Simple Transposition Table:
     # key → (stored_depth, value, action, flag)
-    # flag: 'EXACT', 'LOWERBOUND', 'UPPERBOUND'
+    # flag: TranspositionFlag: EXACT, LOWERBOUND, UPPERBOUND
     TRANSPOSITION_TABLE: ClassVar[
-        dict[int, tuple[int, MinimaxResult[Any], str]]
+        dict[int, tuple[int, MinimaxResult[Any], TranspositionFlag]]
     ] = {}
 
     @classmethod
@@ -68,9 +77,9 @@ class MinimaxWithID(Minimax[State, Action]):
         stored_depth, result, flag = entry
         # only use if stored depth is deep enough
         if stored_depth >= depth and (
-            (flag == "EXACT")
-            or (flag == "LOWERBOUND" and result.value > alpha)
-            or (flag == "UPPERBOUND" and result.value < beta)
+            (flag == TranspositionFlag.EXACT)
+            or (flag == TranspositionFlag.LOWERBOUND and result.value > alpha)
+            or (flag == TranspositionFlag.UPPERBOUND and result.value < beta)
         ):
             return result
         return None
@@ -86,11 +95,11 @@ class MinimaxWithID(Minimax[State, Action]):
     ) -> None:
         """Store in transposition_table with proper flag."""
         if result.value <= alpha:
-            flag = "UPPERBOUND"
+            flag = TranspositionFlag.UPPERBOUND
         elif result.value >= beta:
-            flag = "LOWERBOUND"
+            flag = TranspositionFlag.LOWERBOUND
         else:
-            flag = "EXACT"
+            flag = TranspositionFlag.EXACT
         cls.TRANSPOSITION_TABLE[state_hash] = (depth, result, flag)
 
     @classmethod

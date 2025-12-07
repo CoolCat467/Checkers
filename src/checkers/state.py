@@ -262,104 +262,85 @@ class State:
     def get_jumps(
         self,
         position: Pos,
-        piece_type: int | None = None,
-        _pieces: dict[Pos, int] | None = None,
-        _recursion: int = 0,
     ) -> dict[Pos, list[Pos]]:
-        """Return valid jumps a piece can make.
+        """Return valid jumps a piece can make using an iterative approach.
 
         position is a xy coordinate tuple pointing to a board position
             that may or may not have a piece on it.
-        piece_type is the piece type at position. If not
-            given, position must point to a tile with a piece on it
 
-        Returns dictionary that maps end positions to
-        jumped pieces to get there
+        Returns dictionary that maps end positions to jumped pieces to
+        get there
         """
-        if piece_type is None:
-            piece_type = self.pieces[position]
-        if _pieces is None:
-            _pieces = self.pieces
-        # _pieces = copy.deepcopy(_pieces)
-        _pieces = dict(_pieces)
-
+        # Initial setup
+        piece_type = self.pieces[position]
         enemy_pieces = self.get_piece_types(self.get_enemy(piece_type))
+        w, h = self.size
+        max_recursion = math.ceil((w**2 + h**2) ** 0.25)
 
-        # Get the side coordinates of the tile and make them tuples so
-        # the scan later works properly.
-        sides = get_sides(position)
-        # Make a dictionary to find what direction a tile is in if you
-        # give it the tile.
-        # end position : jumped pieces
-
-        # Make a dictionary for the valid jumps and the pieces they jump
+        # Stack to manage jump exploration
+        stack: list[tuple[Pos, u8, dict[Pos, u8], list[Pos]]] = [
+            (position, piece_type, dict(self.pieces), []),
+        ]
         valid: dict[Pos, list[Pos]] = {}
 
-        valid_sides: tuple[tuple[int, Pos], ...]
-        if PAWN_JUMP_FORWARD_ONLY:
-            valid_sides = pawn_modify(
-                tuple(enumerate(sides)),
-                piece_type,
+        while stack:
+            current_pos, current_piece_type, current_pieces, current_path = (
+                stack.pop()
             )
-        else:
-            valid_sides = tuple(enumerate(sides))
 
-        # For each side tile in the jumpable tiles for this type of piece,
-        for direction, side in valid_sides:
-            # Make sure side exists
-            if not self.valid_location(side):
-                continue
-            side_piece = _pieces.get(side)
-            # Side piece must be one of our enemy's pieces
-            if side_piece not in enemy_pieces:
-                continue
-            # Get the direction from the dictionary we made earlier
-            # Get the coordinates of the tile on the side of the main tile's
-            # side in the same direction as the main tile's side
-            side_side = get_sides(side)[direction]
-            # Make sure side exists
-            if not self.valid_location(side_side):
-                continue
-            side_side_piece = _pieces.get(side_side)
-            # If the side is open,
-            if side_side_piece is None:
-                # Add it the valid jumps dictionary and add the tile
-                # to the list of end tiles.
-                valid[side_side] = [side]
+            # Find possible jumps from current position
+            sides = get_sides(current_pos)
 
-                # Remove jumped piece from future calculations
-                _pieces.pop(side)
+            # Modify sides for pawns if needed
+            if PAWN_JUMP_FORWARD_ONLY:
+                valid_sides = pawn_modify(
+                    tuple(enumerate(sides)),
+                    current_piece_type,
+                )
+            else:
+                valid_sides = tuple(enumerate(sides))
 
-        # For each end point tile in the list of end point tiles,
-        for end_tile in tuple(valid):
-            # Get the dictionary from the jumps you could make
-            # from that end tile
-            w, h = self.size
-            if _recursion + 1 > math.ceil((w**2 + h**2) ** 0.25):
-                break
-            # If the piece has made it to the opposite side,
-            piece_type_copy = piece_type
-            if self.does_piece_king(piece_type_copy, end_tile):
-                # King that piece
-                piece_type_copy += 2
-                _recursion = -1
-            add_valid = self.get_jumps(
-                end_tile,
-                piece_type_copy,
-                _pieces=_pieces,
-                _recursion=_recursion + 1,
-            )
-            # For each key in the new dictionary of valid tile's keys,
-            for end_pos, jumped_pieces in add_valid.items():
-                # If the key is not already existent in the list of
-                # valid destinations,
-                if end_pos not in valid:
-                    # Add that destination to the dictionary and every
-                    # tile you have to jump to get there.
-                    no_duplicates = [
-                        p for p in jumped_pieces if p not in valid[end_tile]
-                    ]
-                    valid[end_pos] = valid[end_tile] + no_duplicates
+            # Explore each possible jump direction
+            for direction, side in valid_sides:
+                # Validate side tile
+                if not self.valid_location(side):
+                    continue
+
+                side_piece = current_pieces.get(side)
+                # Side piece must be an enemy piece
+                if side_piece not in enemy_pieces:
+                    continue
+
+                # Get the tile beyond the jumped piece
+                side_side = get_sides(side)[direction]
+
+                # Validate beyond tile
+                if not self.valid_location(side_side):
+                    continue
+
+                side_side_piece = current_pieces.get(side_side)
+
+                # If beyond tile is empty, we can jump
+                if side_side_piece is None:
+                    # Create a copy of pieces to modify
+                    new_pieces = dict(current_pieces)
+                    # Remove jumped piece
+                    new_pieces.pop(side)
+
+                    # Determine if piece becomes a king
+                    new_piece_type = current_piece_type
+                    if self.does_piece_king(new_piece_type, side_side):
+                        new_piece_type += 2
+
+                    # Track the jump
+                    new_path = [*current_path, side]
+                    valid[side_side] = new_path
+
+                    # Add to stack for further exploration if not too deep
+                    if len(new_path) < max_recursion:
+                        stack.append(
+                            (side_side, new_piece_type, new_pieces, new_path),
+                        )
 
         return valid
 
@@ -368,6 +349,7 @@ class State:
         piece_type = self.pieces[position]
         # Get the side xy choords of the tile's xy pos,
         # then modify results for pawns
+        moves: tuple[Pos, ...]
         if piece_type < 2:
             moves = get_sides_pawn(position, piece_type)
         else:

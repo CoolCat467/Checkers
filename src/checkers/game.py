@@ -33,6 +33,7 @@ __version__ = "2.1.0"
 
 import contextlib
 import sys
+import traceback
 from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, TypeVar
@@ -70,6 +71,9 @@ if TYPE_CHECKING:
     )
 
     from pygame.surface import Surface
+
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
 
 SCREEN_SIZE = (640, 480)
 
@@ -1673,7 +1677,10 @@ async def async_run() -> None:
 
 def run() -> None:
     """Start asynchronous run."""
-    trio.run(async_run, strict_exception_groups=True)
+    try:
+        trio.run(async_run, strict_exception_groups=True)
+    except ExceptionGroup as exc:
+        traceback.print_exception(exc)
 
 
 def cli_run() -> None:
