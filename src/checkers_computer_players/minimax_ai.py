@@ -34,6 +34,7 @@ from checkers_computer_players.minimax import (
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+
 T = TypeVar("T")
 
 # Player:
@@ -148,9 +149,15 @@ class MinimaxWithID(Minimax[State, Action]):
 
         if current_player == Player.MAX:
             value = -infinity
-            for action in cls.actions(state):
+            actions: list[tuple[Action, State]] = [
+                (action, cls.result(state, action))
+                for action in cls.actions(state)
+            ]
+
+            actions.sort(key=lambda act: cls.value(act[1]), reverse=True)
+            for action, next_state in actions:
                 child = cls.alphabeta_transposition_table(
-                    cls.result(state, action),
+                    next_state,
                     next_down,
                     a,
                     b,
@@ -164,9 +171,15 @@ class MinimaxWithID(Minimax[State, Action]):
 
         elif current_player == Player.MIN:
             value = infinity
-            for action in cls.actions(state):
+            actions = [
+                (action, cls.result(state, action))
+                for action in cls.actions(state)
+            ]
+
+            actions.sort(key=lambda act: cls.value(act[1]))
+            for action, next_state in actions:
                 child = cls.alphabeta_transposition_table(
-                    cls.result(state, action),
+                    next_state,
                     next_down,
                     a,
                     b,
@@ -210,7 +223,6 @@ class MinimaxWithID(Minimax[State, Action]):
             )
             best_result = result
 
-            # Optional: if you find a forced win/loss you can stop
             if abs(result.value) == cls.HIGHEST:
                 print(f"reached terminal state stop {depth=}")
                 break
