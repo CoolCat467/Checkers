@@ -1288,7 +1288,8 @@ class ReturnElement(element_list.Element, objects.Button):
         self.outline = RED
         self.text = "Return to Title"
         self.visible = True
-        self.location = (SCREEN_SIZE[0] // 2, self.location.y + 10)
+        self.location = (SCREEN_SIZE[0] // 2, self.rect.center[1] + 10)
+        self.update_location_on_resize = True
 
     async def handle_click(
         self,
@@ -1316,6 +1317,7 @@ class ConnectionElement(element_list.Element, objects.Button):
 
         self.text = f"[{name[0]}:{name[1]}]\n{motd}"
         self.visible = True
+        self.update_location_on_resize = True
 
     async def handle_click(
         self,
@@ -1401,7 +1403,10 @@ class PlayJoiningState(GameState):
                     connections.get_new_connection_position()
                 )
                 element.rect.topleft = (10, element.location.y + 3)
-                connections.add_element(element)
+                try:
+                    connections.add_element(element)
+                except IndexError:
+                    break
             for details in old:
                 if details in current:
                     continue

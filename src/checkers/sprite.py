@@ -99,13 +99,9 @@ class Sprite(ComponentManager, WeakDirtySprite):
         """Set rect center from tuple of integers."""
         self.rect.center = value
 
-    def __set_location(self, value: tuple[int, int]) -> None:
-        """Set rect center from tuple of integers."""
-        self._set_location(value)
-
     location = property(
         __get_location,
-        __set_location,
+        _set_location,
         doc="Location (Center of image)",
     )
 
