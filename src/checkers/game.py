@@ -1284,7 +1284,6 @@ class ReturnElement(element_list.Element, objects.Button):
         """Initialize return element."""
         super().__init__(name, font)
 
-        self.update_location_on_resize = False
         self.border_width = 4
         self.outline = RED
         self.text = "Return to Title"
@@ -1374,7 +1373,7 @@ class PlayJoiningState(GameState):
             },
         )
 
-        await self.manager.raise_event(Event("update_listing", None))
+        await self.manager.raise_event(Event("update_listing", None, 1))
 
     async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
@@ -1425,6 +1424,7 @@ class PlayJoiningState(GameState):
         if self.machine.manager.component_exists("network"):
             self.machine.manager.remove_component("network")
 
+        play_sound("button_click")
         await self.machine.set_state("title")
 
 
