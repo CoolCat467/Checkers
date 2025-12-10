@@ -27,6 +27,7 @@ __version__ = "0.0.0"
 import math
 from dataclasses import dataclass
 from typing import (
+    Final,
     TYPE_CHECKING,
     NamedTuple,
     TypeAlias,
@@ -56,6 +57,13 @@ T = TypeVar("T")
 
 Pos: TypeAlias = tuple[u8, u8]
 
+
+DIRECTIONS: Final = (
+    (-1, -1),
+    (1, -1),
+    (-1, 1),
+    (1, 1),
+)
 
 class Action(NamedTuple):
     """Represents an action."""
@@ -312,15 +320,6 @@ class State:
                     continue
 
                 # Get the tile beyond the jumped piece
-                DIRECTIONS = {
-                    0: (-1, -1),
-                    1: (1, -1),
-                    2: (-1, 1),
-                    3: (1, 1),
-                }
-
-                # (old code below, revert if solution is less optimal)
-                # side_side = get_sides(side)[direction]
                 dx, dy = DIRECTIONS[direction]
                 side_side = (side[0] + dx, side[1] + dy)
 
