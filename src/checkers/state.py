@@ -27,8 +27,8 @@ __version__ = "0.0.0"
 import math
 from dataclasses import dataclass
 from typing import (
-    Final,
     TYPE_CHECKING,
+    Final,
     NamedTuple,
     TypeAlias,
     TypeVar,
@@ -64,6 +64,7 @@ DIRECTIONS: Final = (
     (-1, 1),
     (1, 1),
 )
+
 
 class Action(NamedTuple):
     """Represents an action."""
