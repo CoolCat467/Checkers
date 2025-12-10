@@ -28,6 +28,7 @@ import math
 from dataclasses import dataclass
 from typing import (
     TYPE_CHECKING,
+    Final,
     NamedTuple,
     TypeAlias,
     TypeVar,
@@ -55,6 +56,14 @@ PAWN_JUMP_FORWARD_ONLY = True  # Pawns not allowed to go backwards in jumps?
 T = TypeVar("T")
 
 Pos: TypeAlias = tuple[u8, u8]
+
+
+DIRECTIONS: Final = (
+    (-1, -1),
+    (1, -1),
+    (-1, 1),
+    (1, 1),
+)
 
 
 class Action(NamedTuple):
@@ -312,7 +321,8 @@ class State:
                     continue
 
                 # Get the tile beyond the jumped piece
-                side_side = get_sides(side)[direction]
+                dx, dy = DIRECTIONS[direction]
+                side_side = (side[0] + dx, side[1] + dy)
 
                 # Validate beyond tile
                 if not self.valid_location(side_side):
