@@ -65,9 +65,9 @@ tests = [
     "pytest-cov>=6.0.0",
     "pytest-trio>=0.8.0",
     "coverage>=7.2.5",
-    "uv>=0.5.21",
 ]
 tools = [
+    "uv>=0.5.21",
     "mypy>=1.19.0",
     "ruff>=0.9.2",
     "codespell>=2.3.0",
