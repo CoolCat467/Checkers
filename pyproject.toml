@@ -171,7 +171,7 @@ extend-ignore = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--cov-report=xml --cov-report=term-missing --cov=checkers"
+addopts = "--cov-report=term-missing --cov=checkers"
 testpaths = [
     "tests",
 ]
