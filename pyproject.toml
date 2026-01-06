@@ -39,12 +39,12 @@ keywords = [
     "checkers-game", "ai-support", "networked-game"
 ]
 dependencies = [
-    "libcomponent~=0.0.3",
+    "libcomponent~=0.0.5",
     "pygame~=2.6.0",
     "typing_extensions>=4.12.2",
     "mypy_extensions>=1.0.0",
-    "trio>=0.30.0",
-    "exceptiongroup; python_version < '3.11'",
+    "trio>=0.32.0",
+    "exceptiongroup>=1.2.2; python_version < '3.11'",
 ]
 
 [tool.setuptools.dynamic]
