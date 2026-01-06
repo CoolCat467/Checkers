@@ -56,7 +56,7 @@ class MinimaxWithID(Minimax[State, Action]):
     __slots__ = ()
 
     # Simple Transposition Table:
-    # key → (stored_depth, value, action, flag)
+    # key -> (stored_depth, value, action, flag)
     # flag: TranspositionFlag: EXACT, LOWERBOUND, UPPERBOUND
     TRANSPOSITION_TABLE: ClassVar[
         dict[int, tuple[int, MinimaxResult[Any], TranspositionFlag]]
