@@ -82,5 +82,5 @@ def test_outlined_text_rendering_zero_border(font: Font) -> None:
 def test_button_initialization(font: Font) -> None:
     button = Button("TestButton", font)
     assert button.text == "None"
-    assert button.color == (0, 0, 0, 255)  # type: ignore[comparison-overlap]
     assert button.border_width == 3
+    assert button.color == (0, 0, 0, 255)  # type: ignore[comparison-overlap]

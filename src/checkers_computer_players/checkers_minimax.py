@@ -30,6 +30,7 @@ import math
 import random
 import time
 from collections import Counter
+from enum import IntEnum, auto
 from math import inf as infinity
 from typing import TYPE_CHECKING, Any, TypeVar
 
@@ -45,11 +46,20 @@ if TYPE_CHECKING:
 
     from mypy_extensions import u8
 
+
 T = TypeVar("T")
 
 # Player:
 # 0 = False = Person  = MIN = 0, 2
 # 1 = True  = AI (Us) = MAX = 1, 3
+
+
+class TranspositionFlag(IntEnum):
+    """Flag enum for transposition table."""
+
+    LOWERBOUND = 0
+    EXACT = auto()
+    UPPERBOUND = auto()
 
 
 class MinimaxWithTT(Minimax[State, Action]):
@@ -58,15 +68,15 @@ class MinimaxWithTT(Minimax[State, Action]):
     __slots__ = ("transposition_table",)
 
     # Simple Transposition Table:
-    # key → (stored_depth, result, flag)
-    # flag: 'EXACT', 'LOWERBOUND', 'UPPERBOUND'
+    # key -> (stored_depth, value, action, flag)
+    # flag: TranspositionFlag: EXACT, LOWERBOUND, UPPERBOUND
     def __init__(self) -> None:
         """Initialize this object."""
         super().__init__()
 
         self.transposition_table: dict[
             int,
-            tuple[u8, MinimaxResult[Any], str],
+            tuple[u8, MinimaxResult[Any], TranspositionFlag],
         ] = {}
 
     def _transposition_table_lookup(
@@ -84,9 +94,9 @@ class MinimaxWithTT(Minimax[State, Action]):
         stored_depth, result, flag = entry
         # only use if stored depth is deep enough
         if stored_depth >= depth and (
-            (flag == "EXACT")
-            or (flag == "LOWERBOUND" and result.value > alpha)
-            or (flag == "UPPERBOUND" and result.value < beta)
+            (flag == TranspositionFlag.EXACT)
+            or (flag == TranspositionFlag.LOWERBOUND and result.value > alpha)
+            or (flag == TranspositionFlag.UPPERBOUND and result.value < beta)
         ):
             return result
         return None
@@ -101,11 +111,11 @@ class MinimaxWithTT(Minimax[State, Action]):
     ) -> None:
         """Store in transposition_table with proper flag."""
         if result.value <= alpha:
-            flag = "UPPERBOUND"
+            flag = TranspositionFlag.UPPERBOUND
         elif result.value >= beta:
-            flag = "LOWERBOUND"
+            flag = TranspositionFlag.LOWERBOUND
         else:
-            flag = "EXACT"
+            flag = TranspositionFlag.EXACT
         self.transposition_table[state_hash] = (depth, result, flag)
 
     @classmethod
@@ -153,9 +163,15 @@ class MinimaxWithTT(Minimax[State, Action]):
 
         if current_player == Player.MAX:
             value = -infinity
-            for action in self.actions(state):
+            actions: list[tuple[Action, State]] = [
+                (action, self.result(state, action))
+                for action in self.actions(state)
+            ]
+
+            actions.sort(key=lambda act: self.value(act[1]), reverse=True)
+            for action, next_state in actions:
                 child = self.alphabeta_transposition_table(
-                    self.result(state, action),
+                    next_state,
                     next_down,
                     a,
                     b,
@@ -169,9 +185,15 @@ class MinimaxWithTT(Minimax[State, Action]):
 
         elif current_player == Player.MIN:
             value = infinity
-            for action in self.actions(state):
+            actions = [
+                (action, self.result(state, action))
+                for action in self.actions(state)
+            ]
+
+            actions.sort(key=lambda act: self.value(act[1]))
+            for action, next_state in actions:
                 child = self.alphabeta_transposition_table(
-                    self.result(state, action),
+                    next_state,
                     next_down,
                     a,
                     b,

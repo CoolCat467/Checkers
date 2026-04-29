@@ -39,6 +39,7 @@ from checkers_computer_players.machine_client import (
 if TYPE_CHECKING:
     from checkers.state import Action
 
+
 T = TypeVar("T")
 
 # Player:

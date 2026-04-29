@@ -15,15 +15,12 @@ __ver_minor__ = 0
 __ver_patch__ = 0
 
 import random
-from typing import TYPE_CHECKING
 
+from checkers.state import Action, State
 from checkers_computer_players.machine_client import (
     RemoteState,
     run_clients_in_local_servers_sync,
 )
-
-if TYPE_CHECKING:
-    from checkers.state import Action, State
 
 
 def turn(state: State) -> Action:
@@ -75,7 +72,7 @@ def turn(state: State) -> Action:
         # Set our destination to that jump's end tile id
         destination = jump_tiles[select][1]
     # Tell the game about our decision
-    return state.action_from_points(target, destination)
+    return Action(target, destination)
 
 
 class ComputerPlayer(RemoteState):

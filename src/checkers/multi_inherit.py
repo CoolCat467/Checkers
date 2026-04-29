@@ -47,10 +47,14 @@ class ReturnElement(element_list.Element, objects.Button):
         """Initialize return element."""
         super().__init__(name, font)
 
-        self.update_location_on_resize = False
+        from checkers.game import RED, SCREEN_SIZE
+
         self.border_width = 4
+        self.outline = RED
         self.text = "Return to Title"
         self.visible = True
+        self.location = (SCREEN_SIZE[0] // 2, self.rect.center[1] + 10)
+        self.update_location_on_resize = True
 
     async def handle_click(
         self,
@@ -78,6 +82,7 @@ class ConnectionElement(element_list.Element, objects.Button):
 
         self.text = f"[{name[0]}:{name[1]}]\n{motd}"
         self.visible = True
+        self.update_location_on_resize = True
 
     async def handle_click(
         self,

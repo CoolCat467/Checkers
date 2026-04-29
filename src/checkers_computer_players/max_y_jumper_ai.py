@@ -16,15 +16,13 @@ __ver_patch__ = 0
 
 
 import random
-from typing import TYPE_CHECKING, TypeVar
+from typing import TypeVar
 
+from checkers.state import Action, Pos, State
 from checkers_computer_players.machine_client import (
     RemoteState,
     run_clients_in_local_servers_sync,
 )
-
-if TYPE_CHECKING:
-    from checkers.state import Action, Pos, State
 
 T = TypeVar("T")
 
@@ -81,7 +79,7 @@ def turn(state: State) -> Action:
                         y_pos[y] = []
                     y_pos[y].append((target, move))
                 min_y = min(y_pos)
-                return state.action_from_points(
+                return Action(
                     *random.choice(  # noqa: S311  # Not important to be cryptographically safe
                         y_pos[min_y],
                     ),
@@ -91,7 +89,7 @@ def turn(state: State) -> Action:
         ##            possibleMoves = select_tiles[target]
         ##            # Choose a random valid destination that piece can make as our destination tile id
         ##            destination= random.choice(possibleMoves)#[len(possibleMoves)-1]
-        return state.action_from_points(
+        return Action(
             *random.choice(  # noqa: S311  # Not important to be cryptographically safe
                 best_y,
             ),
@@ -104,7 +102,7 @@ def turn(state: State) -> Action:
     # Set our destination to that jump's end tile id
     destination = jump_tiles[select][1]
     # Tell the game about our decision
-    return state.action_from_points(target, destination)
+    return Action(target, destination)
 
 
 class MaxYJumperPlayer(RemoteState):

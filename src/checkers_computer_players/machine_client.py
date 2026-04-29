@@ -99,7 +99,7 @@ class BaseRemoteState(Component, metaclass=ABCMeta):
     ) -> None:
         """Perform action on internal state and perform our turn if possible."""
         from_pos, to_pos, turn = event.data
-        action = self.state.action_from_points(from_pos, to_pos)
+        action = Action(from_pos, to_pos)
         self.state = self.state.perform_action(action)
         ##        print(f'{turn = }')
         if turn == self.playing_as:
@@ -207,20 +207,21 @@ async def run_client(
         )
         client = MachineClient(remote_state_class)
         with event_manager.temporary_component(client):
-            async with client.client_with_block():
-                await event_manager.raise_event(
-                    Event("client_connect", (host, port)),
-                )
-                print(f"Connected to server {host}:{port}")
-                try:
-                    while client.running:  # noqa: ASYNC110
-                        # Wait so backlog things happen
-                        await trio.sleep(1)
-                except KeyboardInterrupt:
-                    print("Shutting down client from keyboard interrupt.")
+            async with GameClient("game_client") as game_client:
+                with client.temporary_component(game_client):
                     await event_manager.raise_event(
-                        Event("network_stop", None),
+                        Event("client_connect", (host, port)),
                     )
+                    print(f"Connected to server {host}:{port}")
+                    try:
+                        while client.running:  # noqa: ASYNC110
+                            # Wait so backlog things happen
+                            await trio.sleep(1)
+                    except KeyboardInterrupt:
+                        print("Shutting down client from keyboard interrupt.")
+                        await event_manager.raise_event(
+                            Event("network_stop", None),
+                        )
         print(f"Disconnected from server {host}:{port}")
         client.unbind_components()
     connected.remove((host, port))

@@ -33,6 +33,7 @@ __version__ = "2.1.0"
 
 import contextlib
 import sys
+import traceback
 from collections import deque
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Final, TypeVar
@@ -71,6 +72,9 @@ if TYPE_CHECKING:
     )
 
     from pygame.surface import Surface
+
+if sys.version_info < (3, 11):
+    from exceptiongroup import ExceptionGroup
 
 SCREEN_SIZE = (640, 480)
 
@@ -1319,7 +1323,7 @@ class PlayJoiningState(GameState):
             },
         )
 
-        await self.manager.raise_event(Event("update_listing", None))
+        await self.manager.raise_event(Event("update_listing", None, 1))
 
     async def handle_update_listing(self, _: Event[None]) -> None:
         """Update server listing."""
@@ -1347,7 +1351,10 @@ class PlayJoiningState(GameState):
                     connections.get_new_connection_position()
                 )
                 element.rect.topleft = (10, element.location.y + 3)
-                connections.add_element(element)
+                try:
+                    connections.add_element(element)
+                except IndexError:
+                    break
             for details in old:
                 if details in current:
                     continue
@@ -1370,6 +1377,7 @@ class PlayJoiningState(GameState):
         if self.machine.manager.component_exists("network"):
             self.machine.manager.remove_component("network")
 
+        play_sound("button_click")
         await self.machine.set_state("title")
 
 
@@ -1622,7 +1630,10 @@ async def async_run() -> None:
 
 def run() -> None:
     """Start asynchronous run."""
-    trio.run(async_run, strict_exception_groups=True)
+    try:
+        trio.run(async_run, strict_exception_groups=True)
+    except ExceptionGroup as exc:
+        traceback.print_exception(exc)
 
 
 def cli_run() -> None:

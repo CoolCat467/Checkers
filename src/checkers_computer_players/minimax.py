@@ -13,7 +13,7 @@ import random
 from abc import ABC, abstractmethod
 from enum import IntEnum, auto
 from math import inf as infinity
-from typing import TYPE_CHECKING, ClassVar, Generic, NamedTuple, TypeVar
+from typing import TYPE_CHECKING, ClassVar, Generic, NamedTuple, TypeVar, cast
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable
@@ -119,6 +119,7 @@ class Minimax(ABC, Generic[State, Action]):
         elif current_player == Player.CHANCE:
             value = 0.0
             best = sum  # type: ignore[assignment]
+            best = cast("Callable[[float, float], float]", sum)
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
 
@@ -159,9 +160,10 @@ class Minimax(ABC, Generic[State, Action]):
         next_down = None if depth is None else depth - 1
 
         current_player = cls.player(state)
-        value: float
-        best: Callable[[int | float, int | float], int | float]
-        set_idx: u8
+        value: int | float
+        best: Callable[[float, float], float]
+        compare = operator.gt
+        set_idx: u8 = 0
         if current_player == Player.MAX:
             value = -infinity
             best = max
@@ -174,7 +176,7 @@ class Minimax(ABC, Generic[State, Action]):
             set_idx = 1
         elif current_player == Player.CHANCE:
             value = 0.0
-            best = sum  # type: ignore[assignment]
+            best = cast("Callable[[float, float], float]", sum)
         else:
             raise ValueError(f"Unexpected player type {current_player!r}")
 

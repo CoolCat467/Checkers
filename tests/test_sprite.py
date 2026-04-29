@@ -1,10 +1,11 @@
 from __future__ import annotations
 
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import pytest
 import trio
 from libcomponent.component import Event
+from pygame.mask import Mask
 from pygame.rect import Rect
 from pygame.surface import Surface
 
@@ -118,6 +119,18 @@ def test_sprite_image_set_location_change(sprite: Sprite) -> None:
     assert sprite.location == (100, 100)
 
 
+def test_sprite_selected_invisible(sprite: Sprite) -> None:
+    assert not sprite.visible
+    sprite.rect.size = (100, 100)
+    assert not sprite.is_selected((20, 20))
+
+
+def test_sprite_selected(sprite: Sprite) -> None:
+    sprite.visible = True
+    sprite.rect.size = (100, 100)
+    assert sprite.is_selected((20, 20))
+
+
 def test_image_component_init(image_component: ImageComponent) -> None:
     assert image_component.mask_threshold == 127
 
@@ -126,6 +139,40 @@ def test_image_component_add_image(image_component: ImageComponent) -> None:
     image = Surface((10, 10))
     image_component.add_image("test_image", image)
     assert "test_image" in image_component.list_images()
+
+
+def test_image_component_add_images(image_component: ImageComponent) -> None:
+    image = Surface((10, 10))
+    image_component.add_images({"test_image": image})
+    assert "test_image" in image_component.list_images()
+
+
+def test_image_component_get_image_fail(
+    image_component: ImageComponent,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=r'^No image saved for identifier "test_image"$',
+    ):
+        image_component.get_image("test_image")
+
+
+def test_image_component_get_mask_fail(
+    image_component: ImageComponent,
+) -> None:
+    with pytest.raises(
+        ValueError,
+        match=r'^No mask saved for identifier "test_mask"$',
+    ):
+        image_component.get_mask("test_mask")
+
+
+def test_image_component_get_mask_success(
+    image_component: ImageComponent,
+) -> None:
+    image = Surface((10, 10))
+    image_component.add_image("test_image", image)
+    assert isinstance(image_component.get_mask("test_image"), Mask)
 
 
 def test_image_component_add_image_and_mask_invalid_image(
@@ -172,6 +219,30 @@ def test_image_component_add_image_duplication(
     image_component.add_image("test_image", image)
     image_component.add_image("duplicate", "test_image")
     assert image_component.get_image("duplicate") is image
+
+
+def test_image_component_get_duplicate_mask(
+    image_component: ImageComponent,
+) -> None:
+    image = Surface((1, 1))
+    image_component.add_image("test_image", image)
+    image_component.add_image("duplicate", "test_image")
+    assert isinstance(image_component.get_mask("duplicate"), Mask)
+
+
+def test_image_component_set_image_affects_sprite(
+    image_component: ImageComponent,
+) -> None:
+    image = Surface((1, 1))
+    sprite = cast("Sprite", image_component.manager.get_component("sprite"))
+    image_component.add_image("test_image", image)
+    assert sprite.image is None
+    image_component.set_image("test_image")
+    if TYPE_CHECKING:
+        sprite.image = image
+    assert sprite.image is image
+    image_component.set_image("test_image")
+    assert sprite.image is image
 
 
 def test_movement_component_init(

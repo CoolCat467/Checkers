@@ -99,13 +99,9 @@ class Sprite(ComponentManager, WeakDirtySprite):
         """Set rect center from tuple of integers."""
         self.rect.center = value
 
-    def __set_location(self, value: tuple[int, int]) -> None:
-        """Set rect center from tuple of integers."""
-        self._set_location(value)
-
     location = property(
         __get_location,
-        __set_location,
+        _set_location,
         doc="Location (Center of image)",
     )
 
@@ -253,7 +249,7 @@ class ImageComponent(ComponentManager):
         while True:
             if not self.image_exists(identifier):
                 raise ValueError(
-                    f'No image saved for identifier "{identifier}"',
+                    f'No mask saved for identifier "{identifier}"',
                 )
             mask = self.__masks[identifier]
             if isinstance(mask, Mask):
@@ -573,13 +569,14 @@ class TargetingComponent(Component):
             return
 
         to_destination = self.to_destination()
-        travel_distance = min(
-            to_destination @ to_destination,
-            movement.speed * time_passed,
-        )
+        travel_distance = movement.speed * time_passed
 
         if travel_distance > 0:
-            movement.move_heading_distance(travel_distance)
+            dest_magnitude = to_destination.magnitude()
+            if travel_distance > dest_magnitude:
+                sprite.location = self.destination
+            else:
+                movement.move_heading_distance(travel_distance)
         # Fix imprecision
         self.update_heading()
         await trio.lowlevel.checkpoint()
@@ -785,12 +782,12 @@ class GroupProcessor(AsyncStateMachine):
         for group_id in tuple(self.groups):
             self.remove_group(group_id)
 
-    def __del__(self) -> None:
+    def __del__(self) -> None:  # pragma: nocover
         """Clear groups."""
         self.clear_groups()
 
 
-def convert_pygame_event(event: PygameEvent) -> Event[Any]:
+def convert_pygame_event(event: PygameEvent) -> Event[Any]:  # pragma: nocover
     """Convert Pygame Event to Component Event."""
     # data = event.dict
     # data['type_int'] = event.type
