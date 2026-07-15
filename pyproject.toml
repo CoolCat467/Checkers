@@ -78,7 +78,7 @@ packages = ["src/checkers", "src/checkers_computer_players"]
 [tool.hatch.build.targets.wheel.hooks.mypyc]
 dependencies = [
     "hatch-mypyc>=0.16.0",
-    "mypy>=1.20.2",
+    "mypy>=2.1.0",
 ]
 require-runtime-dependencies = true
 include = [
