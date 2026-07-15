@@ -3,6 +3,7 @@ Graphical Checkers Game with AI support
 
 <!-- BADGIE TIME -->
 
+[![pre-commit.ci status](https://results.pre-commit.ci/badge/github/CoolCat467/Checkers/main.svg)](https://results.pre-commit.ci/latest/github/CoolCat467/Checkers/main)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit)](https://github.com/pre-commit/pre-commit)
 
 <!-- END BADGIE TIME -->
