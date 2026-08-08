@@ -125,6 +125,14 @@ async def test_async_state_machine_add() -> None:
         assert bob.machine is not None
 
 
+class ToBob(AsyncState[AsyncStateMachine]):
+    __slots__ = ()
+
+    async def check_conditions(self) -> str:
+        await super().check_conditions()
+        return "bob"
+
+
 @pytest.mark.trio
 async def test_async_state_machine_think() -> None:
     machine = AsyncStateMachine()
@@ -144,13 +152,6 @@ async def test_async_state_machine_think() -> None:
     with pytest.raises(KeyError, match="not found in internal states"):
         await machine.set_state("bob")
     machine.add_state(AsyncState("bob"))
-
-    class ToBob(AsyncState[AsyncStateMachine]):
-        __slots__ = ()
-
-        async def check_conditions(self) -> str:
-            await super().check_conditions()
-            return "bob"
 
     machine.add_state(ToBob("tom"))
     await machine.set_state("tom")

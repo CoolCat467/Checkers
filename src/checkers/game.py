@@ -54,6 +54,7 @@ from pygame.rect import Rect
 
 from checkers import base2d, element_list, objects, sprite
 from checkers.client import GameClient, read_advertisements
+from checkers.multi_inherit import ConnectionElement, ReturnElement
 from checkers.network_shared import DEFAULT_PORT, Pos
 from checkers.objects import Button, OutlinedText
 from checkers.server import GameServer
@@ -108,15 +109,6 @@ WHITE: Final = (255, 255, 255)
 
 
 T = TypeVar("T")
-
-if globals().get("__file__") is None:
-    import importlib
-
-    __file__ = str(
-        Path(importlib.import_module("checkers.data").__path__[0]).parent
-        / "game.py",
-    )
-
 DATA_FOLDER: Final = Path(__file__).absolute().parent / "data"
 
 
@@ -136,13 +128,13 @@ def render_text(
 class Piece(sprite.Sprite):
     """Piece Sprite."""
 
-    __slots__ = (
-        "board_position",
-        "destination_tiles",
-        "piece_type",
-        "position_name",
-        "selected",
-    )
+    ##    __slots__ = (
+    ##        "board_position",
+    ##        "destination_tiles",
+    ##        "piece_type",
+    ##        "position_name",
+    ##        "selected",
+    ##    )
 
     def __init__(
         self,
@@ -286,7 +278,7 @@ class Piece(sprite.Sprite):
 class Tile(sprite.Sprite):
     """Outlined tile sprite - Only exists for selecting destination."""
 
-    __slots__ = ("board_position", "color")
+    # __slots__ = ("board_position", "color")
 
     def __init__(
         self,
@@ -383,14 +375,14 @@ def play_sound(
 class GameBoard(sprite.Sprite):
     """Entity that stores data about the game board and renders it."""
 
-    __slots__ = (
-        "animation_queue",
-        "board_size",
-        "pieces",
-        "processing_animations",
-        "tile_size",
-        "tile_surfs",
-    )
+    ##    __slots__ = (
+    ##        "animation_queue",
+    ##        "board_size",
+    ##        "pieces",
+    ##        "processing_animations",
+    ##        "tile_size",
+    ##        "tile_surfs",
+    ##    )
 
     # Define Tile Color Map and Piece Map
     # tile_color_map = (BLACK, RED)
@@ -695,7 +687,7 @@ class GameBoard(sprite.Sprite):
             else:
                 image.add_image_and_mask(name, surface, "tile_0")
 
-            if index % 2 != 0:
+            if index & 1 != 0:
                 continue
 
             outline_color = GREEN
@@ -716,7 +708,7 @@ class GameBoard(sprite.Sprite):
                 color,
             )
 
-            if piece_type % 2 == 0:
+            if piece_type & 1 == 0:
                 image.add_image(name, surface)
             else:
                 image.add_image_and_mask(
@@ -816,7 +808,7 @@ class GameBoard(sprite.Sprite):
 class ClickDestinationComponent(Component):
     """Component that will use targeting to go to wherever you click on the screen."""
 
-    __slots__ = ("selected",)
+    # __slots__ = ("selected",)
     outline = pygame.color.Color(255, 220, 0)
 
     def __init__(self) -> None:
@@ -1018,7 +1010,7 @@ class HaltState(AsyncState["CheckersClient"]):
 class GameState(AsyncState["CheckersClient"]):
     """Checkers Game Asynchronous State base class."""
 
-    __slots__ = ("id", "manager")
+    # __slots__ = ("id", "manager")
 
     def __init__(self, name: str) -> None:
         """Initialize Game State."""
@@ -1228,7 +1220,7 @@ class TitleState(GameState):
 class PlayHostingState(AsyncState["CheckersClient"]):
     """Start running server."""
 
-    __slots__ = ("address",)
+    # __slots__ = ("address",)
 
     internal_server = False
 
@@ -1275,65 +1267,10 @@ class PlayInternalHostingState(PlayHostingState):
     internal_server = True
 
 
-class ReturnElement(element_list.Element, objects.Button):
-    """Connection list return to title element sprite."""
-
-    __slots__ = ()
-
-    def __init__(self, name: str, font: pygame.font.Font) -> None:
-        """Initialize return element."""
-        super().__init__(name, font)
-
-        self.border_width = 4
-        self.outline = RED
-        self.text = "Return to Title"
-        self.visible = True
-        self.location = (SCREEN_SIZE[0] // 2, self.rect.center[1] + 10)
-        self.update_location_on_resize = True
-
-    async def handle_click(
-        self,
-        _: Event[sprite.PygameMouseButtonEventData],
-    ) -> None:
-        """Handle Click Event."""
-        await self.raise_event(
-            Event("return_to_title", None, 2),
-        )
-
-
-class ConnectionElement(element_list.Element, objects.Button):
-    """Connection list element sprite."""
-
-    __slots__ = ()
-
-    def __init__(
-        self,
-        name: tuple[str, int],
-        font: pygame.font.Font,
-        motd: str,
-    ) -> None:
-        """Initialize connection element."""
-        super().__init__(name, font)
-
-        self.text = f"[{name[0]}:{name[1]}]\n{motd}"
-        self.visible = True
-        self.update_location_on_resize = True
-
-    async def handle_click(
-        self,
-        _: Event[sprite.PygameMouseButtonEventData],
-    ) -> None:
-        """Handle Click Event."""
-        details = self.name
-        await self.raise_event(
-            Event("join_server", details, 2),
-        )
-
-
 class PlayJoiningState(GameState):
     """Start running client."""
 
-    __slots__ = ("font",)
+    # __slots__ = ("font",)
 
     def __init__(self) -> None:
         """Initialize Joining State."""
@@ -1365,6 +1302,8 @@ class PlayJoiningState(GameState):
             30,
         )
         return_button = ReturnElement("return_button", return_font)
+        return_button.outline = RED
+        return_button.location = (SCREEN_SIZE[0] // 2, 30)
         connections.add_element(return_button)
 
         self.manager.register_handlers(
@@ -1440,7 +1379,7 @@ class PlayJoiningState(GameState):
 class PlayState(GameState):
     """Game Play State."""
 
-    __slots__ = ("exit_data",)
+    # __slots__ = ("exit_data",)
 
     def __init__(self) -> None:
         """Initialize Play State."""
@@ -1579,7 +1518,7 @@ class PlayState(GameState):
 class CheckersClient(sprite.GroupProcessor):
     """Checkers Game Client."""
 
-    __slots__ = ("manager",)
+    # __slots__ = ("manager",)
 
     def __init__(self, manager: ExternalRaiseManager) -> None:
         """Initialize Checkers Client."""

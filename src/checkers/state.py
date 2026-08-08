@@ -34,15 +34,19 @@ from typing import (
     TypeVar,
 )
 
-from mypy_extensions import u8
+from mypy_extensions import i16, u8
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Generator, Iterable
 
     from typing_extensions import Self
 
-MANDATORY_CAPTURE = True  # If a jump is available, do you have to or not?
-PAWN_JUMP_FORWARD_ONLY = True  # Pawns not allowed to go backwards in jumps?
+MANDATORY_CAPTURE: Final = (
+    True  # If a jump is available, do you have to or not?
+)
+PAWN_JUMP_FORWARD_ONLY: Final = (
+    True  # Pawns not allowed to go backwards in jumps?
+)
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
@@ -84,13 +88,15 @@ class ActionSet(NamedTuple):
 def get_sides(xy: Pos) -> tuple[Pos, Pos, Pos, Pos]:
     """Return the tile xy coordinates on the top left, top right, bottom left, and bottom right sides of given xy coordinates."""
     cx, cy = xy
-    sides = []
+    cx_i16 = i16(cx)
+    cy_i16 = i16(cy)
+    sides: list[Pos] = []
     for raw_dy in range(2):
-        dy = (raw_dy << 1) - 1
-        ny = cy + dy
+        dy: i16 = (raw_dy << 1) - 1
+        ny: u8 = u8(cy_i16 + dy)
         for raw_dx in range(2):
             dx = (raw_dx << 1) - 1
-            nx = cx + dx
+            nx = u8(cx_i16 + dx)
             sides.append((nx, ny))
     tuple_sides = tuple(sides)
     assert len(tuple_sides) == 4
@@ -133,8 +139,8 @@ def get_sides_pawn(xy: Pos, piece_type: u8) -> tuple[Pos, Pos]:
 class State:
     """Represents state of checkers game."""
 
-    size: tuple[int, int]
-    pieces: dict[Pos, int]
+    size: tuple[u8, u8]
+    pieces: dict[Pos, u8]
     turn: bool = True  # Black moves first
 
     def __str__(self) -> str:
@@ -145,7 +151,7 @@ class State:
         for y in range(h):
             line = []
             for x in range(w):
-                if not (x + y) & 1:
+                if (x + y) & 1 == 0:
                     # line.append("_")
                     line.append("░░")
                     continue
@@ -172,7 +178,7 @@ class State:
         ends.update(moves)
         return ActionSet(jumps, moves, ends)
 
-    def piece_kinged(self, piece_pos: Pos, new_type: int) -> None:
+    def piece_kinged(self, piece_pos: Pos, new_type: u8) -> None:
         """Piece kinged."""
         # print(f'piece_kinged {piece = }')
 
@@ -234,7 +240,7 @@ class State:
             not self.turn,
         )
 
-    def get_tile_name(self, x: int, y: int) -> str:
+    def get_tile_name(self, x: u8, y: u8) -> str:
         """Return name of a given tile."""
         return chr(65 + x) + str(self.size[1] - y)
 
@@ -248,37 +254,42 @@ class State:
         w, h = self.size
         return x >= 0 and y >= 0 and x < w and y < h
 
-    def does_piece_king(self, piece_type: int, position: Pos) -> bool:
+    def does_piece_king(self, piece_type: u8, position: Pos) -> bool:
         """Return if piece needs to be kinged given it's type and position."""
         _, y = position
         _, h = self.size
         return (piece_type == 0 and y == 0) or (piece_type == 1 and y == h - 1)
 
     @staticmethod
-    def get_enemy(self_type: int) -> int:
+    def get_enemy(self_type: u8) -> u8:
         """Return enemy pawn piece type."""
         # If we are kinged, get a pawn version of ourselves.
         # Take that plus one mod 2 to get the pawn of the enemy
-        return (self_type + 1) % 2
+        return (self_type + 1) & 1
 
     @staticmethod
-    def get_piece_types(self_type: int) -> tuple[int, int]:
+    def get_piece_types(self_type: u8) -> tuple[u8, u8]:
         """Return piece types of given piece type."""
         # If we are kinged, get a pawn version of ourselves.
-        self_type %= 2
-        return (self_type, self_type + 2)
+        self_pawn = self_type & 1
+        return (self_pawn, self_pawn + 2)
 
     def get_jumps(
         self,
         position: Pos,
+        piece_type: u8 | None = None,
+        _pieces: dict[Pos, u8] | None = None,
+        _recursion: u8 = 0,
     ) -> dict[Pos, list[Pos]]:
         """Return valid jumps a piece can make using an iterative approach.
 
         position is a xy coordinate tuple pointing to a board position
             that may or may not have a piece on it.
+        piece_type is the piece type at position. If not
+            given, position must point to a tile with a piece on it
 
-        Returns dictionary that maps end positions to jumped pieces to
-        get there
+        Returns dictionary that maps end positions to
+        jumped pieces to get there
         """
         # Initial setup
         piece_type = self.pieces[position]
@@ -309,6 +320,37 @@ class State:
             else:
                 valid_sides = tuple(enumerate(sides))
 
+        # For each end point tile in the list of end point tiles,
+        for end_tile in tuple(valid):
+            # Get the dictionary from the jumps you could make
+            # from that end tile
+            w, h = self.size
+            next_recursion = _recursion + 1
+            if next_recursion > math.ceil((w**2 + h**2) ** 0.25):
+                break
+            # If the piece has made it to the opposite side,
+            piece_type_copy = piece_type
+            if self.does_piece_king(piece_type_copy, end_tile):
+                # King that piece
+                piece_type_copy += 2
+                next_recursion = 0
+            add_valid = self.get_jumps(
+                end_tile,
+                piece_type_copy,
+                _pieces=_pieces,
+                _recursion=next_recursion,
+            )
+            # For each key in the new dictionary of valid tile's keys,
+            for end_pos, jumped_pieces in add_valid.items():
+                # If the key is not already existent in the list of
+                # valid destinations,
+                if end_pos not in valid:
+                    # Add that destination to the dictionary and every
+                    # tile you have to jump to get there.
+                    no_duplicates = [
+                        p for p in jumped_pieces if p not in valid[end_tile]
+                    ]
+                    valid[end_pos] = valid[end_tile] + no_duplicates
             # Explore each possible jump direction
             for direction, side in valid_sides:
                 # Validate side tile
@@ -380,7 +422,7 @@ class State:
         for end in calculate_ends(position):
             yield Action(position, end)
 
-    def get_all_actions(self, player: int) -> Generator[Action, None, None]:
+    def get_all_actions(self, player: u8) -> Generator[Action, None, None]:
         """Yield all actions for given player."""
         player_pieces = self.get_piece_types(player)
 
@@ -406,7 +448,7 @@ class State:
             for position in player_positions:
                 yield from self.wrap_actions(position, self.get_moves)
 
-    def check_for_win(self) -> int | None:
+    def check_for_win(self) -> u8 | None:
         """Return player number if they won else None."""
         # For each of the two players,
         for player in range(2):
@@ -422,25 +464,25 @@ class State:
                 return self.get_enemy(player)
         return None
 
-    def can_player_select_piece(self, player: int, tile_pos: Pos) -> bool:
+    def can_player_select_piece(self, player: u8, tile_pos: Pos) -> bool:
         """Return True if player can select piece on given tile position."""
         piece_at_pos = self.pieces.get(tile_pos)
         if piece_at_pos is None:
             return False
-        return (piece_at_pos % 2) == player
+        return (piece_at_pos & 1) == player
 
-    def get_pieces(self) -> tuple[tuple[Pos, int], ...]:
+    def get_pieces(self) -> tuple[tuple[Pos, u8], ...]:
         """Return all pieces."""
         return tuple((pos, type_) for pos, type_ in self.pieces.items())
 
 
 def generate_pieces(
-    board_width: int,
-    board_height: int,
-    colors: int = 2,
-) -> dict[Pos, int]:
+    board_width: u8,
+    board_height: u8,
+    colors: u8 = 2,
+) -> dict[Pos, u8]:
     """Generate data about each piece."""
-    pieces: dict[Pos, int] = {}
+    pieces: dict[Pos, u8] = {}
     # Get where pieces should be placed
     row_size = math.ceil(board_height / 3)
     opposite_row_start = board_height - row_size
@@ -451,10 +493,10 @@ def generate_pieces(
             # Get the color of that spot by adding x and y mod the number of different colors
             color = (x + y + 1) % colors
             # If a piece should be placed on that tile and the tile is not Red,
-            if (not color) and (
+            if (color == 0) and (
                 (y <= row_size - 1) or (y >= opposite_row_start)
             ):
                 # Set the piece to White Pawn or Black Pawn depending on the current y pos
-                piece_type = int(y <= row_size)
+                piece_type = u8(y <= row_size)
                 pieces[x, y] = piece_type
     return pieces
