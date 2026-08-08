@@ -60,7 +60,7 @@ checkers_game_minimax_ai_client = "checkers_computer_players.minimax_ai:run"
 
 [project.optional-dependencies]
 tests = [
-    "pytest>=9.0.3",
+    "pytest>=9.1.0",
     "pytest-cov>=7.1.0",
     "pytest-trio>=0.8.0",
     "coverage>=7.13.5",
