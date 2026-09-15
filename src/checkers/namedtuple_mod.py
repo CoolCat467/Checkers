@@ -4,7 +4,10 @@ from __future__ import annotations
 
 import typing
 
+import mypy_extensions
 
+
+@mypy_extensions.mypyc_attr(native_class=False)
 class NamedTupleMeta(type):
     """NamedTuple Metaclass."""
 
@@ -62,13 +65,13 @@ class NamedTupleMeta(type):
         return nm_tpl
 
 
-def apply_namedtuple_mod() -> None:  # pragma: nocover
-    """Allow NamedTuple to subclass things other than just NamedTuple or Generic."""
-    typing.NamedTupleMeta = NamedTupleMeta  # type: ignore[attr-defined]
-    typing._NamedTuple = type.__new__(NamedTupleMeta, "NamedTuple", (), {})  # type: ignore[attr-defined]
-
-    def _namedtuple_mro_entries(bases: tuple[type, ...]) -> tuple[type, ...]:
-        assert typing.NamedTuple in bases
-        return (typing._NamedTuple,)  # type: ignore[attr-defined]
-
-    typing.NamedTuple.__mro_entries__ = _namedtuple_mro_entries  # type: ignore[attr-defined]
+# def apply_namedtuple_mod() -> None:  # pragma: nocover
+#     """Allow NamedTuple to subclass things other than just NamedTuple or Generic."""
+#     typing.NamedTupleMeta = NamedTupleMeta  # type: ignore[attr-defined]
+#     typing._NamedTuple = type.__new__(NamedTupleMeta, "NamedTuple", (), {})  # type: ignore[attr-defined]
+#
+#     def _namedtuple_mro_entries(bases: tuple[type, ...]) -> tuple[type, ...]:
+#         assert typing.NamedTuple in bases
+#         return (typing._NamedTuple,)  # type: ignore[attr-defined]
+#
+#     typing.NamedTuple.__mro_entries__ = _namedtuple_mro_entries  # type: ignore[attr-defined]
