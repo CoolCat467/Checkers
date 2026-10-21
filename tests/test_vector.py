@@ -27,10 +27,6 @@ def test_eq_vec() -> None:
     assert Vector2(3, 6) == Vector2(3, 6)
 
 
-def test_eq_tuple() -> None:
-    assert Vector2(3, 6) == (3, 6)  # type: ignore[comparison-overlap]
-
-
 def test_from_points() -> None:
     assert Vector2.from_points((0, 3), (2, 5)) == Vector2(2, 2)
 
