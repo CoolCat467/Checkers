@@ -116,7 +116,7 @@ class WeakDirtySprite(WeakSprite, DirtySprite):
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
-    __slots__ = ("__image", "__rect", "mask", "update_location_on_resize")
+    # __slots__ = ("__image", "__rect", "mask", "update_location_on_resize")
 
     def __init__(self, name: object) -> None:
         """Initialize with name."""
