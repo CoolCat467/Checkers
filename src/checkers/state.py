@@ -41,12 +41,10 @@ if TYPE_CHECKING:
 
     from typing_extensions import Self
 
-MANDATORY_CAPTURE: Final = (
-    True  # If a jump is available, do you have to or not?
-)
-PAWN_JUMP_FORWARD_ONLY: Final = (
-    True  # Pawns not allowed to go backwards in jumps?
-)
+# If a jump is available, do you have to or not?
+MANDATORY_CAPTURE: Final = True
+# Pawns not allowed to go backwards in jumps?
+PAWN_JUMP_FORWARD_ONLY: Final = True
 
 # Note: Tile Ids are chess board tile titles, A1 to H8
 # A8 ... H8
