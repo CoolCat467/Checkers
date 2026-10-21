@@ -5,7 +5,7 @@
 from __future__ import annotations
 
 # Vector - Vector module for various applications.
-# Copyright (C) 2024  CoolCat467
+# Copyright (C) 2024-2026  CoolCat467
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -23,42 +23,26 @@ from __future__ import annotations
 __title__ = "Vector Module"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
-__version__ = "2.0.1"
+__version__ = "2.0.2"
 
 import math
 import sys
+from dataclasses import astuple, dataclass
 from typing import (
     TYPE_CHECKING,
-    ClassVar,
+    cast,
 )
-
-from checkers.namedtuple_mod import NamedTupleMeta
 
 if TYPE_CHECKING:
     from collections.abc import Generator, Iterable, Iterator
 
+    from _typeshed import DataclassInstance
     from typing_extensions import Self
 
-# As a forward to the madness below, we are doing something incredibly sneeky.
-# We have BaseVector, which we want to have all of the shared functionality
-# of all Vector subclasses. We also want each Vector class to be a NamedTuple
-# so we can let Python handle storing data in the most efficient way and
-# make Vectors immutable.
-#
-# Problem is, we can't have Vector classes be
-# subclasses of both NamedTuple and BaseVector, because mypy says
-# `NamedTuple should be a single base  [misc]`, and at runtime the typing module
-# stops us with `TypeError: can only inherit from a NamedTuple type and Generic`
-# So the question becomes, how does NamedTuple work anyways? Can we
-# duplicate its functionality? Turns out it's not as simple as it seems.
-# NamedTuples are not actually real classes. They are fake classes that under
-# the hood use a metaclass called NamedTupleMeta to create the real namedtuple
-# from collections.abc.
-#
-# So my solution was to override NamedTupleMeta with my own version
-# without the runtime check, and that works great. Problem is, type checkers
-# don't think you are allowed to subclass more than NamedTuple and Generic,
-# so we have do do a bit of a hack to avoid that as well.
+# We used to do the coolest hack here allowing us to use a NamedTuple
+# and subclass BaseVector at the same time, but then the typing module
+# had updates to the way it works internally and I don't want to try to
+# have
 
 
 class BaseVector:
@@ -66,22 +50,21 @@ class BaseVector:
 
     __slots__ = ()
 
-    if TYPE_CHECKING:
-        # Because of type hacks later on, pretend we have
-        # the same things NamedTuple does
-        _field_defaults: ClassVar[dict[str, float]]
-        _fields: ClassVar[tuple[str, ...]]
+    def _astuple(self) -> tuple[float, ...]:
+        """Return self as a tuple."""
+        return astuple(cast("DataclassInstance", self))
 
-        # D105 is 'Missing docstring in magic method', but this is to handle
-        # typing issues
-        def __iter__(self) -> Iterator[float]: ...  # noqa: D105
-        def __getitem__(self, value: int) -> float: ...  # noqa: D105
-        def __len__(self) -> int: ...  # noqa: D105
-        def _asdict(self) -> dict[str, float]: ...
-        def _replace(self, /, **kwds: int | float) -> Self: ...
-        def __getnewargs__(self) -> tuple[float, ...]: ...  # noqa: D105
-        @classmethod
-        def _make(cls, iterable: Iterable[float]) -> Self: ...
+    def __iter__(self) -> Iterator[float]:
+        """Return iterator over self."""
+        return iter(self._astuple())
+
+    def __len__(self) -> int:
+        """Return length of self."""
+        return len(self._astuple())
+
+    def __getitem__(self, index: int) -> float:
+        """Return value at given index."""
+        return self._astuple()[index]
 
     @classmethod
     def from_iter(cls: type[Self], iterable: Iterable[float]) -> Self:
@@ -138,6 +121,8 @@ class BaseVector:
         scalar: float,
     ) -> Self:
         """Return result of multiplying self components by rhs scalar."""
+        if not isinstance(scalar, (int, float, complex)):
+            return NotImplemented
         return self.from_iter(c * scalar for c in self)
 
     # Make sure to override right multiply, otherwise tuple's __rmul__
@@ -229,30 +214,12 @@ class BaseVector:
         return self.from_iter(max(min(c, max_value), min_value) for c in self)
 
 
-# Trick type checker into thinking VectorBase is just a BaseVector alias
-if TYPE_CHECKING:
-    VectorBase = BaseVector
-else:
-    # In reality, it's a NamedTuple metaclass
-    VectorBase = type.__new__(
-        NamedTupleMeta,
-        "VectorBase",
-        (BaseVector, tuple),
-        {"__slots__": ()},
-    )
-
-
-class Vector2(VectorBase):
+@dataclass(frozen=True, slots=True)
+class Vector2(BaseVector):
     """Vector2 Object. Takes an x and a y coordinate."""
 
     x: float
     y: float
-
-    if TYPE_CHECKING:
-        # Because type checking does not recognize that BaseVector is
-        # really NamedTupleMeta with extra strings attached, type checkers
-        # do not realize __init__ method is already set up.
-        def __init__(self, x: float, y: float) -> None: ...  # noqa: D107
 
     @classmethod
     def from_radians(
@@ -311,21 +278,13 @@ def project_v_onto_w(vec_v: Vector2, vec_w: Vector2) -> Vector2:
     return vec_w * scalar
 
 
-class Vector3(VectorBase):
+@dataclass(frozen=True, slots=True)
+class Vector3(BaseVector):
     """Vector3 Object. Takes an x, y, and z coordinate."""
 
     x: float
     y: float
     z: float
-
-    if TYPE_CHECKING:
-
-        def __init__(  # noqa: D107
-            self,
-            x: float,
-            y: float,
-            z: float,
-        ) -> None: ...
 
     def cross(
         self: Self,
@@ -370,23 +329,14 @@ class Vector3(VectorBase):
         return (v1 * a + v2 * b).normalized()
 
 
-class Vector4(VectorBase):
+@dataclass(frozen=True, slots=True)
+class Vector4(BaseVector):
     """Vector4, Aka quaternion. Takes an x, y, z, and w coordinate."""
 
     x: float
     y: float
     z: float
     w: float
-
-    if TYPE_CHECKING:
-
-        def __init__(  # noqa: D107
-            self,
-            x: float,
-            y: float,
-            z: float,
-            w: float,
-        ) -> None: ...
 
     def slerp(self: Self, other: Iterable[float], t: float) -> Self:
         """Return spherical linear interpolation between this quaternion and another quaternion."""
