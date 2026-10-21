@@ -24,22 +24,39 @@ __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
 __version__ = "0.0.0"
 
-from typing import TYPE_CHECKING, Any, ClassVar, NamedTuple, TypedDict, cast
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    NamedTuple,
+    TypedDict,
+    cast,
+    override,
+)
+from weakref import WeakKeyDictionary
 
 import trio
 from libcomponent.component import Component, ComponentManager, Event
 from pygame.color import Color
 from pygame.event import Event as PygameEvent, event_name
 from pygame.mask import Mask, from_surface as mask_from_surface
-from pygame.rect import Rect
-from pygame.sprite import LayeredDirty, LayeredUpdates, WeakDirtySprite
+from pygame.rect import FRect, Rect
+from pygame.sprite import (
+    AbstractGroup,
+    DirtySprite,
+    LayeredDirty,
+    LayeredUpdates,
+    Sprite as PygameSprite,
+)
 from pygame.surface import Surface
 
 from checkers.statemachine import AsyncStateMachine
 from checkers.vector import Vector2
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Iterable, Iterator, Mapping
+
+    from typing_extensions import Self
 
 
 class TickEventData(NamedTuple):
@@ -70,10 +87,36 @@ class PygameMouseMotion(PygameMouseEventData):
     buttons: tuple[int, int, int]
 
 
+class WeakSprite(PygameSprite):
+    """A subclass of Sprite that references its Groups weakly.
+
+    This means that any group this belongs to that is not referenced
+    anywhere else is garbage collected automatically.
+    """
+
+    __slots__ = ()
+
+    def __init__(self, *groups: AbstractGroup[Self]) -> None:
+        """Initialize weak sprite."""
+        super().__init__(*groups)
+        self.__dict__["_Sprite__g"] = WeakKeyDictionary(
+            self.__dict__["_Sprite__g"],
+        )
+
+
+class WeakDirtySprite(WeakSprite, DirtySprite):
+    """A subclass of WeakSprite and DirtySprite.
+
+    Combines the benefits of both classes.
+    """
+
+    __slots__ = ()
+
+
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
-    # __slots__ = ("__image", "mask", "rect", "update_location_on_resize")
+    # __slots__ = ("__image", "__rect", "mask", "update_location_on_resize")
 
     def __init__(self, name: object) -> None:
         """Initialize with name."""
@@ -81,15 +124,29 @@ class Sprite(ComponentManager, WeakDirtySprite):
         WeakDirtySprite.__init__(self)
 
         self.__image: Surface | None = None
+        self.__rect: Rect = Rect(0, 0, 0, 0)
+        self.dirty = 0
         self.visible = False
         self.mask: Mask | None = None
-        self.rect: Rect = Rect(0, 0, 0, 0)
 
         self.update_location_on_resize = False
 
+    @property  # type: ignore[mutable-override]
+    @override
+    def rect(self) -> Rect:
+        """Rect representing area on screen."""
+        return self.__rect
+
+    @rect.setter
+    def rect(self, value: Rect) -> None:
+        """Update rect to new object."""
+        assert self.__rect is not None
+        self.__rect = value
+
     def __repr__(self) -> str:
         """Return representation of self."""
-        return f"<{self.__class__.__name__} Sprite {self.list_components()}>"
+        super_repr = WeakDirtySprite.__repr__(self)[:-1]
+        return f"{super_repr} {self.list_components()}>"
 
     def __get_location(self) -> Vector2:
         """Return rect center as new Vector2."""
@@ -219,7 +276,10 @@ class ImageComponent(ComponentManager):
             mask = surface
         self.add_image_and_mask(identifier, surface, mask)
 
-    def add_images(self, images: dict[int | str, Surface | int | str]) -> None:
+    def add_images(
+        self,
+        images: Mapping[int | str, Surface | int | str],
+    ) -> None:
         """Add images to internal database."""
         for ident, surf in images.items():
             self.add_image(ident, surf)
@@ -485,7 +545,7 @@ class MovementComponent(Component):
         """Move distance in heading direction."""
         sprite = cast("Sprite", self.get_component("sprite"))
         change = self.heading * distance
-        if change.dot(change) > 0:
+        if change:
             sprite.location += change
             sprite.dirty = 1
 
@@ -765,14 +825,14 @@ class GroupProcessor(AsyncStateMachine):
             del self.group_names[named]
         return None
 
-    def draw(self, screen: Surface) -> list[Rect]:
+    def draw(self, screen: Surface) -> list[Rect | FRect]:
         """Draw all groups."""
         rects = []
         for group in self.groups.values():
             rects.extend(group.draw(screen))
         return rects
 
-    def repaint_rect(self, screen_rect: Rect) -> None:
+    def repaint_rect(self, screen_rect: Rect | FRect) -> None:
         """Repaint rect for all groups."""
         for group in self.groups.values():
             group.repaint_rect(screen_rect)

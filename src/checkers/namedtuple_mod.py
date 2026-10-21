@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import typing
 
+import _typing
 import mypy_extensions
 
 
@@ -24,15 +25,51 @@ class NamedTupleMeta(type):
             tuple if base is typing._NamedTuple else base  # type: ignore[attr-defined]
             for base in bases
         )
-        for base in bases:
-            if tuple not in base.__mro__:
-                continue
-            break
+        if "__annotations__" in ns:
+            types = ns["__annotations__"]
+            field_names = list(types)
+            annotate = typing._make_eager_annotate(types)  # type: ignore[attr-defined]
+        elif (
+            original_annotate
+            := typing._lazy_annotationlib.get_annotate_from_class_namespace(ns)  # type: ignore[attr-defined]
+        ) is not None:
+            types = typing._lazy_annotationlib.call_annotate_function(  # type: ignore[attr-defined]
+                original_annotate,
+                typing._lazy_annotationlib.Format.FORWARDREF,  # type: ignore[attr-defined]
+            )
+            field_names = list(types)
+
+            # For backward compatibility, type-check all the types at creation time
+            for typ in types.values():
+                typing._type_check(typ, "field annotation must be a type")  # type: ignore[attr-defined]
+
+            def annotate(
+                format_: typing._lazy_annotationlib.Format,  # type: ignore[name-defined]
+            ) -> dict[str, type]:
+                annos = typing._lazy_annotationlib.call_annotate_function(  # type: ignore[attr-defined]
+                    original_annotate,
+                    format_,
+                )
+                if format_ != typing._lazy_annotationlib.Format.STRING:  # type: ignore[attr-defined]
+                    return {
+                        key: typing._type_check(  # type: ignore[attr-defined]
+                            val,
+                            f"field {key} annotation must be a type",
+                        )
+                        for key, val in annos.items()
+                    }
+                return annos  # type: ignore[no-any-return]
         else:
-            raise ValueError("must subclass tuple somewhere in bases")
-        types = ns.get("__annotations__", {})
+            # Empty NamedTuple
+            field_names = []
+
+            def annotate(
+                format_: typing._lazy_annotationlib.Format,  # type: ignore[name-defined]
+            ) -> dict[str, type]:
+                return {}
+
         default_names = []
-        for field_name in types:
+        for field_name in field_names:
             if field_name in ns:
                 default_names.append(field_name)
             elif default_names:
@@ -44,22 +81,38 @@ class NamedTupleMeta(type):
                 )
         nm_tpl = typing._make_nmtuple(  # type: ignore[attr-defined]
             typename,
-            types.items(),
+            field_names,
+            annotate,
             defaults=[ns[n] for n in default_names],
             module=ns["__module__"],
         )
         nm_tpl.__bases__ = bases
         if typing.Generic in bases:
-            class_getitem = typing._generic_class_getitem  # type: ignore[attr-defined]
+            class_getitem = _typing.Generic_class_getitem
             nm_tpl.__class_getitem__ = classmethod(class_getitem)
         # update from user namespace without overriding special namedtuple attributes
-        for key in ns:
+        for key, val in ns.items():
             if key in typing._prohibited:  # type: ignore[attr-defined]
                 raise AttributeError(
                     "Cannot overwrite NamedTuple attribute " + key,
                 )
-            if key not in typing._special and key not in nm_tpl._fields:  # type: ignore[attr-defined]
-                setattr(nm_tpl, key, ns[key])
+            if key not in typing._special:  # type: ignore[attr-defined]
+                if key not in nm_tpl._fields:
+                    setattr(nm_tpl, key, val)
+                try:
+                    set_name = type(val).__set_name__
+                except AttributeError:
+                    pass
+                else:
+                    try:
+                        set_name(val, nm_tpl, key)
+                    except BaseException as e:
+                        e.add_note(
+                            f"Error calling __set_name__ on {type(val).__name__!r} "
+                            f"instance {key!r} in {typename!r}",
+                        )
+                        raise
+
         if typing.Generic in bases:
             nm_tpl.__init_subclass__()
         return nm_tpl
