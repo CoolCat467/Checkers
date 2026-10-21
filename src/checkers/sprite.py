@@ -787,7 +787,9 @@ class GroupProcessor(AsyncStateMachine):
         self.clear_groups()
 
 
-def convert_pygame_event(event: PygameEvent) -> Event[Any]:  # pragma: nocover
+def convert_pygame_event(
+    event: PygameEvent,
+) -> Event[dict[str, Any]]:  # pragma: nocover
     """Convert Pygame Event to Component Event."""
     # data = event.dict
     # data['type_int'] = event.type
