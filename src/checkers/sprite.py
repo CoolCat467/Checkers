@@ -22,7 +22,6 @@ from __future__ import annotations
 __title__ = "Client Sprite"
 __author__ = "CoolCat467"
 __license__ = "GNU General Public License Version 3"
-__version__ = "0.0.0"
 
 from typing import (
     TYPE_CHECKING,
@@ -31,7 +30,6 @@ from typing import (
     NamedTuple,
     TypedDict,
     cast,
-    override,
 )
 from weakref import WeakKeyDictionary
 
@@ -50,14 +48,13 @@ from pygame.sprite import (
     Sprite as PygameSprite,
 )
 from pygame.surface import Surface
+from typing_extensions import Self, override
 
 from checkers.statemachine import AsyncStateMachine
 from checkers.vector import Vector2
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator, Mapping
-
-    from typing_extensions import Self
 
 
 class TickEventData(NamedTuple):
