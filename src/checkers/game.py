@@ -50,7 +50,7 @@ from libcomponent.component import (
 from libcomponent.network_utils import find_ip
 from pygame.color import Color
 from pygame.locals import K_ESCAPE, KEYUP, QUIT, WINDOWRESIZED
-from pygame.rect import Rect
+from pygame.rect import FRect, Rect
 
 from checkers import base2d, element_list, objects, sprite
 from checkers.client import GameClient, read_advertisements
@@ -1613,7 +1613,7 @@ async def async_run() -> None:
     global SCREEN_SIZE
 
     # Set up the screen
-    screen = pygame.display.set_mode(SCREEN_SIZE, 0, 16, vsync=VSYNC)
+    screen = pygame.display.set_mode(SCREEN_SIZE, 0, vsync=VSYNC)
     pygame.display.set_caption(f"{__title__} v{__version__}")
     pygame.key.set_repeat(1000, 30)
     screen.fill((0xFF, 0xFF, 0xFF))
@@ -1668,6 +1668,7 @@ async def async_run() -> None:
                 ),
             )
 
+            rects: list[Rect | FRect]
             if resized_window:
                 resized_window = False
                 screen.fill((0xFF, 0xFF, 0xFF))
