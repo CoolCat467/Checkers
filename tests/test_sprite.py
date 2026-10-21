@@ -84,7 +84,7 @@ def test_sprite_location(sprite: Sprite) -> None:
 
 
 def test_sprite_repr(sprite: Sprite) -> None:
-    assert repr(sprite) == "<Sprite Sprite ('sprite',)>"
+    assert repr(sprite) == "<Sprite DirtySprite(in 0 groups) ('sprite',)>"
 
 
 def test_sprite_image(sprite: Sprite) -> None:
@@ -109,14 +109,14 @@ def test_sprite_image_no_set_location_change(sprite: Sprite) -> None:
     sprite.update_location_on_resize = False
     sprite.location = (100, 100)
     sprite.image = Surface((50, 25))
-    assert sprite.location == (125, 112)
+    assert sprite.location == Vector2(125, 112)
 
 
 def test_sprite_image_set_location_change(sprite: Sprite) -> None:
     sprite.update_location_on_resize = True
     sprite.location = (100, 100)
     sprite.image = Surface((50, 25))
-    assert sprite.location == (100, 100)
+    assert sprite.location == Vector2(100, 100)
 
 
 def test_sprite_selected_invisible(sprite: Sprite) -> None:
@@ -293,7 +293,7 @@ async def test_targeting_component_move_destination_time(
     targeting_component: TargetingComponent,
 ) -> None:
     movement_component = targeting_component.get_component("movement")
-    movement_component.speed = 1
+    movement_component.speed = 100
     targeting_component.destination = Vector2(10, 20)
     current_distance = targeting_component.to_destination().magnitude()
     await targeting_component.move_destination_time(1)

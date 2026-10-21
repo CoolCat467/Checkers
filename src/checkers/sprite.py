@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-# Copyright (C) 2023  CoolCat467
+# Copyright (C) 2023-2026  CoolCat467
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -37,6 +37,7 @@ from weakref import WeakKeyDictionary
 
 import trio
 from libcomponent.component import Component, ComponentManager, Event
+from mypy_extensions import mypyc_attr, trait
 from pygame.color import Color
 from pygame.event import Event as PygameEvent, event_name
 from pygame.mask import Mask, from_surface as mask_from_surface
@@ -87,6 +88,7 @@ class PygameMouseMotion(PygameMouseEventData):
     buttons: tuple[int, int, int]
 
 
+@mypyc_attr(native_class=False)
 class WeakSprite(PygameSprite):
     """A subclass of Sprite that references its Groups weakly.
 
@@ -94,7 +96,7 @@ class WeakSprite(PygameSprite):
     anywhere else is garbage collected automatically.
     """
 
-    __slots__ = ()
+    # __slots__ = ()
 
     def __init__(self, *groups: AbstractGroup[Self]) -> None:
         """Initialize weak sprite."""
@@ -110,9 +112,10 @@ class WeakDirtySprite(WeakSprite, DirtySprite):
     Combines the benefits of both classes.
     """
 
-    __slots__ = ()
+    # __slots__ = ()
 
 
+@trait
 class Sprite(ComponentManager, WeakDirtySprite):
     """Client sprite component."""
 
@@ -219,6 +222,9 @@ class ImageComponent(ComponentManager):
     Requires Component:
         Sprite
 
+    Uses Events:
+        tick: Event[TickEventData]
+
     Attributes
     ----------
         mask_threshold: Threshold value used in pygame.mask.from_surface
@@ -229,7 +235,7 @@ class ImageComponent(ComponentManager):
 
     def __init__(self) -> None:
         """Initialize image component."""
-        super().__init__("image")
+        super().__init__("image", "image")
 
         self.__surfaces: dict[int | str, Surface | int | str] = {}
         self.__masks: dict[int | str, Mask | int | str] = {}
@@ -318,14 +324,16 @@ class ImageComponent(ComponentManager):
 
     def set_image(self, identifier: int | str) -> None:
         """Set sprite component's image by identifier."""
-        outline = cast("OutlineComponent", self.get_component("outline"))
+        outline = self.get_component("outline")
+        assert isinstance(outline, OutlineComponent)
         if outline.active and outline.mod not in str(identifier):
             identifier = outline.get_outline(identifier)
 
         if identifier == self.set_surface:
             return
 
-        sprite = cast("Sprite", self.manager.get_component("sprite"))
+        sprite = self.manager.get_component("sprite")
+        assert isinstance(sprite, Sprite)
         sprite.image = self.get_image(identifier)
         sprite.mask = self.get_mask(identifier)
 
@@ -335,7 +343,7 @@ class ImageComponent(ComponentManager):
 class OutlineComponent(Component):
     """Add outline to sprite.
 
-    Requires Manager:
+    Requires Component:
         ImageComponent
 
     Attributes
@@ -364,22 +372,24 @@ class OutlineComponent(Component):
 
     def set_color(self, color: Color | None) -> None:
         """Set color. If None, disable, otherwise enable."""
-        manager = cast("ImageComponent", self.manager)
+        image = self.get_component("image")
+        assert isinstance(image, ImageComponent)
+
         prev = self.active
         self.__active = color is not None
         if color is None:
             if prev:
-                search = str(manager.set_surface).split(self.mod)[0]
-                for term in manager.list_images():
+                search = str(image.set_surface).split(self.mod)[0]
+                for term in image.list_images():
                     if term == search or str(term) == search:
                         break
                 else:
                     return
-                manager.set_image(term)
+                image.set_image(term)
             return
         self.__color = color
-        assert manager.set_surface is not None
-        manager.set_image(manager.set_surface)
+        assert image.set_surface is not None
+        image.set_image(image.set_surface)
 
     def get_outline_descriptor(self, identifier: str | int) -> str:
         """Return outlined identifier for given original identifier."""
@@ -388,13 +398,14 @@ class OutlineComponent(Component):
 
     def save_outline(self, identifier: str | int) -> None:
         """Save outlined version of given identifier image."""
-        manager = cast("ImageComponent", self.manager)
+        image = self.get_component("image")
+        assert isinstance(image, ImageComponent)
 
         outlined = self.get_outline_descriptor(identifier)
-        if manager.image_exists(outlined):
+        if image.image_exists(outlined):
             return
 
-        surface = manager.get_image(identifier)
+        surface = image.get_image(identifier)
 
         w, h = surface.get_size()
 
@@ -411,14 +422,14 @@ class OutlineComponent(Component):
         surf.fill(Color(0, 0, 0, 0))
 
         surf.lock()
-        for ox, oy in manager.get_mask(identifier).outline():
+        for ox, oy in image.get_mask(identifier).outline():
             for x in range(diameter + 1):
                 for y in range(diameter + 1):
                     surf.set_at((ox + x, oy + y), self.__color)
         surf.unlock()
         surf.blit(surface, (radius, radius))
 
-        manager.add_image(outlined, surf)
+        image.add_image(outlined, surf)
 
     def get_outline(self, identifier: str | int) -> str:
         """Return saved outline effect identifier."""
@@ -441,23 +452,27 @@ class OutlineComponent(Component):
         color: Color | tuple[int, int, int],
     ) -> None:
         """Precalculate all images outlined."""
-        manager = cast("ImageComponent", self.manager)
+        image_component = self.get_component("image")
+        assert isinstance(image_component, ImageComponent)
 
-        for image in manager.list_images():
+        for image in image_component.list_images():
             self.precalculate_outline(image, color)
 
 
 class AnimationComponent(Component):
     """Allows sprite texture to be animated.
 
-    Requires Manager:
+    Requires Component:
         ImageComponent
+
+    Uses Events:
+        tick: Event[TickEventData]
 
     self.controller is an Iterator that yields
     either None or the name of a state in self.states
 
     update_every is float of how many seconds controller
-    should be queried after. If zero, every tick.
+    should be queried after. If zero, every tick event.
     """
 
     __slots__ = ("controller", "update_every", "update_mod")
@@ -466,18 +481,17 @@ class AnimationComponent(Component):
         """Initialize with changing image to same image every second."""
         super().__init__("animation")
 
-        def default() -> Iterator[int | str | None]:
-            manager = cast("ImageComponent", self.manager)
-            while True:
-                yield manager.set_surface
-
-        self.controller: Iterator[int | str | None] = default()
+        self.controller: Iterator[int | str | None] | None = None
 
         self.update_every: float = 1.0
         self.update_mod: float = 0.0
 
     def fetch_controller_new_state(self) -> int | str | None:
         """Ask controller for new state."""
+        if self.controller is None:
+            image = self.get_component("image")
+            assert isinstance(image, ImageComponent)
+            return image.set_surface
         return next(self.controller)
 
     async def tick(self, tick_event: Event[TickEventData]) -> None:
@@ -496,8 +510,9 @@ class AnimationComponent(Component):
             for _ in range(int(updates)):
                 new = self.fetch_controller_new_state()
         if new is not None:
-            manager = cast("ImageComponent", self.manager)
-            manager.set_image(new)
+            image = self.get_component("image")
+            assert isinstance(image, ImageComponent)
+            image.set_image(new)
 
     def bind_handlers(self) -> None:
         """Bind tick handler."""
@@ -535,7 +550,8 @@ class MovementComponent(Component):
 
     def point_toward(self, position: Iterable[int | float]) -> None:
         """Change self.heading to point toward a given position."""
-        sprite = cast("Sprite", self.get_component("sprite"))
+        sprite = self.get_component("sprite")
+        assert isinstance(sprite, Sprite)
         self.heading = Vector2.from_points(
             sprite.location,
             position,
@@ -543,9 +559,10 @@ class MovementComponent(Component):
 
     def move_heading_distance(self, distance: float) -> None:
         """Move distance in heading direction."""
-        sprite = cast("Sprite", self.get_component("sprite"))
+        sprite = self.get_component("sprite")
+        assert isinstance(sprite, Sprite)
         change = self.heading * distance
-        if change:
+        if change.dot(change) > 0:
             sprite.location += change
             sprite.dirty = 1
 
